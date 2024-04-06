@@ -14,7 +14,7 @@ namespace ModularClimateWeatherSystems
         private bool GUIEnabled = false;
 
         //if developer mode is enabled, a modified green logo will replace the normal white Logo.
-        internal static string LogoPath => Utils.DevMode ? "MCWS/PluginData/MCWS_Debug" : "MCWS/PluginData/MCWS_Logo";
+        internal static string LogoPath => Utils.DevMode ? "ModularClimateWeatherSystems/PluginData/MCWS_Debug" : "ModularClimateWeatherSystems/PluginData/MCWS_Logo";
         internal const string modNAME = "MCWS";
         internal const string modID = "MCWS_NS";
 
