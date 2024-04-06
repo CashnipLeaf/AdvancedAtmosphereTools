@@ -407,13 +407,9 @@ namespace ModularClimateWeatherSystems
             {
                 throw new InvalidOperationException("Cannot register data with MCWS during the Flight scene.");
             }
-            if (!double.IsFinite(step))
+            if (!double.IsFinite(step) || step <= 0.0)
             {
-                throw new NotFiniteNumberException("A non-finite timestep was entered.");
-            }
-            if (step <= 0.0)
-            {
-                throw new ArgumentOutOfRangeException("Timesteps less than or equal to zero are not permitted.");
+                throw new ArgumentOutOfRangeException("Timestep argument was non-finite or less than or equal to zero.");
             }
             if (externalbodydata == null)
             {
@@ -432,14 +428,14 @@ namespace ModularClimateWeatherSystems
             }
             if (!double.IsFinite(time) || time < 0.0)
             {
-                throw new ArgumentOutOfRangeException("Argument 'time' was non-finite or less than 0.0.");
+                throw new ArgumentOutOfRangeException("Time argument was non-finite or less than 0.0.");
             }
         }
         private static void CheckPosition(double lon, double lat, double alt)
         {
             if (!double.IsFinite(alt))
             {
-                throw new ArgumentException("Altitude argument was non-finite.");
+                throw new ArgumentOutOfRangeException("Altitude argument was non-finite.");
             }
             if (!double.IsFinite(lon) || lon > 180.0 || lon < -180.0)
             {
