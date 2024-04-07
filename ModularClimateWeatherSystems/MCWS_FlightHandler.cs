@@ -48,8 +48,8 @@ namespace ModularClimateWeatherSystems
             get => temperature;
             private set => temperature = UtilMath.Clamp(value, PhysicsGlobals.SpaceTemperature, float.MaxValue);
         }
-        internal double[][][] temperaturedata1;
-        internal double[][][] temperaturedata2;
+        internal float[][][] temperaturedata1;
+        internal float[][][] temperaturedata2;
 
         internal bool HasPress { get; private set; } = false;
         internal string PressureSource { get; private set; } = "None";
@@ -59,8 +59,8 @@ namespace ModularClimateWeatherSystems
             get => pressure;
             private set => pressure = UtilMath.Clamp(value, 0.0, float.MaxValue);
         }
-        internal double[][][] pressuredata1;
-        internal double[][][] pressuredata2;
+        internal float[][][] pressuredata1;
+        internal float[][][] pressuredata2;
 
         public MCWS_FlightHandler()
         {
@@ -254,14 +254,14 @@ namespace ModularClimateWeatherSystems
                         int topz = Utils.Clamp(bottomz + 1, 0, temperaturedata1[0][0].Length - 1);
 
                         //Bilinearly interpolate on the longitude and latitude axes
-                        double BottomPlane1 = Utils.BiLerp(temperaturedata1[leftx][bottomy][bottomz], temperaturedata1[rightx][bottomy][bottomz], temperaturedata1[leftx][topy][bottomz], temperaturedata1[rightx][topy][bottomz], lerpx, lerpy);
-                        double TopPlane1 = Utils.BiLerp(temperaturedata1[leftx][bottomy][topz], temperaturedata1[rightx][bottomy][topz], temperaturedata1[leftx][topy][topz], temperaturedata1[rightx][topy][topz], lerpx, lerpy);
+                        float BottomPlane1 = Utils.BiLerp(temperaturedata1[leftx][bottomy][bottomz], temperaturedata1[rightx][bottomy][bottomz], temperaturedata1[leftx][topy][bottomz], temperaturedata1[rightx][topy][bottomz], (float)lerpx, (float)lerpy);
+                        float TopPlane1 = Utils.BiLerp(temperaturedata1[leftx][bottomy][topz], temperaturedata1[rightx][bottomy][topz], temperaturedata1[leftx][topy][topz], temperaturedata1[rightx][topy][topz], (float)lerpx, (float)lerpy);
 
-                        double BottomPlane2 = Utils.BiLerp(temperaturedata2[leftx][bottomy][bottomz], temperaturedata2[rightx][bottomy][bottomz], temperaturedata2[leftx][topy][bottomz], temperaturedata2[rightx][topy][bottomz], lerpx, lerpy);
-                        double TopPlane2 = Utils.BiLerp(temperaturedata2[leftx][bottomy][topz], temperaturedata2[rightx][bottomy][topz], temperaturedata2[leftx][topy][topz], temperaturedata2[rightx][topy][topz], lerpx, lerpy);
+                        float BottomPlane2 = Utils.BiLerp(temperaturedata2[leftx][bottomy][bottomz], temperaturedata2[rightx][bottomy][bottomz], temperaturedata2[leftx][topy][bottomz], temperaturedata2[rightx][topy][bottomz], (float)lerpx, (float)lerpy);
+                        float TopPlane2 = Utils.BiLerp(temperaturedata2[leftx][bottomy][topz], temperaturedata2[rightx][bottomy][topz], temperaturedata2[leftx][topy][topz], temperaturedata2[rightx][topy][topz], (float)lerpx, (float)lerpy);
 
                         //Bilinearly interpolate on the altitude and time axes
-                        double Final = Utils.BiLerp(BottomPlane1, TopPlane1, BottomPlane2, TopPlane2, lerpz, lerpt);
+                        double Final = Utils.BiLerp((double)BottomPlane1, (double)TopPlane1, (double)BottomPlane2, (double)TopPlane2, lerpz, lerpt);
                         Temperature = double.IsFinite(Final) ? Final : throw new NotFiniteNumberException();
                     }
                     catch (Exception ex) //fallback data
@@ -296,15 +296,15 @@ namespace ModularClimateWeatherSystems
                         int topz = Utils.Clamp(bottomz + 1, 0, pressuredata1[0][0].Length - 1);
 
                         //Bilinearly interpolate on the longitude and latitude axes
-                        double BottomPlane1 = Utils.BiLerp(pressuredata1[leftx][bottomy][bottomz], pressuredata1[rightx][bottomy][bottomz], pressuredata1[leftx][topy][bottomz], pressuredata1[rightx][topy][bottomz], lerpx, lerpy);
-                        double TopPlane1 = Utils.BiLerp(pressuredata1[leftx][bottomy][topz], pressuredata1[rightx][bottomy][topz], pressuredata1[leftx][topy][topz], pressuredata1[rightx][topy][topz], lerpx, lerpy);
+                        float BottomPlane1 = Utils.BiLerp(pressuredata1[leftx][bottomy][bottomz], pressuredata1[rightx][bottomy][bottomz], pressuredata1[leftx][topy][bottomz], pressuredata1[rightx][topy][bottomz], (float)lerpx, (float)lerpy);
+                        float TopPlane1 = Utils.BiLerp(pressuredata1[leftx][bottomy][topz], pressuredata1[rightx][bottomy][topz], pressuredata1[leftx][topy][topz], pressuredata1[rightx][topy][topz], (float)lerpx, (float)lerpy);
 
-                        double BottomPlane2 = Utils.BiLerp(pressuredata2[leftx][bottomy][bottomz], pressuredata2[rightx][bottomy][bottomz], pressuredata2[leftx][topy][bottomz], pressuredata2[rightx][topy][bottomz], lerpx, lerpy);
-                        double TopPlane2 = Utils.BiLerp(pressuredata2[leftx][bottomy][topz], pressuredata2[rightx][bottomy][topz], pressuredata2[leftx][topy][topz], pressuredata2[rightx][topy][topz], lerpx, lerpy);
+                        float BottomPlane2 = Utils.BiLerp(pressuredata2[leftx][bottomy][bottomz], pressuredata2[rightx][bottomy][bottomz], pressuredata2[leftx][topy][bottomz], pressuredata2[rightx][topy][bottomz], (float)lerpx, (float)lerpy);
+                        float TopPlane2 = Utils.BiLerp(pressuredata2[leftx][bottomy][topz], pressuredata2[rightx][bottomy][topz], pressuredata2[leftx][topy][topz], pressuredata2[rightx][topy][topz], (float)lerpx, (float)lerpy);
 
                         //Linearly interpolate on the time axis
-                        double BottomPlaneFinal = UtilMath.Lerp(BottomPlane1, BottomPlane2, lerpt);
-                        double TopPlaneFinal = UtilMath.Lerp(TopPlane1, TopPlane2, lerpt);
+                        double BottomPlaneFinal = UtilMath.Lerp((double)BottomPlane1, (double)BottomPlane2, lerpt);
+                        double TopPlaneFinal = UtilMath.Lerp((double)TopPlane1, (double)TopPlane2, lerpt);
 
                         //Exponentially interpolate on the altitude axis
                         double Final = Utils.InterpolatePressure(BottomPlaneFinal, TopPlaneFinal, lerpz);

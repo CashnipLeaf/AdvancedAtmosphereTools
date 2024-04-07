@@ -50,6 +50,10 @@ namespace ModularClimateWeatherSystems
         {
             return UtilMath.Lerp(UtilMath.Lerp(first1, second1, by1), UtilMath.Lerp(first2, second2, by1), by2);
         }
+        internal static float BiLerp(float first1, float second1, float first2, float second2, float by1, float by2)
+        {
+            return Mathf.Lerp(Mathf.Lerp(first1, second1, by1), Mathf.Lerp(first2, second2, by1), by2);
+        }
         internal static Vector3 BiLerpVector(Vector3 first1, Vector3 second1, Vector3 first2, Vector3 second2, float by1, float by2)
         {
             return Vector3.Lerp(Vector3.Lerp(first1, second1, by1), Vector3.Lerp(first2, second2, by1), by2);

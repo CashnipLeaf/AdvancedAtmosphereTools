@@ -5,7 +5,7 @@ using UnityEngine;
 namespace ModularClimateWeatherSystems
 {
     using GlobalWindDelegate = Func<string, double, Vector3[][][]>; //body, time, global wind data (return value)
-    using GlobalPropertyDelegate = Func<string, double, double[][][]>; //body, time, global property data (return value)
+    using GlobalPropertyDelegate = Func<string, double, float[][][]>; //body, time, global property data (return value)
     
     //API for interfacing with this mod.
     public static class MCWS_API
@@ -53,7 +53,7 @@ namespace ModularClimateWeatherSystems
             {
                 ToRegister("Temperature", name, body, step);
                 //Sample some data to verify that the returned array is of the correct format
-                double[][][] checkdata = dlg.Invoke(body, 0.0);
+                float[][][] checkdata = dlg.Invoke(body, 0.0);
                 if (checkdata != null && checkdata[0] != null && checkdata[0][0] != null)
                 {
                     if (checkdata.Length >= 2 && checkdata[0].Length >= 2 && checkdata[0][0].Length >= 2 && checkdata.Length % 2 == 0 && checkdata[0].Length % 2 == 0)
@@ -82,7 +82,7 @@ namespace ModularClimateWeatherSystems
             {
                 ToRegister("Pressure", name, body, step);
                 //Sample some data to verify that the returned array is of the correct format
-                double[][][] checkdata = dlg.Invoke(body, 0.0);
+                float[][][] checkdata = dlg.Invoke(body, 0.0);
                 if (checkdata != null && checkdata[0] != null && checkdata[0][0] != null)
                 {
                     if (checkdata.Length >= 2 && checkdata[0].Length >= 2 && checkdata[0][0].Length >= 2 && checkdata.Length % 2 == 0 && checkdata[0].Length % 2 == 0)
@@ -137,8 +137,8 @@ namespace ModularClimateWeatherSystems
 
         //functions with less overhead for internal use
         internal static Vector3[][][] FetchGlobalWindData(string body, double time) => BodyExists(body) ? externalbodydata[body].GetWind(time) : null;
-        internal static double[][][] FetchGlobalTemperatureData(string body, double time) => BodyExists(body) ? externalbodydata[body].GetTemperature(time) : null;
-        internal static double[][][] FetchGlobalPressureData(string body, double time) => BodyExists(body) ? externalbodydata[body].GetPressure(time) : null;
+        internal static float[][][] FetchGlobalTemperatureData(string body, double time) => BodyExists(body) ? externalbodydata[body].GetTemperature(time) : null;
+        internal static float[][][] FetchGlobalPressureData(string body, double time) => BodyExists(body) ? externalbodydata[body].GetPressure(time) : null;
 
         //-------------BODY DATA CLASS------------------
         internal class BodyData
@@ -199,10 +199,10 @@ namespace ModularClimateWeatherSystems
             internal Vector3[][][] GetWind(double time) => HasWind ? winddlg.Invoke(Body, time) : null;
 
             internal bool HasTemperature => !string.IsNullOrEmpty(tempsource) && temper != null && double.IsFinite(TemperatureTimeStep);
-            internal double[][][] GetTemperature(double time) => HasTemperature ? temper.Invoke(Body, time) : null;
+            internal float[][][] GetTemperature(double time) => HasTemperature ? temper.Invoke(Body, time) : null;
 
             internal bool HasPressure => !string.IsNullOrEmpty(presssource) && pressure != null && double.IsFinite(PressureTimeStep);
-            internal double[][][] GetPressure(double time) => HasPressure ? pressure.Invoke(Body, time) : null;
+            internal float[][][] GetPressure(double time) => HasPressure ? pressure.Invoke(Body, time) : null;
         }
 
         //-------------GET DATA FROM MCWS----------------
@@ -221,12 +221,12 @@ namespace ModularClimateWeatherSystems
             double timelerp = CanGetData ? UtilMath.Clamp01((Instance.CurrentTime % Instance.Windtimestep) / Instance.Windtimestep) : throw new InvalidOperationException(NotFlightScene);
             return timelerp > 0.5 ? Instance.winddata2 : Instance.winddata1;
         }
-        public static double[][][] GetCurrentTemperatureData()
+        public static float[][][] GetCurrentTemperatureData()
         {
             double timelerp = CanGetData ? UtilMath.Clamp01((Instance.CurrentTime % Instance.Temptimestep) / Instance.Temptimestep) : throw new InvalidOperationException(NotFlightScene);
             return timelerp > 0.5 ? Instance.temperaturedata2 : Instance.temperaturedata1;
         }
-        public static double[][][] GetCurrentPressureData()
+        public static float[][][] GetCurrentPressureData()
         {
             double timelerp = CanGetData ? UtilMath.Clamp01((Instance.CurrentTime % Instance.Presstimestep) / Instance.Presstimestep) : throw new InvalidOperationException(NotFlightScene);
             return timelerp > 0.5 ? Instance.pressuredata2 : Instance.pressuredata1;
@@ -247,7 +247,7 @@ namespace ModularClimateWeatherSystems
             }
             return null;
         }
-        public static double[][][] GetGlobalTemperatureData(string body, double time)
+        public static float[][][] GetGlobalTemperatureData(string body, double time)
         {
             CheckInputs(body, time);
             try
@@ -261,7 +261,7 @@ namespace ModularClimateWeatherSystems
             }
             return null;
         }
-        public static double[][][] GetGlobalPressureData(string body, double time)
+        public static float[][][] GetGlobalPressureData(string body, double time)
         {
             CheckInputs(body, time);
             try
@@ -319,7 +319,7 @@ namespace ModularClimateWeatherSystems
         public static double GetPointTemperatureData(string body, double lon, double lat, double alt, double time)
         {
             CheckPosition(lon, lat, alt);
-            double[][][] temperaturedata = GetGlobalTemperatureData(body, time);
+            float[][][] temperaturedata = GetGlobalTemperatureData(body, time);
             CelestialBody bod = FlightGlobals.GetBodyByName(body);
             bool validbody = bod != null && bod.atmosphere && alt <= bod.atmosphereDepth;
             try
@@ -343,10 +343,10 @@ namespace ModularClimateWeatherSystems
                     int bottomz = Utils.Clamp((int)Math.Truncate(mapz), 0, temperaturedata[0][0].Length - 2);
                     int topz = Utils.Clamp(bottomz + 1, 0, temperaturedata[0][0].Length - 1);
 
-                    double BottomPlane = Utils.BiLerp(temperaturedata[leftx][bottomy][bottomz], temperaturedata[rightx][bottomy][bottomz], temperaturedata[leftx][topy][bottomz], temperaturedata[rightx][topy][bottomz], lerpx, lerpy);
-                    double TopPlane = Utils.BiLerp(temperaturedata[leftx][bottomy][topz], temperaturedata[rightx][bottomy][topz], temperaturedata[leftx][topy][topz], temperaturedata[rightx][topy][topz], lerpx, lerpy);
+                    float BottomPlane = Utils.BiLerp(temperaturedata[leftx][bottomy][bottomz], temperaturedata[rightx][bottomy][bottomz], temperaturedata[leftx][topy][bottomz], temperaturedata[rightx][topy][bottomz], (float)lerpx, (float)lerpy);
+                    float TopPlane = Utils.BiLerp(temperaturedata[leftx][bottomy][topz], temperaturedata[rightx][bottomy][topz], temperaturedata[leftx][topy][topz], temperaturedata[rightx][topy][topz], (float)lerpx, (float)lerpy);
 
-                    double Final = UtilMath.Lerp(BottomPlane, TopPlane, lerpz);
+                    double Final = UtilMath.Lerp((double)BottomPlane, (double)TopPlane, lerpz);
                     return double.IsFinite(Final) ? Final : throw new NotFiniteNumberException();
                 }
             }
@@ -359,7 +359,7 @@ namespace ModularClimateWeatherSystems
         public static double GetPointPressureData(string body, double lon, double lat, double alt, double time)
         {
             CheckPosition(lon, lat, alt);
-            double[][][] pressuredata = GetGlobalPressureData(body, time);
+            float[][][] pressuredata = GetGlobalPressureData(body, time);
             CelestialBody bod = FlightGlobals.GetBodyByName(body);
             bool validbody = bod != null && bod.atmosphere && alt <= bod.atmosphereDepth;
             try
@@ -383,10 +383,10 @@ namespace ModularClimateWeatherSystems
                     int bottomz = Utils.Clamp((int)Math.Truncate(mapz), 0, pressuredata[0][0].Length - 2);
                     int topz = Utils.Clamp(bottomz + 1, 0, pressuredata[0][0].Length - 1);
 
-                    double BottomPlane = Utils.BiLerp(pressuredata[leftx][bottomy][bottomz], pressuredata[rightx][bottomy][bottomz], pressuredata[leftx][topy][bottomz], pressuredata[rightx][topy][bottomz], lerpx, lerpy);
-                    double TopPlane = Utils.BiLerp(pressuredata[leftx][bottomy][topz], pressuredata[rightx][bottomy][topz], pressuredata[leftx][topy][topz], pressuredata[rightx][topy][topz], lerpx, lerpy);
+                    float BottomPlane = Utils.BiLerp(pressuredata[leftx][bottomy][bottomz], pressuredata[rightx][bottomy][bottomz], pressuredata[leftx][topy][bottomz], pressuredata[rightx][topy][bottomz], (float)lerpx, (float)lerpy);
+                    float TopPlane = Utils.BiLerp(pressuredata[leftx][bottomy][topz], pressuredata[rightx][bottomy][topz], pressuredata[leftx][topy][topz], pressuredata[rightx][topy][topz], (float)lerpx, (float)lerpy);
 
-                    double Final = Utils.InterpolatePressure(BottomPlane, TopPlane, lerpz);
+                    double Final = Utils.InterpolatePressure((double)BottomPlane, (double)TopPlane, lerpz);
                     return double.IsFinite(Final) ? Final : throw new NotFiniteNumberException();
                 }
             }
