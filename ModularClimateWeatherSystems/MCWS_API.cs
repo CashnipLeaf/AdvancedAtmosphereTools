@@ -12,7 +12,7 @@ namespace ModularClimateWeatherSystems
         private static Dictionary<string, BodyData> externalbodydata;
 
         //--------------------------REGISTER EXTERNAL DATA--------------------------
-        public static bool RegisterTimestepWindData(string body, GlobalPropertyDelegate dlgX, GlobalPropertyDelegate dlgY, GlobalPropertyDelegate dlgZ, string name, double step)
+        public static bool RegisterTimestepWindData(string body, GlobalPropertyDelegate dlgX, GlobalPropertyDelegate dlgY, GlobalPropertyDelegate dlgZ, string name, bool scaleLog, double step)
         {
             if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(body) || dlgX == null || dlgY == null || dlgZ == null)
             {
@@ -30,39 +30,24 @@ namespace ModularClimateWeatherSystems
                 {
                     if(!CheckArraySizes(checkdataX, checkdataY, checkdataZ))
                     {
-                        throw new DataMisalignedException("Returned Wind data arrays are not of identical dimensions.");
+                        throw new FormatException("The three returned Wind data arrays are not of identical dimensions.");
                     }
-                    if (checkdataX.GetUpperBound(0) >= 1 && checkdataX.GetUpperBound(1) >= 1 && checkdataX.GetUpperBound(2) >= 1 && checkdataX.GetUpperBound(0) % 2 == 1 && checkdataX.GetUpperBound(1) % 2 == 1)
+                    if (checkdataX.GetUpperBound(0) >= 1 && checkdataX.GetUpperBound(1) >= 1 && checkdataX.GetUpperBound(2) >= 1 && checkdataX.GetUpperBound(1) % 2 == 1 && checkdataX.GetUpperBound(2) % 2 == 1)
                     {
-                        externalbodydata[body].SetWindFunc(name, dlgX, dlgY,dlgZ, step);
+                        externalbodydata[body].SetWindFunc(name, dlgX, dlgY,dlgZ, scaleLog, step);
                         SuccessfulRegistration("Wind", name, body);
                         return true;
                     }
                     FormatError("Wind");
                 }
-                throw new NullReferenceException("One or more of the returned Wind data arrays was null.");
+                throw new ArgumentNullException("One or more of the returned Wind data arrays was null.");
             }
             CannotRegister("Wind", name, body);
             return false;
         }
-        public static bool RegisterWindData(string body, GlobalPropertyDelegate dlgx, GlobalPropertyDelegate dlgy, GlobalPropertyDelegate dlgz, string name) => RegisterTimestepWindData(body, dlgx,dlgy,dlgz, name, DEFAULTINTERVAL);
+        public static bool RegisterWindData(string body, GlobalPropertyDelegate dlgx, GlobalPropertyDelegate dlgy, GlobalPropertyDelegate dlgz, string name, bool scaleLog) => RegisterTimestepWindData(body, dlgx,dlgy,dlgz, name, scaleLog, DEFAULTINTERVAL);
 
-        private static bool CheckArraySizes(float[,,] arr1, float[,,] arr2, float[,,] arr3)
-        {
-            if(arr1.GetUpperBound(0) == arr2.GetUpperBound(0) && arr1.GetUpperBound(0) == arr3.GetUpperBound(0) && arr2.GetUpperBound(0) == arr3.GetUpperBound(0))
-            {
-                if (arr1.GetUpperBound(1) == arr2.GetUpperBound(1) && arr1.GetUpperBound(1) == arr3.GetUpperBound(1) && arr2.GetUpperBound(1) == arr3.GetUpperBound(1))
-                {
-                    if (arr1.GetUpperBound(2) == arr2.GetUpperBound(2) && arr1.GetUpperBound(2) == arr3.GetUpperBound(2) && arr2.GetUpperBound(2) == arr3.GetUpperBound(2))
-                    {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-
-        public static bool RegisterTimestepTemperatureData(string body, GlobalPropertyDelegate dlg, string name, double step)
+        public static bool RegisterTimestepTemperatureData(string body, GlobalPropertyDelegate dlg, string name, bool scaleLog, double step)
         {
             if(string.IsNullOrEmpty(name) || string.IsNullOrEmpty(body) || dlg == null)
             {
@@ -76,9 +61,9 @@ namespace ModularClimateWeatherSystems
                 float[,,] checkdata = dlg.Invoke(body, 0.0);
                 if (checkdata != null)
                 {
-                    if (checkdata.GetUpperBound(0) >= 1 && checkdata.GetUpperBound(1) >= 1 && checkdata.GetUpperBound(2) >= 1 && checkdata.GetUpperBound(0) % 2 == 1 && checkdata.GetUpperBound(1) % 2 == 1)
+                    if (checkdata.GetUpperBound(0) >= 1 && checkdata.GetUpperBound(1) >= 1 && checkdata.GetUpperBound(2) >= 1 && checkdata.GetUpperBound(1) % 2 == 1 && checkdata.GetUpperBound(2) % 2 == 1)
                     {
-                        externalbodydata[body].SetTemperatureFunc(name, dlg, step);
+                        externalbodydata[body].SetTemperatureFunc(name, dlg, scaleLog, step);
                         SuccessfulRegistration("Temperature", name, body);
                         return true;
                     }
@@ -89,9 +74,9 @@ namespace ModularClimateWeatherSystems
             CannotRegister("Temperature", name, body);
             return false;
         }
-        public static bool RegisterTemperatureData(string body, GlobalPropertyDelegate dlg, string name) => RegisterTimestepTemperatureData(body, dlg, name, DEFAULTINTERVAL);
+        public static bool RegisterTemperatureData(string body, GlobalPropertyDelegate dlg, string name, bool scaleLog) => RegisterTimestepTemperatureData(body, dlg, name, scaleLog, DEFAULTINTERVAL);
 
-        public static bool RegisterTimestepPressureData(string body, GlobalPropertyDelegate dlg, string name, double step)
+        public static bool RegisterTimestepPressureData(string body, GlobalPropertyDelegate dlg, string name, bool scaleLog, double step)
         {
             if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(body) || dlg == null)
             {
@@ -105,9 +90,9 @@ namespace ModularClimateWeatherSystems
                 float[,,] checkdata = dlg.Invoke(body, 0.0);
                 if (checkdata != null)
                 {
-                    if (checkdata.GetUpperBound(0) >= 1 && checkdata.GetUpperBound(1) >= 1 && checkdata.GetUpperBound(2) >= 1 && checkdata.GetUpperBound(0) % 2 == 1 && checkdata.GetUpperBound(1) % 2 == 1)
+                    if (checkdata.GetUpperBound(0) >= 1 && checkdata.GetUpperBound(1) >= 1 && checkdata.GetUpperBound(2) >= 1 && checkdata.GetUpperBound(1) % 2 == 1 && checkdata.GetUpperBound(2) % 2 == 1)
                     {
-                        externalbodydata[body].SetPressureFunc(name, dlg, step);
+                        externalbodydata[body].SetPressureFunc(name, dlg, scaleLog, step);
                         SuccessfulRegistration("Pressure", name, body);
                         return true;
                     }
@@ -118,7 +103,7 @@ namespace ModularClimateWeatherSystems
             CannotRegister("Pressure", name, body);
             return false;
         }
-        public static bool RegisterPressureData(string body, GlobalPropertyDelegate dlg, string name) => RegisterTimestepPressureData(body, dlg, name, DEFAULTINTERVAL);
+        public static bool RegisterPressureData(string body, GlobalPropertyDelegate dlg, string name, bool scaleLog) => RegisterTimestepPressureData(body, dlg, name, scaleLog, DEFAULTINTERVAL);
 
         //-------------FETCH EXTERNAL DATA-------------
         internal static bool[] HasExternalData(string body)
@@ -155,6 +140,18 @@ namespace ModularClimateWeatherSystems
             return sources;
         }
 
+        internal static bool[] GetScaling(string body)
+        {
+            bool[] logs = new bool[3] { false, false, false };
+            if (BodyExists(body))
+            {
+                logs[0] = externalbodydata[body].WindLogScaling;
+                logs[1] = externalbodydata[body].TempLogScaling;
+                logs[2] = externalbodydata[body].PressLogScaling;
+            }
+            return logs;
+        }
+
         //functions with less overhead for internal use
         internal static float[][,,] FetchGlobalWindData(string body, double time) => BodyExists(body) ? externalbodydata[body].GetWind(time) : null;
         internal static float[,,] FetchGlobalTemperatureData(string body, double time) => BodyExists(body) ? externalbodydata[body].GetTemperature(time) : null;
@@ -163,7 +160,7 @@ namespace ModularClimateWeatherSystems
         //-------------BODY DATA CLASS------------------
         internal class BodyData
         {
-            internal string Body { get; private set; }
+            internal string Body;
 
             private string windsource;
             internal string WindSource
@@ -174,7 +171,8 @@ namespace ModularClimateWeatherSystems
             private GlobalPropertyDelegate windx;
             private GlobalPropertyDelegate windy;
             private GlobalPropertyDelegate windz;
-            internal double WindTimeStep { get; private set; } = double.NaN;
+            internal double WindTimeStep = double.NaN;
+            internal bool WindLogScaling = false;
 
             private string tempsource;
             internal string TemperatureSource
@@ -183,7 +181,8 @@ namespace ModularClimateWeatherSystems
                 private set => tempsource = value;
             }
             private GlobalPropertyDelegate temper;
-            internal double TemperatureTimeStep { get; private set; } = double.NaN;
+            internal double TemperatureTimeStep = double.NaN;
+            internal bool TempLogScaling = false;
 
             private string presssource;
             internal string PressureSource 
@@ -192,31 +191,36 @@ namespace ModularClimateWeatherSystems
                 private set => presssource = value; 
             }
             private GlobalPropertyDelegate pressure;
-            internal double PressureTimeStep { get; private set; } = double.NaN;
+            internal double PressureTimeStep = double.NaN;
+            internal bool PressLogScaling = false;
 
             internal BodyData(string bodyname)
             {
                 Body = bodyname;
             }
-            internal void SetWindFunc(string name, GlobalPropertyDelegate delx, GlobalPropertyDelegate dely, GlobalPropertyDelegate delz, double timestep)
+
+            internal void SetWindFunc(string name, GlobalPropertyDelegate delx, GlobalPropertyDelegate dely, GlobalPropertyDelegate delz, bool scaleLog, double timestep)
             {
                 WindSource = name;
                 windx = delx;
                 windy = dely;
                 windz = delz;
                 WindTimeStep = timestep;
+                WindLogScaling = scaleLog;
             }
-            internal void SetTemperatureFunc(string name, GlobalPropertyDelegate del, double timestep)
+            internal void SetTemperatureFunc(string name, GlobalPropertyDelegate del, bool scaleLog, double timestep)
             {
                 TemperatureSource = name;
                 temper = del;
                 TemperatureTimeStep = timestep;
+                TempLogScaling = scaleLog;
             }
-            internal void SetPressureFunc(string name, GlobalPropertyDelegate del, double timestep)
+            internal void SetPressureFunc(string name, GlobalPropertyDelegate del, bool scaleLog, double timestep)
             {
                 PressureSource = name;
                 pressure = del;
                 PressureTimeStep = timestep;
+                PressLogScaling = scaleLog;
             }
 
             internal bool HasWind => !string.IsNullOrEmpty(windsource) && windx != null && windy != null && windz != null && double.IsFinite(WindTimeStep);
@@ -229,7 +233,7 @@ namespace ModularClimateWeatherSystems
                     float[,,] zWind = windz.Invoke(Body, time);
                     if(xWind != null && yWind != null && zWind != null)
                     {
-                        return CheckArraySizes(xWind, yWind, zWind) ? new float[3][,,] { xWind, yWind, zWind } : throw new DataMisalignedException("Returned Wind data arrays are not of identical dimensions.");
+                        return CheckArraySizes(xWind, yWind, zWind) ? new float[3][,,] { xWind, yWind, zWind } : throw new FormatException("The three Wind data arrays are not of identical dimensions.");
                     }
                 }
                 return null;
@@ -241,6 +245,7 @@ namespace ModularClimateWeatherSystems
             internal bool HasPressure => !string.IsNullOrEmpty(presssource) && pressure != null && double.IsFinite(PressureTimeStep);
             internal float[,,] GetPressure(double time) => HasPressure ? pressure.Invoke(Body, time) : null;
         }
+        internal static bool BodyExists(string body) => externalbodydata != null && externalbodydata.ContainsKey(body);
 
         //-------------GET DATA FROM MCWS----------------
 
@@ -256,7 +261,7 @@ namespace ModularClimateWeatherSystems
         public static float[][,,] GetCurrentWindData()
         {
             double timelerp = CanGetData ? UtilMath.Clamp01((Instance.CurrentTime % Instance.Windtimestep) / Instance.Windtimestep) : throw new InvalidOperationException(NotFlightScene);
-            return timelerp > 0.5 ? new float[][,,] { Instance.winddataX2, Instance.winddataY2, Instance.winddataZ2 } : new float[][,,] { Instance.winddataX1, Instance.winddataY1, Instance.winddataZ1 };
+            return timelerp > 0.5 ? new float[3][,,] { Instance.winddataX2, Instance.winddataY2, Instance.winddataZ2 } : new float[3][,,] { Instance.winddataX1, Instance.winddataY1, Instance.winddataZ1 };
         }
         public static float[,,] GetCurrentTemperatureData()
         {
@@ -317,43 +322,45 @@ namespace ModularClimateWeatherSystems
         public static Vector3 GetPointWindData(string body, double lon, double lat, double alt, double time)
         {
             CheckPosition(lon, lat, alt);
-            float[][,,] winddata = GetGlobalWindData(body, time);
-            float[,,] winddataX = winddata[0];
-            float[,,] winddataY = winddata[1];
-            float[,,] winddataZ = winddata[2];
-
             CelestialBody bod = FlightGlobals.GetBodyByName(body);
             try
             {
+                float[][,,] winddata = GetGlobalWindData(body, time);
                 if (bod != null && bod.atmosphere && alt <= bod.atmosphereDepth && winddata != null)
                 {
+                    float[,,] winddataX = winddata[0];
+                    float[,,] winddataY = winddata[1];
+                    float[,,] winddataZ = winddata[2];
+                    bool logscale = BodyExists(body) && externalbodydata[body].WindLogScaling;
+
                     //derive the locations of the data in the arrays
-                    double mapx = UtilMath.WrapAround((lon * (winddataX.GetUpperBound(0) + 1)) - 0.5, 0, winddataX.GetUpperBound(1) + 1);
+                    double mapx = UtilMath.WrapAround((lon * (winddataX.GetUpperBound(2) + 1)) - 0.5, 0, winddataX.GetUpperBound(2) + 1);
                     double mapy = (lat * (winddataX.GetUpperBound(1) + 1)) - 0.5;
-                    double mapz = alt * (winddataX.GetUpperBound(2) + 1);
+                    double normalalt = (alt / bod.atmosphereDepth);
+                    double mapz = (logscale ? Utils.ScaleLog(normalalt) : normalalt) * (winddataX.GetUpperBound(0) + 1);
 
                     double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
                     double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
                     double lerpz = alt >= 0.0 ? UtilMath.Clamp01(mapz - Math.Truncate(mapz)) : 0.0;
 
-                    int leftx = (int)Math.Truncate(mapx);
-                    int rightx = UtilMath.WrapAround((int)Math.Truncate(mapx) + 1, 0, winddataX.GetUpperBound(0));
+                    int x1 = (int)Math.Truncate(mapx);
+                    int x2 = UtilMath.WrapAround(x1 + 1, 0, winddataX.GetUpperBound(2));
 
-                    int bottomy = Utils.Clamp((int)Math.Truncate(mapy), 0, winddataX.GetUpperBound(1));
-                    int topy = Utils.Clamp((int)Math.Truncate(mapy) + 1, 0, winddataX.GetUpperBound(1));
+                    int y1 = Utils.Clamp((int)Math.Truncate(mapy), 0, winddataX.GetUpperBound(1));
+                    int y2 = Utils.Clamp(y1 + 1, 0, winddataX.GetUpperBound(1));
 
-                    int bottomz = Utils.Clamp((int)Math.Truncate(mapz), 0, winddataX.GetUpperBound(2));
-                    int topz = Utils.Clamp(bottomz + 1, 0, winddataX.GetUpperBound(2));
+                    int z1 = Utils.Clamp((int)Math.Truncate(mapz), 0, winddataX.GetUpperBound(0));
+                    int z2 = Utils.Clamp(z1 + 1, 0, winddataX.GetUpperBound(0));
 
                     //Bilinearly interpolate on the longitude and latitude axes
-                    float BottomPlaneX = Utils.BiLerp(winddataX[leftx, bottomy, bottomz], winddataX[rightx, bottomy, bottomz], winddataX[leftx, topy, bottomz], winddataX[rightx, topy, bottomz], (float)lerpx, (float)lerpy);
-                    float TopPlaneX = Utils.BiLerp(winddataX[leftx, bottomy, topz], winddataX[rightx, bottomy, topz], winddataX[leftx, topy, topz], winddataX[rightx, topy, topz], (float)lerpx, (float)lerpy);
+                    float BottomPlaneX = Utils.BiLerp(winddataX[z1, y1, x1], winddataX[z1, y1, x2], winddataX[z1, y2, x1], winddataX[z1, y2, x2], (float)lerpx, (float)lerpy);
+                    float TopPlaneX = Utils.BiLerp(winddataX[z2, y1, x1], winddataX[z2, y1, x2], winddataX[z2, y2, x1], winddataX[z2, y2, x2], (float)lerpx, (float)lerpy);
 
-                    float BottomPlaneY = Utils.BiLerp(winddataY[leftx, bottomy, bottomz], winddataY[rightx, bottomy, bottomz], winddataY[leftx, topy, bottomz], winddataY[rightx, topy, bottomz], (float)lerpx, (float)lerpy);
-                    float TopPlaneY = Utils.BiLerp(winddataY[leftx, bottomy, topz], winddataY[rightx, bottomy, topz], winddataY[leftx, topy, topz], winddataY[rightx, topy, topz], (float)lerpx, (float)lerpy);
+                    float BottomPlaneY = Utils.BiLerp(winddataY[z1, y1, x1], winddataY[z1, y1, x2], winddataY[z1, y2, x1], winddataY[z1, y2, x2], (float)lerpx, (float)lerpy);
+                    float TopPlaneY = Utils.BiLerp(winddataY[z2, y1, x1], winddataY[z2, y1, x2], winddataY[z2, y2, x1], winddataY[z2, y2, x2], (float)lerpx, (float)lerpy);
 
-                    float BottomPlaneZ = Utils.BiLerp(winddataZ[leftx, bottomy, bottomz], winddataZ[rightx, bottomy, bottomz], winddataZ[leftx, topy, bottomz], winddataZ[rightx, topy, bottomz], (float)lerpx, (float)lerpy);
-                    float TopPlaneZ = Utils.BiLerp(winddataZ[leftx, bottomy, topz], winddataZ[rightx, bottomy, topz], winddataZ[leftx, topy, topz], winddataZ[rightx, topy, topz], (float)lerpx, (float)lerpy);
+                    float BottomPlaneZ = Utils.BiLerp(winddataZ[z1, y1, x1], winddataZ[z1, y1, x2], winddataZ[z1, y2, x1], winddataZ[z1, y2, x2], (float)lerpx, (float)lerpy);
+                    float TopPlaneZ = Utils.BiLerp(winddataZ[z2, y1, x1], winddataZ[z2, y1, x2], winddataZ[z2, y2, x1], winddataZ[z2, y2, x2], (float)lerpx, (float)lerpy);
 
                     Vector3 BottomPlane = new Vector3(BottomPlaneX, BottomPlaneY, BottomPlaneZ);
                     Vector3 TopPlane = new Vector3(TopPlaneX, TopPlaneY, TopPlaneZ);
@@ -371,32 +378,34 @@ namespace ModularClimateWeatherSystems
         public static double GetPointTemperatureData(string body, double lon, double lat, double alt, double time)
         {
             CheckPosition(lon, lat, alt);
-            float[,,] temperaturedata = GetGlobalTemperatureData(body, time);
             CelestialBody bod = FlightGlobals.GetBodyByName(body);
             bool validbody = bod != null && bod.atmosphere && alt <= bod.atmosphereDepth;
             try
             {
+                float[,,] temperaturedata = GetGlobalTemperatureData(body, time);
                 if (validbody && temperaturedata != null)
                 {
+                    bool logscale = BodyExists(body) && externalbodydata[body].TempLogScaling;
                     double mapx = UtilMath.WrapAround(((lon + 180.0) / 360.0 * temperaturedata.Length) - 0.5, 0, temperaturedata.Length);
                     double mapy = ((180.0 - (lat + 90.0)) / 180.0 * (temperaturedata.GetUpperBound(1) + 1)) - 0.5;
-                    double mapz = (alt / bod.atmosphereDepth) * (temperaturedata.GetUpperBound(2) + 1);
+                    double normalalt = (alt / bod.atmosphereDepth);
+                    double mapz = (logscale ? Utils.ScaleLog(normalalt) : normalalt) * (temperaturedata.GetUpperBound(2) + 1);
 
                     double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
                     double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
                     double lerpz = alt >= 0.0 ? UtilMath.Clamp01(mapz - Math.Truncate(mapz)) : 0.0f;
 
-                    int leftx = (int)Math.Truncate(mapx);
-                    int rightx = (int)UtilMath.WrapAround(mapx + 1, 0, temperaturedata.GetUpperBound(0));
+                    int x1 = (int)Math.Truncate(mapx);
+                    int x2 = (int)UtilMath.WrapAround(mapx + 1, 0, temperaturedata.GetUpperBound(0));
 
-                    int bottomy = Utils.Clamp((int)Math.Truncate(mapy), 0, temperaturedata.GetUpperBound(1));
-                    int topy = Utils.Clamp((int)Math.Truncate(mapy) + 1, 0, temperaturedata.GetUpperBound(1));
+                    int y1 = Utils.Clamp((int)Math.Truncate(mapy), 0, temperaturedata.GetUpperBound(1));
+                    int y2 = Utils.Clamp((int)Math.Truncate(mapy) + 1, 0, temperaturedata.GetUpperBound(1));
 
-                    int bottomz = Utils.Clamp((int)Math.Truncate(mapz), 0, temperaturedata.GetUpperBound(2));
-                    int topz = Utils.Clamp(bottomz + 1, 0, temperaturedata.GetUpperBound(2));
+                    int z1 = Utils.Clamp((int)Math.Truncate(mapz), 0, temperaturedata.GetUpperBound(2));
+                    int z2 = Utils.Clamp(z1 + 1, 0, temperaturedata.GetUpperBound(2));
 
-                    float BottomPlane = Utils.BiLerp(temperaturedata[leftx,bottomy,bottomz], temperaturedata[rightx, bottomy, bottomz], temperaturedata[leftx, topy, bottomz], temperaturedata[rightx, topy, bottomz], (float)lerpx, (float)lerpy);
-                    float TopPlane = Utils.BiLerp(temperaturedata[leftx, bottomy, topz], temperaturedata[rightx, bottomy, topz], temperaturedata[leftx,topy,topz], temperaturedata[rightx, topy, topz], (float)lerpx, (float)lerpy);
+                    float BottomPlane = Utils.BiLerp(temperaturedata[z1, y1, x1], temperaturedata[z1, y1, x2], temperaturedata[z1, y2, x1], temperaturedata[z1, y2, x2], (float)lerpx, (float)lerpy);
+                    float TopPlane = Utils.BiLerp(temperaturedata[z2, y1, x1], temperaturedata[z2, y1, x2], temperaturedata[z2, y2, x1], temperaturedata[z2, y2, x2], (float)lerpx, (float)lerpy);
 
                     double Final = UtilMath.Lerp((double)BottomPlane, (double)TopPlane, lerpz);
                     return double.IsFinite(Final) ? Final : throw new NotFiniteNumberException();
@@ -411,32 +420,34 @@ namespace ModularClimateWeatherSystems
         public static double GetPointPressureData(string body, double lon, double lat, double alt, double time)
         {
             CheckPosition(lon, lat, alt);
-            float[,,] pressuredata = GetGlobalPressureData(body, time);
             CelestialBody bod = FlightGlobals.GetBodyByName(body);
             bool validbody = bod != null && bod.atmosphere && alt <= bod.atmosphereDepth;
             try
             {
+                float[,,] pressuredata = GetGlobalPressureData(body, time);
                 if (validbody && pressuredata != null)
                 {
+                    bool logscale = BodyExists(body) && externalbodydata[body].PressLogScaling;
                     double mapx = UtilMath.WrapAround(((lon + 180.0) / 360.0 * (pressuredata.GetUpperBound(0) + 1)) - 0.5, 0, (pressuredata.GetUpperBound(0) + 1));
                     double mapy = ((180.0 - (lat + 90.0)) / 180.0 * (pressuredata.GetUpperBound(1)+1)) - 0.5;
-                    double mapz = (alt / bod.atmosphereDepth) * (pressuredata.GetUpperBound(2) + 1);
+                    double normalalt = (alt / bod.atmosphereDepth);
+                    double mapz = (logscale ? Utils.ScaleLog(normalalt) : normalalt) * (pressuredata.GetUpperBound(2) + 1);
 
                     double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
                     double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
                     double lerpz = alt >= 0.0 ? UtilMath.Clamp01(mapz - Math.Truncate(mapz)) : 0.0f;
 
-                    int leftx = (int)Math.Truncate(mapx);
-                    int rightx = (int)UtilMath.WrapAround(mapx + 1, 0, pressuredata.Length);
+                    int x1 = (int)Math.Truncate(mapx);
+                    int x2 = (int)UtilMath.WrapAround(mapx + 1, 0, pressuredata.Length);
 
-                    int bottomy = Utils.Clamp((int)Math.Truncate(mapy), 0, pressuredata.GetUpperBound(1));
-                    int topy = Utils.Clamp((int)Math.Truncate(mapy) + 1, 0, pressuredata.GetUpperBound(1));
+                    int y1 = Utils.Clamp((int)Math.Truncate(mapy), 0, pressuredata.GetUpperBound(1));
+                    int y2 = Utils.Clamp((int)Math.Truncate(mapy) + 1, 0, pressuredata.GetUpperBound(1));
 
-                    int bottomz = Utils.Clamp((int)Math.Truncate(mapz), 0, pressuredata.GetUpperBound(2) - 1);
-                    int topz = Utils.Clamp(bottomz + 1, 0, pressuredata.GetUpperBound(2));
+                    int z1 = Utils.Clamp((int)Math.Truncate(mapz), 0, pressuredata.GetUpperBound(2) - 1);
+                    int z2 = Utils.Clamp(z1 + 1, 0, pressuredata.GetUpperBound(2));
 
-                    float BottomPlane = Utils.BiLerp(pressuredata[leftx,bottomy,bottomz], pressuredata[rightx,bottomy,bottomz], pressuredata[leftx,topy,bottomz], pressuredata[rightx, topy, bottomz], (float)lerpx, (float)lerpy);
-                    float TopPlane = Utils.BiLerp(pressuredata[leftx, bottomy, topz], pressuredata[rightx, bottomy, topz], pressuredata[leftx, topy, topz], pressuredata[rightx,topy,topz], (float)lerpx, (float)lerpy);
+                    float BottomPlane = Utils.BiLerp(pressuredata[z1, y1, x1], pressuredata[z1, y1, x2], pressuredata[z1, y2, x1], pressuredata[z1, y2, x2], (float)lerpx, (float)lerpy);
+                    float TopPlane = Utils.BiLerp(pressuredata[z2, y1, x1], pressuredata[z2, y1, x2], pressuredata[z2, y2, x1], pressuredata[z2, y2, x2], (float)lerpx, (float)lerpy);
 
                     double Final = Utils.InterpolatePressure((double)BottomPlane, (double)TopPlane, lerpz);
                     return double.IsFinite(Final) ? Final : throw new NotFiniteNumberException();
@@ -451,7 +462,26 @@ namespace ModularClimateWeatherSystems
 
         //-------------HELPER FUNCTIONS AND VALUES-----------------
         internal const double DEFAULTINTERVAL = 300.0;
-        internal static bool BodyExists(string body) => externalbodydata != null && externalbodydata.ContainsKey(body);
+
+        internal static bool CheckArraySizes(float[,,] arr1, float[,,] arr2, float[,,] arr3)
+        {
+            if (arr1.GetUpperBound(0) == arr2.GetUpperBound(0) && arr1.GetUpperBound(0) == arr3.GetUpperBound(0) && arr2.GetUpperBound(0) == arr3.GetUpperBound(0))
+            {
+                if (arr1.GetUpperBound(1) == arr2.GetUpperBound(1) && arr1.GetUpperBound(1) == arr3.GetUpperBound(1) && arr2.GetUpperBound(1) == arr3.GetUpperBound(1))
+                {
+                    if (arr1.GetUpperBound(2) == arr2.GetUpperBound(2) && arr1.GetUpperBound(2) == arr3.GetUpperBound(2) && arr2.GetUpperBound(2) == arr3.GetUpperBound(2))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        internal static bool CheckArraySizes(float[,,] arr1, float[,,] arr2)
+        {
+            return arr1.GetUpperBound(0) == arr2.GetUpperBound(0) && arr1.GetUpperBound(1) == arr2.GetUpperBound(1) && arr1.GetUpperBound(2) == arr2.GetUpperBound(2);
+        }
 
         private static void CheckRegistration(string body, double step)
         {
@@ -503,7 +533,7 @@ namespace ModularClimateWeatherSystems
         private static void SuccessfulRegistration(string type, string name, string body) => Utils.LogAPI(string.Format("'{0}' has successfully registered as a {1} data source for the Celestial Body {2}.", name, type, body));
         private static void CannotRegister(string type, string name, string body) => Utils.LogAPIWarning(string.Format("Could not register '{0}' as a {1} data source for the Celestial Body {2}. Another plugin has already registered.", name, type, body));
         private static void FormatError(string type) => throw new FormatException(string.Format("Returned {0} Data array does not conform to the required format.", type));
-        private static void BadArrayError(string type) => throw new NullReferenceException(string.Format("Returned {0} Data array is null.", type));
+        private static void BadArrayError(string type) => throw new ArgumentNullException(string.Format("Returned {0} Data array is null.", type));
         private static void NullArgs() => throw new ArgumentNullException("One or more arguments was null or empty.");
     }
 }

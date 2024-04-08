@@ -89,14 +89,8 @@ namespace ModularClimateWeatherSystems
                 }
             }
 
-            if (progradewind != null)
-            {
-                progradewind.SetActive(false);
-            }
-            if (retrogradewind != null)
-            {
-                retrogradewind.SetActive(false);
-            }
+            progradewind?.SetActive(false);
+            retrogradewind?.SetActive(false);
         }
 
         void OnDestroy()

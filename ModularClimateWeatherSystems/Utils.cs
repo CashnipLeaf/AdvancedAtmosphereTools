@@ -16,13 +16,13 @@ namespace ModularClimateWeatherSystems
         internal static void LogError(string message) => Debug.LogError("[MCWS][ERROR] " + message); //Errors that invoke fail-safe protections.
 
         //------------------------------SETTINGS AND SETUP--------------------------------
-        internal const string version = "v0.9.0";
+        internal const string version = "0.9.0";
         internal static string GameDataPath => KSPUtil.ApplicationRootPath + "GameData/";
 
-        internal static bool DevMode { get; private set; } = false;
-        internal static bool Minutesforcoords { get; private set; } = false;
-        internal static bool AdjustedIndicatorsDisabled { get; private set; } = false;
-        internal static float GlobalWindSpeedMultiplier { get; private set; } = 1.0f;
+        internal static bool DevMode = false;
+        internal static bool Minutesforcoords = false;
+        internal static bool AdjustedIndicatorsDisabled = false;
+        internal static float GlobalWindSpeedMultiplier = 1.0f;
         internal static bool FAR_Exists = false;
 
         internal static void CheckSettings()
@@ -46,17 +46,9 @@ namespace ModularClimateWeatherSystems
         //------------------------------INTERPOLATION-------------------------
 
         //Bilinear Interpolation to SAVE ME SOME LINES
-        internal static double BiLerp(double first1, double second1, double first2, double second2, double by1, double by2)
-        {
-            return UtilMath.Lerp(UtilMath.Lerp(first1, second1, by1), UtilMath.Lerp(first2, second2, by1), by2);
-        }
         internal static float BiLerp(float first1, float second1, float first2, float second2, float by1, float by2)
         {
             return Mathf.Lerp(Mathf.Lerp(first1, second1, by1), Mathf.Lerp(first2, second2, by1), by2);
-        }
-        internal static Vector3 BiLerpVector(Vector3 first1, Vector3 second1, Vector3 first2, Vector3 second2, float by1, float by2)
-        {
-            return Vector3.Lerp(Vector3.Lerp(first1, second1, by1), Vector3.Lerp(first2, second2, by1), by2);
         }
 
         //Pressure cannot be interpolated linearly on the Z (up/down) axis due to its exponential decay. This algorithm does an exponential interpolation of sorts.
@@ -73,6 +65,8 @@ namespace ModularClimateWeatherSystems
             }
             return first * Math.Pow(Math.E, -1 * UtilMath.Lerp(0.0, UtilMath.Clamp(scalefactor, float.MinValue, float.MaxValue), by));
         }
+
+        internal static double ScaleLog(double n) => UtilMath.Clamp01(Math.Log(n + 1.0, 2.0));
 
         //------------------------------LOCALIZATION CACHE------------------------- 
         internal static Dictionary<string, string> LOCCache;

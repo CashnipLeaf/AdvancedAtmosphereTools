@@ -111,8 +111,7 @@ namespace ModularClimateWeatherSystems
                 else
                 {
                     part.dragVectorMag = 0.0f;
-                    part.dragVectorDir = Vector3.zero;
-                    part.dragVectorDirLocal = Vector3.zero; 
+                    part.dragVectorDir = part.dragVectorDirLocal = Vector3.zero;
                 }
                 part.dragScalar = 0.0f;
                 if (!part.ShieldedFromAirstream && !(part.atmDensity <= 0 && part.submergedPortion <= 0.0) && !part.DragCubes.None)
@@ -130,7 +129,7 @@ namespace ModularClimateWeatherSystems
             Vector3 windvec = (FH != null && FH.HasWind) ? FH.AppliedWind : Vector3.zero;
             if (Utils.IsVectorFinite(windvec) && windvec != Vector3.zero)
             {
-                fi.Vel = fi.Vel - windvec;
+                fi.Vel -= windvec;
                 fi.spd = !fi.Vessel.IgnoreSpeedActive ? fi.Vel.magnitude : 0.0;
                 fi.Vessel.speed = fi.spd;
                 fi.nVel = (fi.spd != 0.0) ? fi.Vel / (float)fi.spd : Vector3.zero;
@@ -314,36 +313,4 @@ namespace ModularClimateWeatherSystems
             pointVelocity -= Vector3.Lerp(windvec, Vector3.zero, (float)__instance.part.submergedPortion);
         }
     }
-
-    /*
-    [HarmonyPatch(typeof(ModuleLiftingSurface), nameof(ModuleLiftingSurface.GetLiftVector))]
-    public static class GroundEffect
-    {
-        static bool Prefix(ModuleLiftingSurface __instance, ref float liftDot, ref float absDot)
-        {
-            if (!Utils.GroundEffectDisabled)
-            {
-                double alt = FlightGlobals.getAltitudeAtPos(__instance.part.transform.position);
-
-                MCWS_FlightHandler FH = MCWS_FlightHandler.Instance;
-                if (FH != null || FH.craftWingSpan > 0.0f)
-                {
-                    return true;
-                }
-            }
-            
-
-            return true;
-        }
-
-        static void Postfix(ref Vector3 __result, ModuleLiftingSurface __instance, Vector3 liftVector, float liftDot, float absDot, double Q, float mach)
-        {
-            if (!Utils.GroundEffectDisabled)
-            {
-
-            }
-        }
-    }
-    */
-
 }

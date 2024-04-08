@@ -7,14 +7,14 @@ using ToolbarControl_NS;
 namespace ModularClimateWeatherSystems
 {
     //This portion of the FlightHandler runs the GUI
-    public partial class MCWS_FlightHandler
+    partial class MCWS_FlightHandler
     {
         private ToolbarControl toolbarController;
         private bool toolbarButtonAdded = false;
         private bool GUIEnabled = false;
 
         //if developer mode is enabled, a modified green logo will replace the normal white Logo.
-        internal static string LogoPath => Utils.DevMode ? "ModularClimateWeatherSystems/PluginData/MCWS_Debug" : "ModularClimateWeatherSystems/PluginData/MCWS_Logo";
+        internal static string LogoPath => "ModularClimateWeatherSystems/PluginData/" + (Utils.DevMode ? "MCWS_Debug" : "MCWS_Logo");
         internal const string modNAME = "MCWS";
         internal const string modID = "MCWS_NS";
 
@@ -56,7 +56,7 @@ namespace ModularClimateWeatherSystems
         {
             if (GUIEnabled)
             {
-                windowPos = GUILayout.Window("MCWS".GetHashCode(), windowPos, DrawWindow, "MCWS " + Utils.version);
+                windowPos = GUILayout.Window("MCWS".GetHashCode(), windowPos, DrawWindow, "MCWS v" + Utils.version);
             }
         }
 
@@ -67,8 +67,8 @@ namespace ModularClimateWeatherSystems
             {
                 Vector3 craftdragvector = activevessel.srf_velocity;
                 Vector3 craftdragvectorwind = activevessel.srf_velocity - AppliedWind;
-                Vector3 craftdragvectortransformed = inversevesselframe * craftdragvector;
-                Vector3 craftdragvectortransformedwind = inversevesselframe * craftdragvectorwind;
+                Vector3 craftdragvectortransformed = Inversevesselframe * craftdragvector;
+                Vector3 craftdragvectortransformedwind = Inversevesselframe * craftdragvectorwind;
 
                 double alpha = 0.0;
                 double slip = 0.0;
@@ -290,13 +290,12 @@ namespace ModularClimateWeatherSystems
         {
             if (Utils.Minutesforcoords)
             {
-                int direction = (2 * axis) + (deg < 0.0 ? 1 : 0);
                 double minutes = (deg % 1) * 60.0;
                 double seconds = ((deg % 1) * 3600.0) % 60.0;
                 string degs = string.Format("{0:F0}{1}", Math.Floor(Math.Abs(deg)), Degreesstr);
                 string mins = string.Format("{0:F0}{1}", Math.Floor(Math.Abs(minutes)), Minutesstr);
                 string secs = string.Format("{0:F0}{1}", Math.Floor(Math.Abs(seconds)), Secondsstr);
-                return degs + " " + mins + " " + secs + " " + directions[direction];
+                return degs + " " + mins + " " + secs + " " + directions[(2 * axis) + (deg < 0.0 ? 1 : 0)];
             }
             return string.Format("{0:F2}{1}", deg, Degreesstr);
         }
