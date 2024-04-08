@@ -11,16 +11,13 @@ Dependencies:
 - ClickThrough Blocker: https://github.com/linuxgurugamer/ClickThroughBlocker/releases
 - HarmonyKSP (bundled with download): https://github.com/KSPModdingLibs/HarmonyKSP/releases
 
-## Integration with other mods:
-- FerramAerospaceResearch: If installed, MCWS will defer all relevant aero/thermal calculations to FAR and supply it with wind, temperature, and pressure information.
-
 ## Mod Compatibility  
 **Recommended Mods:**
 - Kopernicus
 - KSPCommunityFixes
 
 **Compatible With:**
-- FerramAerospaceResearch
+- FerramAerospaceResearch: If installed, MCWS will defer all relevant aero/thermal calculations to FAR and supply it with wind, temperature, and pressure information.
 - Most, if not all parts mods
 
 **Conflicts With:** 
