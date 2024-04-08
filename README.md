@@ -30,6 +30,3 @@ MCWS adds a few extra features to help you out when flying, including:
 
 ## Credits and Acknowledgements
 - @sarbian, @ferram4, and @Starwaster for making the Modular Flight Integrator that allows interfacing with KSP's physics system.
-
-## License Information
-- MCWS is licensed under the MIT license.
