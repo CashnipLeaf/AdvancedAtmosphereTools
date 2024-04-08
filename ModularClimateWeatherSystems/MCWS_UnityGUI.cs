@@ -56,7 +56,7 @@ namespace ModularClimateWeatherSystems
         {
             if (GUIEnabled)
             {
-                windowPos = GUILayout.Window("MCWS".GetHashCode(), windowPos, DrawWindow, "MCWS: " + Utils.version);
+                windowPos = GUILayout.Window("MCWS".GetHashCode(), windowPos, DrawWindow, "MCWS " + Utils.version);
             }
         }
 

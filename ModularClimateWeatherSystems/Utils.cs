@@ -16,7 +16,7 @@ namespace ModularClimateWeatherSystems
         internal static void LogError(string message) => Debug.LogError("[MCWS][ERROR] " + message); //Errors that invoke fail-safe protections.
 
         //------------------------------SETTINGS AND SETUP--------------------------------
-        internal const string version = "DEVELOPMENT VER 0.1.0";
+        internal const string version = "v0.9.0";
         internal static string GameDataPath => KSPUtil.ApplicationRootPath + "GameData/";
 
         internal static bool DevMode { get; private set; } = false;
