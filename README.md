@@ -9,7 +9,7 @@ Dependencies:
 - ModularFlightIntegrator: https://forum.kerbalspaceprogram.com/topic/106369-19-modularflightintegrator-127-19-october-2019/
 - Toolbar Controller: https://github.com/linuxgurugamer/ToolbarControl/releases
 - ClickThrough Blocker: https://github.com/linuxgurugamer/ClickThroughBlocker/releases
-- Harmony for KSP (bundled)
+- Harmony for KSP (bundled): https://github.com/KSPModdingLibs/HarmonyKSP/releases
 
 ## Integration with other mods:
 - FerramAerospaceResearch: If installed, MCWS will defer all relevant aero/thermal calculations to FAR and supply it with wind, temperature, and pressure information.
