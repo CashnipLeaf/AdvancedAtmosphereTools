@@ -21,7 +21,7 @@ Dependencies:
 - Most, if not all parts mods
 
 **Conflicts With:** 
-- Other mods that modify the stock aerodynamics or thermodynamics systems (The latter is not a hard guarantee. It depends on which parts of the thermodynamics systems get overridden)
+- Other mods that modify the stock aerodynamics system
 
 ## Other Features
 MCWS adds a few extra features to help you out when flying, including:
