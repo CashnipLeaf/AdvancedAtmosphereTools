@@ -18,11 +18,12 @@ namespace ModularClimateWeatherSystems
         internal const string modNAME = "MCWS";
         internal const string modID = "MCWS_NS";
 
-        private Rect windowPos;
-        private static float Xpos => 100f * GameSettings.UI_SCALE;
-        private static float Ypos => 100f * GameSettings.UI_SCALE;
-        private static float Xwidth => (Utils.DevMode ? 345.0f : 285.0f) * Mathf.Clamp(GameSettings.UI_SCALE, 0.75f, 1.5f);
-        private static float Yheight => 60f * GameSettings.UI_SCALE;
+        private Rect windowPos;        
+        private static float Xpos => 100f * UIscale;
+        private static float Ypos => 100f * UIscale;
+        private static float Xwidth => (Utils.DevMode ? 345.0f : 285.0f) * Mathf.Clamp(UIscale, 0.75f, 1.5f);
+        private static float Yheight => 60f * UIscale;
+        private static float UIscale => GameSettings.UI_SCALE;
         
         private static string Distunit => Localizer.Format(GetLOC("#LOC_MCWS_meter"));
         private static string Speedunit => Localizer.Format(GetLOC("#LOC_MCWS_meterspersec"));
@@ -62,8 +63,34 @@ namespace ModularClimateWeatherSystems
 
         void DrawWindow(int windowID)
         {
+            GUIStyle button = new GUIStyle(GUI.skin.button)
+            {
+                padding = new RectOffset(10, 10, 6, 0),
+                margin = new RectOffset(2, 2, 2, 2),
+                stretchWidth = true,
+                stretchHeight = false,
+                fontSize = 13
+            };
+
             GUILayout.BeginVertical();
-            if(activevessel != null && mainbody != null)
+
+            //toggle the DisableWindWhenStationary setting
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button(Utils.DisableWindWhenStationary ? GetLOC("#LOC_MCWS_enablewind") : GetLOC("#LOC_MCWS_disablewind"), button))
+            {
+                Utils.DisableWindWhenStationary = !Utils.DisableWindWhenStationary;
+            }
+            GUILayout.EndHorizontal();
+
+            //toggle the wind-adjusted prograde indicators
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button(Utils.AdjustedIndicatorsDisabled ? GetLOC("#LOC_MCWS_enableindicators") : GetLOC("#LOC_MCWS_disableindicators"), button))
+            {
+                Utils.AdjustedIndicatorsDisabled = !Utils.AdjustedIndicatorsDisabled;
+            }
+            GUILayout.EndHorizontal();
+
+            if (activevessel != null && mainbody != null)
             {
                 Vector3 craftdragvector = activevessel.srf_velocity;
                 Vector3 craftdragvectorwind = activevessel.srf_velocity - AppliedWind;
@@ -87,7 +114,7 @@ namespace ModularClimateWeatherSystems
                 string TAS = inatmo ? string.Format("{0:F1} {1}", craftdragvectorwind.magnitude, Speedunit) : GetLOC("#LOC_MCWS_na");
                 string mach = inatmo ? string.Format("{0:F2}", activevessel.mach) : GetLOC("#LOC_MCWS_na");
                 double trk = craftdragvector.magnitude > 0.0 ? UtilMath.WrapAround(Math.Atan2(craftdragvectortransformed.z, craftdragvectortransformed.x) * UtilMath.Rad2Deg, 0.0, 360.0) : 0.0;
-                string track = inatmo && craftdragvector.magnitude > 0.0 ? string.Format("{0:F1} {1}", trk, Degreesstr) : GetLOC("#LOC_MCWS_na");
+                string track = inatmo && craftdragvector.magnitude > 0.1 ? string.Format("{0:F1} {1}", trk, Degreesstr) : GetLOC("#LOC_MCWS_na");
 
                 string windspeed = string.Format("{0:F1} {1}", Multipliedwindvec.magnitude, Speedunit);
                 string v_windspeed = string.Format("{0:F1} {1}", Multipliedwindvec.y, Speedunit);
@@ -103,7 +130,7 @@ namespace ModularClimateWeatherSystems
                 else
                 {
                     double heading = UtilMath.WrapAround((Math.Atan2(Multipliedwindvec.z, Multipliedwindvec.x) * UtilMath.Rad2Deg) + 180.0, 0.0, 360.0);
-                    windheading = string.Format("{0:F2} {1}", heading, Degreesstr);
+                    windheading = string.Format("{0:F1} {1}", heading, Degreesstr);
                     winddirection = cardinaldirs[(int)((heading / 22.5) + .5) % 16];
                 }
 
@@ -155,7 +182,7 @@ namespace ModularClimateWeatherSystems
                         liftforce = Vector3d.Dot(totalforce, normalized);
                         dragforce = Vector3d.Dot(totalforce, -nvel);
                         liftinduceddrag = Vector3d.Dot(totallift, -nvel);
-                        liftdragratio = liftforce / dragforce;
+                        liftdragratio =  Math.Abs(liftforce) > 0.0001 ? liftforce / dragforce : 0.0;
                     }
                 }
 
@@ -238,11 +265,12 @@ namespace ModularClimateWeatherSystems
                 DrawCentered(GetLOC("#LOC_MCWS_NoVessel"));
                 GUILayout.FlexibleSpace();
             }
+
             GUILayout.EndVertical();
             GUI.DragWindow();
         }
 
-        //GUILayout functions to avoid being a WET boi
+        //GUILayout functions because things look neater this way.
         private void DrawHeader(string tag)
         {
             GUILayout.BeginHorizontal();

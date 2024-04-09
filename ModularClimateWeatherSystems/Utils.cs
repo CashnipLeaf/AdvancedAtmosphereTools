@@ -24,23 +24,27 @@ namespace ModularClimateWeatherSystems
         internal static bool AdjustedIndicatorsDisabled = false;
         internal static float GlobalWindSpeedMultiplier = 1.0f;
         internal static bool FAR_Exists = false;
+        internal static bool DisableWindWhenStationary = false;
 
         internal static void CheckSettings()
         {
             bool debug = false;
             bool mins = false;
             bool indicator = true;
+            bool stationary = false;
             float windspeedmult = 1.0f;
             ConfigNode[] settings = GameDatabase.Instance.GetConfigNodes("MCWS_SETTINGS");
             settings[0].TryGetValue("DeveloperMode", ref debug);
             settings[0].TryGetValue("UseMOAForCoords", ref mins);
             settings[0].TryGetValue("GlobalWindSpeedMultiplier", ref windspeedmult);
             settings[0].TryGetValue("DisableAdjustedProgradeIndicators", ref indicator);
+            settings[0].TryGetValue("DisableWindWhenStationary", ref stationary);
 
             DevMode = debug;
             AdjustedIndicatorsDisabled = indicator;
             Minutesforcoords = mins;
-            GlobalWindSpeedMultiplier = float.IsFinite(windspeedmult) ? Mathf.Clamp(windspeedmult, 0.0f, float.MaxValue) : 0.0f;
+            GlobalWindSpeedMultiplier = float.IsFinite(windspeedmult) ? Mathf.Clamp(windspeedmult, 0.0f, float.MaxValue) : 1.0f;
+            DisableWindWhenStationary = stationary;
         }
 
         //------------------------------INTERPOLATION-------------------------
@@ -77,14 +81,13 @@ namespace ModularClimateWeatherSystems
             IEnumerator tags = Localizer.Tags.Keys.GetEnumerator();
             while (tags.MoveNext())
             {
-                if (tags.Current == null)
+                if (tags.Current != null)
                 {
-                    continue;
-                }
-                string tag = tags.Current.ToString();
-                if (tag.Contains("#LOC_MCWS_"))
-                {
-                    LOCCache.Add(tag, Localizer.GetStringByTag(tag).Replace("\\n", "\n"));
+                    string tag = tags.Current.ToString();
+                    if (tag.Contains("#LOC_MCWS_"))
+                    {
+                        LOCCache.Add(tag, Localizer.GetStringByTag(tag).Replace("\\n", "\n"));
+                    }
                 }
             }
         }

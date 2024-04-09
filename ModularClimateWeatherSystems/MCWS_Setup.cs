@@ -34,6 +34,7 @@ namespace ModularClimateWeatherSystems
                 msgstring += string.Format("[MCWS SETTINGS] GlobalWindSpeedMultiplier: {0:F2} \n", Utils.GlobalWindSpeedMultiplier);
                 msgstring += string.Format("[MCWS SETTINGS] UseMOAForCoords: {0} \n", Utils.Minutesforcoords);
                 msgstring += string.Format("[MCWS SETTINGS] DisableAdjustedProgradeIndicators: {0} \n", Utils.AdjustedIndicatorsDisabled);
+                msgstring += string.Format("[MCWS SETTINGS] DisableWindWhenStationary: {0} \n", Utils.DisableWindWhenStationary);
                 msgstring += string.Format("[MCWS SETTINGS] DeveloperMode: {0}", Utils.DevMode);
                 Utils.LogInfo(msgstring);
                 if (Utils.DevMode)

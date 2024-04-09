@@ -10,12 +10,12 @@ namespace ModularClimateWeatherSystems
     [KSPAddon(KSPAddon.Startup.SpaceCentre, true)]
     public class FlightDynamicsOverrides : MonoBehaviour
     {
-        //make sure that things dont get patched more than once. That would be very bad.
         public static FlightDynamicsOverrides Instance { get; private set; }
         private static MCWS_FlightHandler FH => MCWS_FlightHandler.Instance;
 
         public FlightDynamicsOverrides()
         {
+            //make sure that things dont get patched more than once. That would be very bad.
             if (Instance == null)
             {
                 Utils.LogInfo("Initializing Flight Dynamics Overrides.");
@@ -23,6 +23,7 @@ namespace ModularClimateWeatherSystems
             }
             else
             {
+                Utils.LogWarning("Destroying duplicate Flight Dynamics Overrides. Check your install for duplicate mod folders.");
                 Destroy(this);
             }
         }
@@ -91,10 +92,11 @@ namespace ModularClimateWeatherSystems
             fi.BaseFIUpdateAerodynamics(part);
         }
 
-        //Inject the new drag vector into the UpdateAerodynamics function
+        //Takes advantage of CalculateAerodynamicArea()'s placement inside UpdateAerodynamics()
+        //to inject a new drag vector into the part before UpdateAerodynamics() uses to calculate anything.
         double AerodynamicAreaOverride(ModularFlightIntegrator fi, Part part)
         {
-            Vector3 windvec = (FH != null && FH.HasWind && FH.AppliedWind != null) ? FH.AppliedWind : Vector3.zero;
+            Vector3 windvec = (FH != null && FH.HasWind) ? FH.InternalAppliedWind : Vector3.zero;
             windvec = Vector3.Lerp(windvec, Vector3.zero, (float)part.submergedPortion);
 
             //add an offset to the velocity vector used for body drag/lift calcs and update the related fields.
@@ -126,7 +128,7 @@ namespace ModularClimateWeatherSystems
 
         void CalculateConstantsAtmosphereOverride(ModularFlightIntegrator fi)
         {
-            Vector3 windvec = (FH != null && FH.HasWind) ? FH.AppliedWind : Vector3.zero;
+            Vector3 windvec = (FH != null && FH.HasWind) ? FH.InternalAppliedWind : Vector3.zero;
             if (Utils.IsVectorFinite(windvec) && windvec != Vector3.zero)
             {
                 fi.Vel -= windvec;
@@ -172,14 +174,12 @@ namespace ModularClimateWeatherSystems
             }
             return coeff * fi.CurrentMainBody.convectionMultiplier;
         }
-
         double CalculateConvecCoeffNewtonian(ModularFlightIntegrator fi)
         {
             double coeff = fi.density <= 1.0 ? Math.Pow(fi.density, PhysicsGlobals.NewtonianDensityExponent) : fi.density;
             double multiplier = PhysicsGlobals.NewtonianConvectionFactorBase + Math.Pow(fi.spd, PhysicsGlobals.NewtonianVelocityExponent);
             return coeff * multiplier * PhysicsGlobals.NewtonianConvectionFactorTotal;
         }
-
         double CalculateConvecCoeffMach(ModularFlightIntegrator fi)
         {
             double coeff = fi.density <= 1.0 ? Math.Pow(fi.density, PhysicsGlobals.MachConvectionDensityExponent) : fi.density;
@@ -196,7 +196,7 @@ namespace ModularClimateWeatherSystems
 
             if (fi.CurrentMainBody.atmosphere && fi.altitude <= fi.CurrentMainBody.atmosphereDepth)
             {
-                fi.staticPressurekPa = MCWS_FlightHandler.Instance.Pressure;
+                fi.staticPressurekPa = FH.Pressure;
                 fi.staticPressureAtm = fi.staticPressurekPa * 0.0098692326671601278;
             }
             else
@@ -207,6 +207,26 @@ namespace ModularClimateWeatherSystems
     }
 
     //--------------------------HARMONY PATCHES-------------------------------
+
+    //add an offset to the velocity vector used for wing lift calculations to account for wind.
+    [HarmonyPatch(typeof(ModuleLiftingSurface), nameof(ModuleLiftingSurface.SetupCoefficients))]
+    public static class WingVectorOverride
+    {
+        static void Prefix(ref Vector3 pointVelocity, ModuleLiftingSurface __instance)
+        {
+            MCWS_FlightHandler FH = MCWS_FlightHandler.Instance;
+            if (!Utils.IsVectorFinite(pointVelocity) || FH == null || !FH.HasWind)
+            {
+                return;
+            }
+            Vector3 windvec = FH.InternalAppliedWind;
+            if (!Utils.IsVectorFinite(windvec) || windvec == Vector3.zero)
+            {
+                return;
+            }
+            pointVelocity -= Vector3.Lerp(windvec, Vector3.zero, (float)__instance.part.submergedPortion);
+        }
+    }
 
     //modify the air intakes so that wind affects intake performance
     [HarmonyPatch(typeof(ModuleResourceIntake), nameof(ModuleResourceIntake.FixedUpdate))]
@@ -220,7 +240,7 @@ namespace ModularClimateWeatherSystems
             {
                 return true;
             }
-            Vector3 windvec = FH.AppliedWind;
+            Vector3 windvec = FH.InternalAppliedWind;
             if (!Utils.IsVectorFinite(windvec) || windvec == Vector3.zero)
             {
                 return true;
@@ -291,26 +311,6 @@ namespace ModularClimateWeatherSystems
             }
             __instance.status = Localizer.Format("#autoLOC_8005416");
             return false;
-        }
-    }
-
-    //add an offset to the velocity vector used for wing lift calculations to account for wind.
-    [HarmonyPatch(typeof(ModuleLiftingSurface), nameof(ModuleLiftingSurface.SetupCoefficients))]
-    public static class WingVectorOverride
-    {
-        static void Prefix(ref Vector3 pointVelocity, ModuleLiftingSurface __instance)
-        {
-            MCWS_FlightHandler FH = MCWS_FlightHandler.Instance;
-            if (!Utils.IsVectorFinite(pointVelocity) || FH == null || !FH.HasWind)
-            {
-                return;
-            }
-            Vector3 windvec = FH.AppliedWind;
-            if (!Utils.IsVectorFinite(windvec) || windvec == Vector3.zero)
-            {
-                return;
-            }
-            pointVelocity -= Vector3.Lerp(windvec, Vector3.zero, (float)__instance.part.submergedPortion);
         }
     }
 }

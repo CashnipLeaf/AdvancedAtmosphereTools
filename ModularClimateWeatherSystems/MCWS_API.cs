@@ -28,7 +28,7 @@ namespace ModularClimateWeatherSystems
                 float[,,] checkdataZ = dlgZ.Invoke(body, 0.0);
                 if (checkdataX != null && checkdataY != null && checkdataZ != null)
                 {
-                    if(!CheckArraySizes(checkdataX, checkdataY, checkdataZ))
+                    if (!CheckArraySizes(checkdataX, checkdataY, checkdataZ))
                     {
                         throw new FormatException("The three returned Wind data arrays are not of identical dimensions.");
                     }
@@ -49,7 +49,7 @@ namespace ModularClimateWeatherSystems
 
         public static bool RegisterTimestepTemperatureData(string body, GlobalPropertyDelegate dlg, string name, bool scaleLog, double step)
         {
-            if(string.IsNullOrEmpty(name) || string.IsNullOrEmpty(body) || dlg == null)
+            if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(body) || dlg == null)
             {
                 NullArgs();
             }
@@ -120,7 +120,7 @@ namespace ModularClimateWeatherSystems
         internal static double[] GetTimeSteps(string body)
         {
             double[] steps = new double[3] { double.NaN, double.NaN, double.NaN };
-            if(BodyExists(body))
+            if (BodyExists(body))
             {
                 steps[0] = externalbodydata[body].WindTimeStep;
                 steps[1] = externalbodydata[body].TemperatureTimeStep;
@@ -231,7 +231,7 @@ namespace ModularClimateWeatherSystems
                     float[,,] xWind = windx.Invoke(Body, time);
                     float[,,] yWind = windy.Invoke(Body, time);
                     float[,,] zWind = windz.Invoke(Body, time);
-                    if(xWind != null && yWind != null && zWind != null)
+                    if (xWind != null && yWind != null && zWind != null)
                     {
                         return CheckArraySizes(xWind, yWind, zWind) ? new float[3][,,] { xWind, yWind, zWind } : throw new FormatException("The three Wind data arrays are not of identical dimensions.");
                     }
@@ -252,7 +252,7 @@ namespace ModularClimateWeatherSystems
         //Data in use by the flighthandler
         private static MCWS_FlightHandler Instance => MCWS_FlightHandler.Instance;
         private static bool CanGetData => HighLogic.LoadedSceneIsFlight && Instance != null;
-        private const string NotFlightScene = "Cannot access FlightHandler data outside of the Flight scene.";
+        private const string NotFlightScene = "Cannot access Flight Handler data outside of the Flight scene.";
         public static Vector3 GetCurrentWindVec() => CanGetData ? Instance.CachedWind : throw new InvalidOperationException(NotFlightScene); // wind vector in the global coordinate frame
         public static Vector3 GetRawWindVec() => CanGetData ? Instance.RawWind : throw new InvalidOperationException(NotFlightScene); //wind vector in the local coordinate frame
         public static double GetCurrentTemperature() => CanGetData ? Instance.Temperature : throw new InvalidOperationException(NotFlightScene);

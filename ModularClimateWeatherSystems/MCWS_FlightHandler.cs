@@ -37,12 +37,13 @@ namespace ModularClimateWeatherSystems
         internal bool HasPress=> HasData[2];
 
         internal string[] Sources = new string[3] { "None", "None", "None" };
-        internal bool[] ScaleLog = new bool[3] { false, false, false };
+        internal bool[] ScaleLog = new bool[3] { false, false, false }; 
 
         internal Vector3 RawWind = Vector3.zero;
         internal Vector3 Multipliedwindvec => RawWind * Utils.GlobalWindSpeedMultiplier;
         internal Vector3 CachedWind = Vector3.zero;
         internal Vector3 AppliedWind => CachedWind * Utils.GlobalWindSpeedMultiplier;
+        internal Vector3 InternalAppliedWind => AppliedWind * (activevessel != null && activevessel.LandedOrSplashed && Utils.DisableWindWhenStationary ? (float)UtilMath.Lerp(0.0, 1.0, (activevessel.srfSpeed - 5.0) * 0.2) : 1.0f);
         internal float[,,] winddataX1;
         internal float[,,] winddataY1;
         internal float[,,] winddataZ1;
@@ -77,6 +78,7 @@ namespace ModularClimateWeatherSystems
             }
             else
             {
+                Utils.LogWarning("Destroying duplicate Flight Handler. Check your install for duplicate mod folders.");
                 Destroy(this);
             }
         }
@@ -85,16 +87,16 @@ namespace ModularClimateWeatherSystems
         {
             if (Utils.FAR_Exists)
             {
-                Utils.LogInfo("Attempting to Register with FerramAerospaceResearch.");
+                Utils.LogInfo("Registering MCWS with FerramAerospaceResearch.");
                 FARConnected = RegisterWithFAR();
             }
         }
 
         void FixedUpdate()
         {
-            activevessel = null;
             if (!FlightGlobals.ready || FlightGlobals.ActiveVessel == null)
             {
+                activevessel = null;
                 return;
             }
             activevessel = FlightGlobals.ActiveVessel;
@@ -321,7 +323,7 @@ namespace ModularClimateWeatherSystems
                         double BottomPlaneFinal = UtilMath.Lerp((double)BottomPlane1, (double)BottomPlane2, lerpt);
                         double TopPlaneFinal = UtilMath.Lerp((double)TopPlane1, (double)TopPlane2, lerpt);
 
-                        //Exponentially interpolate on the altitude axis
+                        //Logarithmically interpolate on the altitude axis
                         double Final = Utils.InterpolatePressure(BottomPlaneFinal, TopPlaneFinal, lerpz);
                         Pressure = double.IsFinite(Final) ? Final : throw new NotFiniteNumberException();
                     }
@@ -380,7 +382,7 @@ namespace ModularClimateWeatherSystems
             {
                 temperaturedata1 = MCWS_API.FetchGlobalTemperatureData(body, step1);
                 temperaturedata2 = MCWS_API.FetchGlobalTemperatureData(body, step2);
-                if(!MCWS_API.CheckArraySizes(temperaturedata1, temperaturedata2))
+                if (!MCWS_API.CheckArraySizes(temperaturedata1, temperaturedata2))
                 {
                     throw new FormatException("The two Temperature data arrays are not of identical dimensions.");
                 }
@@ -399,7 +401,7 @@ namespace ModularClimateWeatherSystems
             {
                 pressuredata1 = MCWS_API.FetchGlobalPressureData(body, step1);
                 pressuredata2 = MCWS_API.FetchGlobalPressureData(body, step2);
-                if(!MCWS_API.CheckArraySizes(pressuredata1, pressuredata2))
+                if (!MCWS_API.CheckArraySizes(pressuredata1, pressuredata2))
                 {
                     throw new FormatException("The two Pressure data arrays are not of identical dimensions.");
                 }
@@ -449,7 +451,7 @@ namespace ModularClimateWeatherSystems
         //----------------FerramAerospaceResearch Compatibility--------------
 
         //Functions for FAR to call
-        internal Vector3 GetTheWind(CelestialBody body, Part p, Vector3 pos) => AppliedWind;
+        internal Vector3 GetTheWind(CelestialBody body, Part p, Vector3 pos) => InternalAppliedWind;
         internal double GetTheTemperature(CelestialBody body, Part p, Vector3 pos) => Temperature;
         internal double GetThePressure(CelestialBody body, Part p, Vector3 pos) => Pressure;
 
