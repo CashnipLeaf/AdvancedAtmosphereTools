@@ -117,7 +117,7 @@ namespace ModularClimateWeatherSystems
 
         //------------------------------MATH AND RELATED-------------------------
 
-        //Desperate solution to try and save lines.
+        //Desperate solution to try and save lines, did not end up saving that many lines. Might inline.
         internal static float BiLerp(float first1, float second1, float first2, float second2, float by1, float by2)
         {
             return Mathf.Lerp(Mathf.Lerp(first1, second1, by1), Mathf.Lerp(first2, second2, by1), by2);

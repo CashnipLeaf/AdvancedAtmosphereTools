@@ -52,7 +52,7 @@ namespace ModularClimateWeatherSystems
                     {
                         navBall = FindObjectOfType<NavBall>();
 
-                        //set up the indicators. this used to be a separate function, but it got inlined to reduce file length.
+                        //set up the indicators.
                         progradewind = Instantiate(navBall.progradeVector.gameObject);
                         progradewind.transform.parent = navBall.progradeVector.parent;
                         progradewind.transform.position = navBall.progradeVector.position;
@@ -105,7 +105,7 @@ namespace ModularClimateWeatherSystems
             GameEvents.onUIScaleChange.Remove(ResizeIndicators);
         }
 
-        void ResizeIndicators() //I would inline this if I could.
+        void ResizeIndicators()
         {
             float navballDefaultSize = 44f * GameSettings.UI_SCALE_NAVBALL;
             navBallLocalScale = new Vector3(navballDefaultSize, navballDefaultSize, navballDefaultSize);

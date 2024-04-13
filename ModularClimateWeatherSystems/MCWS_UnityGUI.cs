@@ -70,7 +70,7 @@ namespace ModularClimateWeatherSystems
                 stretchWidth = true,
                 stretchHeight = false,
                 fontSize = 13
-            }; //Hack fix. Unity does not allow calling GUI functions outside of OnGUI()
+            }; //Unity does not allow calling GUI functions outside of OnGUI(). FML.
 
             GUILayout.BeginVertical();
 
@@ -223,7 +223,7 @@ namespace ModularClimateWeatherSystems
                     GUILayout.FlexibleSpace();
                 }
 
-                if (Settings.DevMode) //Will probably deprecate
+                if (Settings.DevMode) //TODO: remove because the DevMode setting no longer exists.
                 {
                     DrawHeader("Developer Mode Information");
                     DrawElement("Connected to FAR", FARConnected.ToString()); //connected to FAR

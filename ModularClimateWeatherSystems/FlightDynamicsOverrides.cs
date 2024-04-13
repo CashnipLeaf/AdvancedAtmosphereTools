@@ -152,7 +152,7 @@ namespace ModularClimateWeatherSystems
             fi.pseudoReDragMult = (double)PhysicsGlobals.DragCurvePseudoReynolds.Evaluate((float)fi.pseudoReynolds);
         }
 
-        double CalculateConvectiveCoeff(ModularFlightIntegrator fi) //Would love to inline this but I'm not sure how to.
+        double CalculateConvectiveCoeff(ModularFlightIntegrator fi) //I would love to clean this up, but it works and I dont wanna touch it.
         {
             double coeff;
             if (fi.Vessel.situation == Vessel.Situations.SPLASHED)
@@ -228,11 +228,10 @@ namespace ModularClimateWeatherSystems
     }
 
     //Modify air intake behavior so wind affects intake performance.
-    //Yes, I know it's ugly. No, I don't care.
     [HarmonyPatch(typeof(ModuleResourceIntake), nameof(ModuleResourceIntake.FixedUpdate))]
     public static class IntakeOverride
     {
-        static bool Prefix(ModuleResourceIntake __instance)
+        static bool Prefix(ModuleResourceIntake __instance) //This is an abomination. Please msg me if you have a cleaner implementation.
         {
             //fall back to stock behavior as a failsafe
             MCWS_FlightHandler FH = MCWS_FlightHandler.Instance;

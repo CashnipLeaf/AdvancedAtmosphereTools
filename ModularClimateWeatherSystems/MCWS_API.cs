@@ -106,6 +106,8 @@ namespace ModularClimateWeatherSystems
         public static bool RegisterPressureData(string body, GlobalPropertyDelegate dlg, string name, bool scaleLog) => RegisterTimestepPressureData(body, dlg, name, scaleLog, DEFAULTINTERVAL);
 
         //-------------FETCH EXTERNAL DATA-------------
+
+        //These are terrible. Don't do this. 
         internal static bool[] HasExternalData(string body)
         {
             bool[] steps = new bool[3] { false, false, false };
@@ -139,7 +141,6 @@ namespace ModularClimateWeatherSystems
             }
             return sources;
         }
-
         internal static bool[] GetScaling(string body)
         {
             bool[] logs = new bool[3] { false, false, false };
@@ -246,17 +247,17 @@ namespace ModularClimateWeatherSystems
         public static float[][,,] GetCurrentWindData()
         {
             double timelerp = CanGetData ? UtilMath.Clamp01((Instance.CurrentTime % Instance.Windtimestep) / Instance.Windtimestep) : throw new InvalidOperationException(NotFlightScene);
-            return timelerp > 0.5 ? new float[3][,,] { Instance.WindDataX2, Instance.WindDataY2, Instance.WindDataZ2 } : new float[3][,,] { Instance.WindDataX1, Instance.WindDataY1, Instance.WindDataZ1 };
+            return timelerp > 0.5 ? new float[3][,,] { Instance.winddataX2, Instance.winddataY2, Instance.winddataZ2 } : new float[3][,,] { Instance.winddataX1, Instance.winddataY1, Instance.winddataZ1 };
         }
         public static float[,,] GetCurrentTemperatureData()
         {
             double timelerp = CanGetData ? UtilMath.Clamp01((Instance.CurrentTime % Instance.Temptimestep) / Instance.Temptimestep) : throw new InvalidOperationException(NotFlightScene);
-            return timelerp > 0.5 ? Instance.TemperatureData2 : Instance.TemperatureData1;
+            return timelerp > 0.5 ? Instance.temperaturedata2 : Instance.temperaturedata1;
         }
         public static float[,,] GetCurrentPressureData()
         {
             double timelerp = CanGetData ? UtilMath.Clamp01((Instance.CurrentTime % Instance.Presstimestep) / Instance.Presstimestep) : throw new InvalidOperationException(NotFlightScene);
-            return timelerp > 0.5 ? Instance.PressureData2 : Instance.PressureData1;
+            return timelerp > 0.5 ? Instance.pressuredata2 : Instance.pressuredata1;
         }
         
         //Get Global Data for any body at any time. No interpolation is performed on MCWS's end here, so make sure you can deal with these values.
@@ -447,6 +448,7 @@ namespace ModularClimateWeatherSystems
         //-------------HELPER FUNCTIONS AND VALUES-----------------
         internal const double DEFAULTINTERVAL = 300.0;
 
+        //I CBA to do a cleaner implementation of this.
         internal static bool CheckArraySizes(float[,,] arr1, float[,,] arr2, float[,,] arr3) => CheckArraySizes(arr1, arr2) && CheckArraySizes(arr1, arr3) && CheckArraySizes(arr2, arr3);
         internal static bool CheckArraySizes(float[,,] arr1, float[,,] arr2) => arr1.GetLength(0) == arr2.GetLength(0) && arr1.GetLength(1) == arr2.GetLength(1) && arr1.GetLength(2) == arr2.GetLength(2);
 
