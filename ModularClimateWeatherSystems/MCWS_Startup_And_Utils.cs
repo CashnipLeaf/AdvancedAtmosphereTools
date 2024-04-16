@@ -106,7 +106,6 @@ namespace ModularClimateWeatherSystems
     {
         internal const string version = "0.9.0";
         internal static string GameDataPath => KSPUtil.ApplicationRootPath + "GameData/";
-
         internal static Dictionary<string, string> LOCCache; //localization cache
 
         internal static void LogInfo(string message) => Debug.Log("[MCWS] " + message); //General information
@@ -123,15 +122,30 @@ namespace ModularClimateWeatherSystems
             return Mathf.Lerp(Mathf.Lerp(first1, second1, by1), Mathf.Lerp(first2, second2, by1), by2);
         }
 
-        //Logarithmic interpolation, specifically used for pressure on the Z axis
-        internal static double InterpolateLog(double first, double second, double by)
+        //allow for altitude spacing based on some factor
+        internal static double ScaleAltitude(double nX, double xBase, int upperbound, out int int1, out int int2)
         {
-            //control factors needed to prevent it from going straight to zero if either value is zero. 
-            //This will only do things with positive values anyways, so support for negative values isn't required.
-            return Math.Pow(Math.Max(first, 0.0000001), 1d - by) * Math.Pow(Math.Max(second, 0.0000001), by);
+            nX = UtilMath.Clamp01(nX);
+            double z = (xBase <= 1.0 ? nX : ((Math.Pow(xBase, -nX * upperbound) - 1) / (Math.Pow(xBase, -1 * upperbound) - 1))) * upperbound;
+            int1 = Clamp((int)Math.Floor(z), 0, upperbound); //layer 1
+            int2 = Clamp(int1 + 1, 0, upperbound); //layer 2
+
+            double z1 = xBase <= 1.0 ? (double)int1 / (double)upperbound : ((Math.Pow(xBase, int1) - 1) / (Math.Pow(xBase, upperbound) - 1));
+            double z2 = xBase <= 1.0 ? (double)int2 / (double)upperbound : ((Math.Pow(xBase, int2) - 1) / (Math.Pow(xBase, upperbound) - 1));
+            if (nX >= z2 || z2 <= z1)
+            {
+                return 1.0;
+            }
+            else if (nX <= z1)
+            {
+                return 0.0;
+            }
+            else
+            {
+                return UtilMath.Clamp01((nX - z1) / (z2 - z1)); //returns the lerp factor between the two layers
+            }
         }
 
-        internal static double ScaleLog(double n) => Math.Log(UtilMath.Clamp01(n) + 1.0, 2.0); //apply a logarithm to altitude scaling if requested
         internal static int Clamp(int value, int min, int max) => Math.Min(Math.Max(value, min), max); //Apparently no such function exists for integers. Why?
         internal static bool IsVectorFinite(Vector3 v) => float.IsFinite(v.x) && float.IsFinite(v.y) && float.IsFinite(v.z);
         internal static bool IsVectorFinite(Vector3d vd) => double.IsFinite(vd.x) && double.IsFinite(vd.y) && double.IsFinite(vd.z); //might remove since nothing uses it.

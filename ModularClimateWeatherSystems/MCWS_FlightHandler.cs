@@ -38,7 +38,7 @@ namespace ModularClimateWeatherSystems
         internal bool HasPress => HasData[2];
 
         internal string[] Sources = new string[3] { "None", "None", "None" };
-        internal bool[] ScaleLog = new bool[3] { false, false, false }; 
+        internal double[] ScaleFactors = new double[3] { 1d, 1d, 1d }; 
 
         internal Vector3 RawWind = Vector3.zero;
         internal Vector3 AppliedWind = Vector3.zero;
@@ -139,7 +139,7 @@ namespace ModularClimateWeatherSystems
                         HasData = MCWS_API.HasExternalData(mainbody.name);
                         double[] timesteps = MCWS_API.GetTimeSteps(mainbody.name);
                         Sources = MCWS_API.GetSources(mainbody.name);
-                        ScaleLog = MCWS_API.GetScaling(mainbody.name);
+                        ScaleFactors = MCWS_API.GetScaling(mainbody.name);
 
                         if (HasData[0])
                         {
@@ -221,22 +221,18 @@ namespace ModularClimateWeatherSystems
                     {
                         //derive the locations of the data in the arrays
                         double mapx = UtilMath.WrapAround((normalizedlon * winddataX1.GetLength(2)) - 0.5, 0, winddataX1.GetLength(2));
-                        double mapy = (normalizedlat * winddataX1.GetLength(1)) - 0.5;
-                        double mapz = (ScaleLog[0] ? Utils.ScaleLog(normalizedalt) : normalizedalt) * winddataX1.GetLength(0);
-
-                        double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
-                        double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
-                        double lerpz = alt >= 0.0 ? UtilMath.Clamp01(mapz - Math.Truncate(mapz)) : 0.0;
-                        double lerpt = UtilMath.Clamp01((CurrentTime % Temptimestep) / Temptimestep);
+                        double mapy = normalizedlat * winddataX1.GetUpperBound(1);
 
                         int x1 = (int)UtilMath.Clamp(Math.Truncate(mapx), 0, winddataX1.GetUpperBound(2));
                         int x2 = UtilMath.WrapAround(x1 + 1, 0, winddataX1.GetUpperBound(2));
 
-                        int y1 = Utils.Clamp((int)Math.Truncate(mapy), 0, winddataX1.GetUpperBound(1));
+                        int y1 = Utils.Clamp((int)Math.Floor(mapy), 0, winddataX1.GetUpperBound(1));
                         int y2 = Utils.Clamp(y1 + 1, 0, winddataX1.GetUpperBound(1));
 
-                        int z1 = Utils.Clamp((int)Math.Truncate(mapz), 0, winddataX1.GetUpperBound(0));
-                        int z2 = Utils.Clamp(z1 + 1, 0, winddataX1.GetUpperBound(0));
+                        double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
+                        double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
+                        double lerpz = Utils.ScaleAltitude(normalizedalt, ScaleFactors[0], winddataX1.GetUpperBound(0), out int z1, out int z2);
+                        double lerpt = UtilMath.Clamp01((CurrentTime % Windtimestep) / Windtimestep);
 
                         //Bilinearly interpolate on the longitude and latitude axes 
                         float BottomPlaneX1 = Utils.BiLerp(winddataX1[z1, y1, x1], winddataX1[z1, y1, x2], winddataX1[z1, y2, x1], winddataX1[z1, y2, x2], (float)lerpx, (float)lerpy);
@@ -288,22 +284,18 @@ namespace ModularClimateWeatherSystems
                     {
                         //derive the locations of the data in the arrays
                         double mapx = UtilMath.WrapAround((normalizedlon * temperaturedata1.GetLength(2)) - 0.5, 0, temperaturedata1.GetLength(2));
-                        double mapy = (normalizedlat * temperaturedata1.GetLength(1)) - 0.5;
-                        double mapz = (ScaleLog[1] ? Utils.ScaleLog(normalizedalt) : normalizedalt) * temperaturedata1.GetLength(0);
+                        double mapy = normalizedlat * temperaturedata1.GetUpperBound(1);
+
+                        int x1 = (int)UtilMath.Clamp(Math.Truncate(mapx), 0, temperaturedata1.GetUpperBound(2));
+                        int x2 = UtilMath.WrapAround(x1 + 1, 0, temperaturedata1.GetUpperBound(2));
+
+                        int y1 = Utils.Clamp((int)Math.Floor(mapy), 0, temperaturedata1.GetUpperBound(1));
+                        int y2 = Utils.Clamp(y1 + 1, 0, temperaturedata1.GetUpperBound(1));
 
                         double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
                         double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
-                        double lerpz = alt >= 0.0 ? UtilMath.Clamp01(mapz - Math.Truncate(mapz)) : 0.0;
+                        double lerpz = Utils.ScaleAltitude(normalizedalt, ScaleFactors[1], temperaturedata1.GetUpperBound(0), out int z1, out int z2);
                         double lerpt = UtilMath.Clamp01((CurrentTime % Temptimestep) / Temptimestep);
-
-                        int x1 = (int)UtilMath.Clamp(Math.Truncate(mapx), 0, temperaturedata1.GetUpperBound(2));
-                        int x2 = UtilMath.WrapAround(x1 + 1, 0, pressuredata1.GetUpperBound(2));
-
-                        int y1 = Utils.Clamp((int)Math.Truncate(mapy), 0, temperaturedata1.GetUpperBound(1));
-                        int y2 = Utils.Clamp(y1 + 1, 0, temperaturedata1.GetUpperBound(1));
-
-                        int z1 = Utils.Clamp((int)Math.Truncate(mapz), 0, temperaturedata1.GetUpperBound(0));
-                        int z2 = Utils.Clamp(z1 + 1, 0, temperaturedata1.GetUpperBound(0));
 
                         //Bilinearly interpolate on the longitude and latitude axes
                         float BottomPlane1 = Utils.BiLerp(temperaturedata1[z1, y1, x1], temperaturedata1[z1, y1, x2], temperaturedata1[z1, y2, x1], temperaturedata1[z1, y2, x2], (float)lerpx, (float)lerpy);
@@ -329,22 +321,18 @@ namespace ModularClimateWeatherSystems
                     {
                         //derive the locations of the data in the arrays
                         double mapx = UtilMath.WrapAround((normalizedlon * pressuredata1.GetLength(2)) - 0.5, 0.0, pressuredata1.GetLength(2));
-                        double mapy = (normalizedlat * pressuredata1.GetLength(1)) - 0.5;
-                        double mapz = (ScaleLog[2] ? Utils.ScaleLog(normalizedalt) : normalizedalt) * pressuredata1.GetLength(0);
-
-                        double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
-                        double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
-                        double lerpz = alt >= 0.0 ? UtilMath.Clamp01(mapz - Math.Truncate(mapz)) : 0.0f;
-                        double lerpt = UtilMath.Clamp01((CurrentTime % Presstimestep) / Presstimestep);
+                        double mapy = normalizedlat * pressuredata1.GetUpperBound(1);
 
                         int x1 = (int)UtilMath.Clamp(Math.Truncate(mapx), 0, pressuredata1.GetUpperBound(2));
                         int x2 = UtilMath.WrapAround(x1 + 1, 0, pressuredata1.GetUpperBound(2));
 
-                        int y1 = Utils.Clamp((int)Math.Truncate(mapy), 0, pressuredata1.GetUpperBound(1));
+                        int y1 = Utils.Clamp((int)Math.Floor(mapy), 0, pressuredata1.GetUpperBound(1));
                         int y2 = Utils.Clamp(y1 + 1, 0, pressuredata1.GetUpperBound(1));
 
-                        int z1 = Utils.Clamp((int)Math.Truncate(mapz), 0, pressuredata1.GetUpperBound(0));
-                        int z2 = Utils.Clamp(z1 + 1, 0, pressuredata1.GetUpperBound(0));
+                        double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
+                        double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
+                        double lerpz = Utils.ScaleAltitude(normalizedalt, ScaleFactors[2], pressuredata1.GetUpperBound(0), out int z1, out int z2);
+                        double lerpt = UtilMath.Clamp01((CurrentTime % Presstimestep) / Presstimestep);
 
                         //Bilinearly interpolate on the longitude and latitude axes
                         float BottomPlane1 = Utils.BiLerp(pressuredata1[z1, y1, x1], pressuredata1[z1, y1, x2], pressuredata1[z1, y2, x1], pressuredata1[z1, y2, x2], (float)lerpx, (float)lerpy);
@@ -358,8 +346,8 @@ namespace ModularClimateWeatherSystems
                         double TopPlaneFinal = UtilMath.Lerp((double)TopPlane1, (double)TopPlane2, lerpt);
 
                         //Logarithmically interpolate on the altitude axis.
-                        double Final = Utils.InterpolateLog(BottomPlaneFinal, TopPlaneFinal, lerpz);
-                        Pressure = double.IsFinite(Final) ? Final : throw new NotFiniteNumberException();
+                        double Final = Math.Pow(Math.Max(BottomPlaneFinal, 0.0000001), 1d - lerpz) * Math.Pow(Math.Max(TopPlaneFinal, 0.0000001), lerpz);
+                        Pressure = double.IsFinite(Final) ? Final * 0.001 : throw new NotFiniteNumberException(); //convert to kPa
                     }
                     catch (Exception ex) //fallback data
                     {
@@ -452,7 +440,8 @@ namespace ModularClimateWeatherSystems
         private void ClearGlobalData()
         {
             winddataX1 = winddataX2 = winddataY1 = winddataY2 = winddataZ1 = winddataZ2 = temperaturedata1 = temperaturedata2 = pressuredata1 = pressuredata2 = null;
-            HasData[0] = HasData[1] = HasData[2] = ScaleLog[0] = ScaleLog[1] = ScaleLog[2] = false;
+            HasData[0] = HasData[1] = HasData[2] = false;
+            ScaleFactors[0] = ScaleFactors[1] = ScaleFactors[2] = 1.0;
             Sources[0] = Sources[1] = Sources[2] = "None";
         }
 

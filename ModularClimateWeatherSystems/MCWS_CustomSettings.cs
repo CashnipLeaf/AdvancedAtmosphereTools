@@ -46,6 +46,7 @@ namespace ModularClimateWeatherSystems
                 List<string> coordsunitlist = new List<string>
                 {
                     "Degrees",
+                    "Degrees, Minutes",
                     "Degrees, Minutes, Seconds"
                 };
                 return (IList)coordsunitlist;
@@ -100,18 +101,26 @@ namespace ModularClimateWeatherSystems
     internal static class Settings
     {
         internal static bool DevMode = false;
-        internal static bool Minutesforcoords = false;
-        internal static bool AdjustedIndicatorsEnabled = false;
+        internal static string Minutesforcoords = "Degrees";
         internal static float GlobalWindSpeedMultiplier = 1.0f;
         internal static bool FAR_Exists = false;
-        internal static bool DisableWindWhenStationary = false;
         internal static float WindSpeedVariability = 0.0f;
+
+        //hack fix to allow the buttons in the GUI to actually do something
+        internal static bool AdjustedIndicatorsEnabled => buttonindicatorsenabled ^ settingsindicatorsenabled;
+        internal static bool DisableWindWhenStationary => buttondisablewindstationary ^ settingsdisablewindstationary;
+
+        internal static bool buttonindicatorsenabled = false; //GUI button
+        internal static bool settingsindicatorsenabled = false;
+
+        internal static bool buttondisablewindstationary = false; //GUI button
+        internal static bool settingsdisablewindstationary = false;
 
         internal static void CheckGameSettings() //fetch game settings.
         {
-            Minutesforcoords = HighLogic.CurrentGame.Parameters.CustomParams<MCWS_CustomSettings>().minsforcoords == "Degrees, Minutes, Seconds";
-            AdjustedIndicatorsEnabled = HighLogic.CurrentGame.Parameters.CustomParams<MCWS_CustomSettings>().adjustedmarkers;
-            DisableWindWhenStationary = HighLogic.CurrentGame.Parameters.CustomParams<MCWS_CustomSettings>().disablestationarywind;
+            Minutesforcoords = HighLogic.CurrentGame.Parameters.CustomParams<MCWS_CustomSettings>().minsforcoords;
+            settingsindicatorsenabled = HighLogic.CurrentGame.Parameters.CustomParams<MCWS_CustomSettings>().adjustedmarkers;
+            settingsdisablewindstationary = HighLogic.CurrentGame.Parameters.CustomParams<MCWS_CustomSettings>().disablestationarywind;
             GlobalWindSpeedMultiplier = HighLogic.CurrentGame.Parameters.CustomParams<MCWS_CustomSettingsAero>().windmult;
             WindSpeedVariability = ((float)HighLogic.CurrentGame.Parameters.CustomParams<MCWS_CustomSettingsAero>().windvariability) * 0.01f;
         }

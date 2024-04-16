@@ -25,7 +25,6 @@ namespace ModularClimateWeatherSystems
         private static float Yheight => 60f * UIscale;
         private static float UIscale => GameSettings.UI_SCALE;
         
-        private static string Distunit => Localizer.Format(GetLOC("#LOC_MCWS_meter"));
         private static string Speedunit => Localizer.Format(GetLOC("#LOC_MCWS_meterspersec"));
         private static string Pressunit => Localizer.Format(GetLOC("#LOC_MCWS_kpa"));
         private static string Forceunit => Localizer.Format(GetLOC("#LOC_MCWS_kilonewton"));
@@ -51,6 +50,7 @@ namespace ModularClimateWeatherSystems
                 toolbarButtonAdded = true;
             }
             windowPos = new Rect(Xpos, Ypos, Xwidth, Yheight);
+            Settings.buttondisablewindstationary = Settings.buttonindicatorsenabled = false;
         }
 
         void OnGUI()
@@ -70,7 +70,7 @@ namespace ModularClimateWeatherSystems
                 stretchWidth = true,
                 stretchHeight = false,
                 fontSize = 13
-            }; //Unity does not allow calling GUI functions outside of OnGUI(). FML.
+            }; //Unity does not allow calling GUI functions outside of OnGUI(). FML
 
             GUILayout.BeginVertical();
 
@@ -78,7 +78,7 @@ namespace ModularClimateWeatherSystems
             GUILayout.BeginHorizontal();
             if (GUILayout.Button(Settings.DisableWindWhenStationary ? GetLOC("#LOC_MCWS_enablewind") : GetLOC("#LOC_MCWS_disablewind"), button))
             {
-                Settings.DisableWindWhenStationary = !Settings.DisableWindWhenStationary;
+                Settings.buttondisablewindstationary = !Settings.buttondisablewindstationary;
             }
             GUILayout.EndHorizontal();
 
@@ -86,7 +86,7 @@ namespace ModularClimateWeatherSystems
             GUILayout.BeginHorizontal();
             if (GUILayout.Button(Settings.AdjustedIndicatorsEnabled ? GetLOC("#LOC_MCWS_enableindicators") : GetLOC("#LOC_MCWS_disableindicators"), button))
             {
-                Settings.AdjustedIndicatorsEnabled = !Settings.AdjustedIndicatorsEnabled;
+                Settings.buttonindicatorsenabled = !Settings.buttonindicatorsenabled;
             }
             GUILayout.EndHorizontal();
 
@@ -108,7 +108,7 @@ namespace ModularClimateWeatherSystems
                 string bodyname = mainbody.displayName.Split('^')[0];
                 bool inatmo = mainbody.atmosphere && activevessel.staticPressurekPa > 0.0;
 
-                string altitude = string.Format("{0:F1} {1}", activevessel.altitude, Distunit);
+                string altitude = string.Format(Math.Abs(activevessel.altitude) > 1000000d ? "{0:0.#####E+00} {1}" : "{0:F2} {1}", activevessel.altitude, Localizer.Format(GetLOC("#LOC_MCWS_meter")));
                 double grndspd = Math.Sqrt(Math.Pow(craftdragvectortransformed.x, 2) + Math.Pow(craftdragvectortransformed.z, 2));
                 string groundspeed = inatmo ? string.Format("{0:F1} {1}", grndspd, Speedunit) : GetLOC("#LOC_MCWS_na");
                 string TAS = inatmo ? string.Format("{0:F1} {1}", craftdragvectorwind.magnitude, Speedunit) : GetLOC("#LOC_MCWS_na");
@@ -120,19 +120,11 @@ namespace ModularClimateWeatherSystems
                 string v_windspeed = string.Format("{0:F1} {1}", RawWind.y, Speedunit);
                 string h_windspeed = string.Format("{0:F1} {1}", Math.Sqrt(Math.Pow(RawWind.x, 2) + Math.Pow(RawWind.z, 2)), Speedunit);
 
-                string windheading;
-                string winddirection;
-                if (RawWind.x == 0.0 && RawWind.z == 0.0)
-                {
-                    windheading = GetLOC("#LOC_MCWS_na");
-                    winddirection = GetLOC("#LOC_MCWS_na");
-                }
-                else
-                {
-                    double heading = UtilMath.WrapAround((Math.Atan2(RawWind.z, RawWind.x) * UtilMath.Rad2Deg) + 180.0, 0.0, 360.0);
-                    windheading = string.Format("{0:F1} {1}", heading, Degreesstr);
-                    winddirection = cardinaldirs[(int)((heading / 22.5) + .5) % 16]; //this used to be a separate function but it got inlined to reduce file length.
-                }
+                bool istherewind = RawWind.x != 0.0 || RawWind.z != 0.0;
+                double heading = istherewind ? UtilMath.WrapAround((Math.Atan2(RawWind.z, RawWind.x) * UtilMath.Rad2Deg) + 180.0, 0.0, 360.0) : 0.0;
+
+                string windheading = istherewind ? string.Format("{0:F1} {1}", heading, Degreesstr) : GetLOC("#LOC_MCWS_na");
+                string winddirection = istherewind ? cardinaldirs[(int)((heading / 22.5) + .5) % 16] : GetLOC("#LOC_MCWS_na");
 
                 string statictemp = string.Format("{0:F1} {1}", activevessel.atmosphericTemperature, Tempunit);
                 string exttemp = string.Format("{0:F1} {1}", activevessel.externalTemperature, Tempunit);
@@ -229,9 +221,9 @@ namespace ModularClimateWeatherSystems
                     DrawElement("Connected to FAR", FARConnected.ToString()); //connected to FAR
                     DrawElement("Body Internal Name", mainbody.name); //internal name of the current celestial body
                     DrawElement("Wind Speed Multiplier", string.Format("{0:F2}", Settings.GlobalWindSpeedMultiplier));
-                    //DrawElement("Wind Vector (Vessel)", RawWind.ToString()); //wind vector retrieved from the wind objects
-                    //DrawElement("Wind Vector (World)", CachedWind.ToString()); //wind vector after being transformed relative to the craft's frame of reference
-                    //DrawElement("Wind Vector (Applied)", AppliedWind.ToString()); //wind vector after being multiplied by the wind speed multiplier
+                    DrawElement("Wind Vector (Vessel)", normalwind.ToString()); //wind vector retrieved from the wind objects
+                    DrawElement("Wind Vector (World)", transformedwind.ToString()); //wind vector after being transformed relative to the craft's frame of reference
+                    DrawElement("Wind Vector (Applied)", InternalAppliedWind.ToString()); //wind vector after being multiplied by the wind speed multiplier
                     DrawElement("World Position", activevessel.GetWorldPos3D().ToString("F1"));
                     DrawElement("Drag Vector (World)", craftdragvector.ToString());
                     DrawElement("Drag Vector (Vessel)", craftdragvectortransformed.ToString());
@@ -313,18 +305,21 @@ namespace ModularClimateWeatherSystems
         private void ToolbarButtonOnFalse() => GUIEnabled = false;
 
         //display the longitude and latitude information as either degrees or degrees, minutes, and seconds + direction
-        internal static string DegreesString(double deg, int axis)
+        private static string DegreesString(double deg, int axis)
         {
-            if (Settings.Minutesforcoords)
+            double degrees = Math.Floor(Math.Abs(deg));
+            double minutes = Math.Abs((deg % 1) * 60.0);
+            double seconds = Math.Floor(Math.Abs(((deg % 1) * 3600.0) % 60.0));
+            string dir = directions[(2 * axis) + (deg < 0.0 ? 1 : 0)];
+            switch (Settings.Minutesforcoords)
             {
-                double minutes = (deg % 1) * 60.0;
-                double seconds = ((deg % 1) * 3600.0) % 60.0;
-                string degs = string.Format("{0:F0}{1}", Math.Floor(Math.Abs(deg)), Degreesstr);
-                string mins = string.Format("{0:F0}{1}", Math.Floor(Math.Abs(minutes)), Minutesstr);
-                string secs = string.Format("{0:F0}{1}", Math.Floor(Math.Abs(seconds)), Secondsstr);
-                return degs + " " + mins + " " + secs + " " + directions[(2 * axis) + (deg < 0.0 ? 1 : 0)];
-            }
-            return string.Format("{0:F2}{1}", deg, Degreesstr);
+                case "Degrees, Minutes, Seconds":
+                    return string.Format("{0:F0}{1} {2:F0}{3} {4:F0}{5} {6}", degrees, Degreesstr, Math.Floor(minutes), Minutesstr, seconds, Secondsstr, dir);
+                case "Degrees, Minutes":
+                    return string.Format("{0:F0}{1} {2:F1}{3} {4}", degrees, Degreesstr, minutes, Minutesstr, dir);
+                default:
+                    return string.Format("{0:F2}{1}", deg, Degreesstr);
+            } 
         }
     }
 }

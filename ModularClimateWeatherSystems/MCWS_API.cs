@@ -12,11 +12,11 @@ namespace ModularClimateWeatherSystems
         private static Dictionary<string, BodyData> externalbodydata;
 
         //--------------------------REGISTER EXTERNAL DATA--------------------------
-        public static bool RegisterTimestepWindData(string body, GlobalPropertyDelegate dlgX, GlobalPropertyDelegate dlgY, GlobalPropertyDelegate dlgZ, string name, bool scaleLog, double step)
+        public static bool RegisterTimestepWindData(string body, GlobalPropertyDelegate dlgX, GlobalPropertyDelegate dlgY, GlobalPropertyDelegate dlgZ, string name, float scaleFactor, double step)
         {
             if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(body) || dlgX == null || dlgY == null || dlgZ == null)
             {
-                NullArgs();
+                throw new ArgumentNullException("One or more arguments was null or empty.");
             }
             CheckRegistration(body, step);
             if (!externalbodydata[body].HasWind)
@@ -34,7 +34,7 @@ namespace ModularClimateWeatherSystems
                     }
                     if (checkdataX.GetLength(0) >= 2 && checkdataX.GetLength(1) >= 2 && checkdataX.GetLength(2) >= 2)
                     {
-                        externalbodydata[body].SetWindFunc(name, dlgX, dlgY,dlgZ, scaleLog, step);
+                        externalbodydata[body].SetWindFunc(name, dlgX, dlgY,dlgZ, (double)scaleFactor, step);
                         SuccessfulRegistration("Wind", name, body);
                         return true;
                     }
@@ -45,13 +45,13 @@ namespace ModularClimateWeatherSystems
             CannotRegister("Wind", name, body);
             return false;
         }
-        public static bool RegisterWindData(string body, GlobalPropertyDelegate dlgx, GlobalPropertyDelegate dlgy, GlobalPropertyDelegate dlgz, string name, bool scaleLog) => RegisterTimestepWindData(body, dlgx,dlgy,dlgz, name, scaleLog, DEFAULTINTERVAL);
+        public static bool RegisterWindData(string body, GlobalPropertyDelegate dlgx, GlobalPropertyDelegate dlgy, GlobalPropertyDelegate dlgz, string name, float scaleFactor) => RegisterTimestepWindData(body, dlgx,dlgy,dlgz, name, scaleFactor, DEFAULTINTERVAL);
 
-        public static bool RegisterTimestepTemperatureData(string body, GlobalPropertyDelegate dlg, string name, bool scaleLog, double step)
+        public static bool RegisterTimestepTemperatureData(string body, GlobalPropertyDelegate dlg, string name, float scaleFactor, double step)
         {
             if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(body) || dlg == null)
             {
-                NullArgs();
+                throw new ArgumentNullException("One or more arguments was null or empty.");
             }
             CheckRegistration(body, step);
             if (!externalbodydata[body].HasTemperature)
@@ -63,7 +63,7 @@ namespace ModularClimateWeatherSystems
                 {
                     if (checkdata.GetLength(0) >= 2 && checkdata.GetLength(1) >= 2 && checkdata.GetLength(2) >= 2)
                     {
-                        externalbodydata[body].SetTemperatureFunc(name, dlg, scaleLog, step);
+                        externalbodydata[body].SetTemperatureFunc(name, dlg, (double) scaleFactor, step);
                         SuccessfulRegistration("Temperature", name, body);
                         return true;
                     }
@@ -74,13 +74,13 @@ namespace ModularClimateWeatherSystems
             CannotRegister("Temperature", name, body);
             return false;
         }
-        public static bool RegisterTemperatureData(string body, GlobalPropertyDelegate dlg, string name, bool scaleLog) => RegisterTimestepTemperatureData(body, dlg, name, scaleLog, DEFAULTINTERVAL);
+        public static bool RegisterTemperatureData(string body, GlobalPropertyDelegate dlg, string name, float scaleFactor) => RegisterTimestepTemperatureData(body, dlg, name, scaleFactor, DEFAULTINTERVAL);
 
-        public static bool RegisterTimestepPressureData(string body, GlobalPropertyDelegate dlg, string name, bool scaleLog, double step)
+        public static bool RegisterTimestepPressureData(string body, GlobalPropertyDelegate dlg, string name, float scaleFactor, double step)
         {
             if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(body) || dlg == null)
             {
-                NullArgs();
+                throw new ArgumentNullException("One or more arguments was null or empty.");
             }
             CheckRegistration(body, step);
             if (!externalbodydata[body].HasPressure)
@@ -92,7 +92,7 @@ namespace ModularClimateWeatherSystems
                 {
                     if (checkdata.GetLength(0) >= 2 && checkdata.GetLength(1) >= 2 && checkdata.GetLength(2) >= 2)
                     {
-                        externalbodydata[body].SetPressureFunc(name, dlg, scaleLog, step);
+                        externalbodydata[body].SetPressureFunc(name, dlg, (double)scaleFactor, step);
                         SuccessfulRegistration("Pressure", name, body);
                         return true;
                     }
@@ -103,7 +103,7 @@ namespace ModularClimateWeatherSystems
             CannotRegister("Pressure", name, body);
             return false;
         }
-        public static bool RegisterPressureData(string body, GlobalPropertyDelegate dlg, string name, bool scaleLog) => RegisterTimestepPressureData(body, dlg, name, scaleLog, DEFAULTINTERVAL);
+        public static bool RegisterPressureData(string body, GlobalPropertyDelegate dlg, string name, float scaleFactor) => RegisterTimestepPressureData(body, dlg, name, scaleFactor, DEFAULTINTERVAL);
 
         //-------------FETCH EXTERNAL DATA-------------
 
@@ -141,16 +141,16 @@ namespace ModularClimateWeatherSystems
             }
             return sources;
         }
-        internal static bool[] GetScaling(string body)
+        internal static double[] GetScaling(string body)
         {
-            bool[] logs = new bool[3] { false, false, false };
+            double[] factors = new double[3] { 1.0, 1.0, 1.0 };
             if (BodyExists(body))
             {
-                logs[0] = externalbodydata[body].WindLogScaling;
-                logs[1] = externalbodydata[body].TempLogScaling;
-                logs[2] = externalbodydata[body].PressLogScaling;
+                factors[0] = externalbodydata[body].WindScaleFactor;
+                factors[1] = externalbodydata[body].TempScaleFactor;
+                factors[2] = externalbodydata[body].PressScaleFactor;
             }
-            return logs;
+            return factors;
         }
 
         //functions with less overhead for internal use only
@@ -169,44 +169,44 @@ namespace ModularClimateWeatherSystems
             private GlobalPropertyDelegate windy;
             private GlobalPropertyDelegate windz;
             internal double WindTimeStep = double.NaN;
-            internal bool WindLogScaling = false;
+            internal double WindScaleFactor = 1d;
 
             private string tempsource;
             internal string TemperatureSource => string.IsNullOrEmpty(tempsource) ? "None" : tempsource;
             private GlobalPropertyDelegate temper;
             internal double TemperatureTimeStep = double.NaN;
-            internal bool TempLogScaling = false;
+            internal double TempScaleFactor = 1d;
 
             private string presssource;
             internal string PressureSource => string.IsNullOrEmpty(presssource) ? "None" : presssource;
             private GlobalPropertyDelegate pressure;
             internal double PressureTimeStep = double.NaN;
-            internal bool PressLogScaling = false;
+            internal double PressScaleFactor = 1d;
 
             internal BodyData(string bodyname) => Body = bodyname;
 
-            internal void SetWindFunc(string name, GlobalPropertyDelegate delx, GlobalPropertyDelegate dely, GlobalPropertyDelegate delz, bool scaleLog, double timestep)
+            internal void SetWindFunc(string name, GlobalPropertyDelegate delx, GlobalPropertyDelegate dely, GlobalPropertyDelegate delz, double scalefactor, double timestep)
             {
                 windsource = name;
                 windx = delx;
                 windy = dely;
                 windz = delz;
                 WindTimeStep = timestep;
-                WindLogScaling = scaleLog;
+                WindScaleFactor = Math.Max(1.0, scalefactor);
             }
-            internal void SetTemperatureFunc(string name, GlobalPropertyDelegate del, bool scaleLog, double timestep)
+            internal void SetTemperatureFunc(string name, GlobalPropertyDelegate del, double scalefactor, double timestep)
             {
                 tempsource = name;
                 temper = del;
                 TemperatureTimeStep = timestep;
-                TempLogScaling = scaleLog;
+                TempScaleFactor = Math.Max(1.0, scalefactor);
             }
-            internal void SetPressureFunc(string name, GlobalPropertyDelegate del, bool scaleLog, double timestep)
+            internal void SetPressureFunc(string name, GlobalPropertyDelegate del, double scalefactor, double timestep)
             {
                 presssource = name;
                 pressure = del;
                 PressureTimeStep = timestep;
-                PressLogScaling = scaleLog;
+                PressScaleFactor = Math.Max(1.0, scalefactor);
             }
 
             internal bool HasWind => !string.IsNullOrEmpty(windsource) && windx != null && windy != null && windz != null && double.IsFinite(WindTimeStep);
@@ -242,7 +242,7 @@ namespace ModularClimateWeatherSystems
         public static Vector3 GetCurrentWindVec() => CanGetData ? Instance.transformedwind : throw new InvalidOperationException(NotFlightScene); // wind vector in the global coordinate frame
         public static Vector3 GetRawWindVec() => CanGetData ? Instance.normalwind : throw new InvalidOperationException(NotFlightScene); //wind vector in the local coordinate frame
         public static double GetCurrentTemperature() => CanGetData ? Instance.Temperature : throw new InvalidOperationException(NotFlightScene);
-        public static double GetCurrentPressure() => CanGetData ? Instance.Pressure : throw new InvalidOperationException(NotFlightScene);
+        public static double GetCurrentPressure() => CanGetData ? Instance.Pressure * 1000 : throw new InvalidOperationException(NotFlightScene); //convert back to Pa
         //nearest-neighbor interpolation for global data
         public static float[][,,] GetCurrentWindData()
         {
@@ -320,22 +320,17 @@ namespace ModularClimateWeatherSystems
 
                     //derive the locations of the data in the arrays
                     double mapx = UtilMath.WrapAround((((lon + 180.0) / 360.0) * winddataX.GetLength(2)) - 0.5, 0, winddataX.GetLength(2));
-                    double mapy = (lat * (winddataX.GetLength(1))) - 0.5;
-                    double normalalt = (alt / bod.atmosphereDepth);
-                    double mapz = (externalbodydata[body].WindLogScaling ? Utils.ScaleLog(normalalt) : normalalt) * winddataX.GetLength(0);
-
-                    double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
-                    double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
-                    double lerpz = alt >= 0.0 ? UtilMath.Clamp01(mapz - Math.Truncate(mapz)) : 0.0;
+                    double mapy = ((180.0 - (lat + 90.0)) / 180.0) * winddataX.GetUpperBound(1);
 
                     int x1 = (int)UtilMath.Clamp(Math.Truncate(mapx), 0, winddataX.GetUpperBound(2));
                     int x2 = UtilMath.WrapAround(x1 + 1, 0, winddataX.GetUpperBound(2));
 
-                    int y1 = Utils.Clamp((int)Math.Truncate(mapy), 0, winddataX.GetUpperBound(1));
+                    int y1 = Utils.Clamp((int)Math.Floor(mapy), 0, winddataX.GetUpperBound(1));
                     int y2 = Utils.Clamp(y1 + 1, 0, winddataX.GetUpperBound(1));
 
-                    int z1 = Utils.Clamp((int)Math.Truncate(mapz), 0, winddataX.GetUpperBound(0));
-                    int z2 = Utils.Clamp(z1 + 1, 0, winddataX.GetUpperBound(0));
+                    double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
+                    double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
+                    double lerpz = Utils.ScaleAltitude(UtilMath.Clamp01(alt / bod.atmosphereDepth), externalbodydata[body].WindScaleFactor, winddataX.GetUpperBound(0), out int z1, out int z2);
 
                     //Bilinearly interpolate on the longitude and latitude axes
                     float BottomPlaneX = Utils.BiLerp(winddataX[z1, y1, x1], winddataX[z1, y1, x2], winddataX[z1, y2, x1], winddataX[z1, y2, x2], (float)lerpx, (float)lerpy);
@@ -372,22 +367,17 @@ namespace ModularClimateWeatherSystems
                 if (validbody && temperaturedata != null)
                 {
                     double mapx = UtilMath.WrapAround((((lon + 180.0) / 360.0) * temperaturedata.GetLength(2)) - 0.5, 0, temperaturedata.GetLength(2));
-                    double mapy = (((180.0 - (lat + 90.0)) / 180.0) * temperaturedata.GetLength(1)) - 0.5;
-                    double normalalt = (alt / bod.atmosphereDepth);
-                    double mapz = (externalbodydata[body].TempLogScaling ? Utils.ScaleLog(normalalt) : normalalt) * temperaturedata.GetLength(0);
-
-                    double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
-                    double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
-                    double lerpz = alt >= 0.0 ? UtilMath.Clamp01(mapz - Math.Truncate(mapz)) : 0.0f;
+                    double mapy = ((180.0 - (lat + 90.0)) / 180.0) * temperaturedata.GetUpperBound(1);
 
                     int x1 = (int)UtilMath.Clamp(Math.Truncate(mapx), 0, temperaturedata.GetUpperBound(2));
                     int x2 = UtilMath.WrapAround(x1 + 1, 0, temperaturedata.GetUpperBound(2));
 
-                    int y1 = Utils.Clamp((int)Math.Truncate(mapy), 0, temperaturedata.GetUpperBound(1));
+                    int y1 = Utils.Clamp((int)Math.Floor(mapy), 0, temperaturedata.GetUpperBound(1));
                     int y2 = Utils.Clamp(y1 + 1, 0, temperaturedata.GetUpperBound(1));
 
-                    int z1 = Utils.Clamp((int)Math.Truncate(mapz), 0, temperaturedata.GetUpperBound(0));
-                    int z2 = Utils.Clamp(z1 + 1, 0, temperaturedata.GetUpperBound(0));
+                    double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
+                    double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
+                    double lerpz = Utils.ScaleAltitude(UtilMath.Clamp01(alt / bod.atmosphereDepth), externalbodydata[body].TempScaleFactor, temperaturedata.GetUpperBound(0), out int z1, out int z2);
 
                     float BottomPlane = Utils.BiLerp(temperaturedata[z1, y1, x1], temperaturedata[z1, y1, x2], temperaturedata[z1, y2, x1], temperaturedata[z1, y2, x2], (float)lerpx, (float)lerpy);
                     float TopPlane = Utils.BiLerp(temperaturedata[z2, y1, x1], temperaturedata[z2, y1, x2], temperaturedata[z2, y2, x1], temperaturedata[z2, y2, x2], (float)lerpx, (float)lerpy);
@@ -413,28 +403,23 @@ namespace ModularClimateWeatherSystems
                 if (validbody && pressuredata != null)
                 {
                     double mapx = UtilMath.WrapAround((((lon + 180.0) / 360.0) * pressuredata.GetLength(2)) - 0.5, 0, pressuredata.GetLength(2));
-                    double mapy = (((180.0 - (lat + 90.0)) / 180.0) * pressuredata.GetLength(1)) - 0.5;
-                    double normalalt = (alt / bod.atmosphereDepth);
-                    double mapz = (externalbodydata[body].PressLogScaling ? Utils.ScaleLog(normalalt) : normalalt) * pressuredata.GetLength(0);
-
-                    double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
-                    double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
-                    double lerpz = alt >= 0.0 ? UtilMath.Clamp01(mapz - Math.Truncate(mapz)) : 0.0f;
+                    double mapy = ((180.0 - (lat + 90.0)) / 180.0) * pressuredata.GetUpperBound(1);
 
                     int x1 = (int)UtilMath.Clamp(Math.Truncate(mapx), 0, pressuredata.GetUpperBound(2));
                     int x2 = (int)UtilMath.WrapAround(mapx + 1, 0, pressuredata.GetUpperBound(2));
 
-                    int y1 = Utils.Clamp((int)Math.Truncate(mapy), 0, pressuredata.GetUpperBound(1));
-                    int y2 = Utils.Clamp((int)Math.Truncate(mapy) + 1, 0, pressuredata.GetUpperBound(1));
+                    int y1 = Utils.Clamp((int)Math.Floor(mapy), 0, pressuredata.GetUpperBound(1));
+                    int y2 = Utils.Clamp(y1 + 1, 0, pressuredata.GetUpperBound(1));
 
-                    int z1 = Utils.Clamp((int)Math.Truncate(mapz), 0, pressuredata.GetUpperBound(0));
-                    int z2 = Utils.Clamp(z1 + 1, 0, pressuredata.GetUpperBound(0));
+                    double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
+                    double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
+                    double lerpz = Utils.ScaleAltitude(UtilMath.Clamp01(alt / bod.atmosphereDepth), externalbodydata[body].PressScaleFactor, pressuredata.GetUpperBound(0), out int z1, out int z2);
 
                     float BottomPlane = Utils.BiLerp(pressuredata[z1, y1, x1], pressuredata[z1, y1, x2], pressuredata[z1, y2, x1], pressuredata[z1, y2, x2], (float)lerpx, (float)lerpy);
                     float TopPlane = Utils.BiLerp(pressuredata[z2, y1, x1], pressuredata[z2, y1, x2], pressuredata[z2, y2, x1], pressuredata[z2, y2, x2], (float)lerpx, (float)lerpy);
 
                     //apply logarithmic interpolation
-                    double Final = Utils.InterpolateLog((double)BottomPlane, (double)TopPlane, lerpz);
+                    double Final = Math.Pow(Math.Max(BottomPlane, 0.0000001), 1d - lerpz) * Math.Pow(Math.Max(TopPlane, 0.0000001), lerpz);
                     return double.IsFinite(Final) ? Final : throw new NotFiniteNumberException();
                 }
             }
@@ -503,6 +488,5 @@ namespace ModularClimateWeatherSystems
         private static void CannotRegister(string type, string name, string body) => Utils.LogAPIWarning(string.Format("Could not register '{0}' as a {1} data source for the Celestial Body {2}. Another plugin has already registered.", name, type, body));
         private static void FormatError(string type) => throw new FormatException(string.Format("Returned {0} Data array does not conform to the required format.", type));
         private static void BadArrayError(string type) => throw new ArgumentNullException(string.Format("Returned {0} Data array is null.", type));
-        private static void NullArgs() => throw new ArgumentNullException("One or more arguments was null or empty.");
     }
 }
