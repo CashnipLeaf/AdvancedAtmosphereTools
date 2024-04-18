@@ -21,7 +21,7 @@ namespace ModularClimateWeatherSystems
         private Matrix4x4 Vesselframe = Matrix4x4.identity;
         internal bool FARConnected = false;
         internal double CurrentTime => Planetarium.GetUniversalTime();
-        internal static double DEFAULTINTERVAL => MCWS_API.DEFAULTINTERVAL;
+        internal const double DEFAULTINTERVAL = 300.0;
 
         internal double Windtimestep = DEFAULTINTERVAL;
         internal double Windtimeofnextstep = DEFAULTINTERVAL;
@@ -51,7 +51,7 @@ namespace ModularClimateWeatherSystems
         internal Vector3 InternalAppliedWind => AppliedWind * DisableMultiplier; 
         private float DisableMultiplier = 1.0f;
 
-        internal float[,,] winddataX1; 
+        internal float[,,] winddataX1;
         internal float[,,] winddataY1;
         internal float[,,] winddataZ1;
         internal float[,,] winddataX2;
@@ -346,7 +346,7 @@ namespace ModularClimateWeatherSystems
                         double TopPlaneFinal = UtilMath.Lerp((double)TopPlane1, (double)TopPlane2, lerpt);
 
                         //Logarithmically interpolate on the altitude axis.
-                        double Final = Math.Pow(Math.Max(BottomPlaneFinal, 0.0000001), 1d - lerpz) * Math.Pow(Math.Max(TopPlaneFinal, 0.0000001), lerpz);
+                        double Final = Math.Pow(Math.Max(BottomPlaneFinal, Utils.Epsilon), 1d - lerpz) * Math.Pow(Math.Max(TopPlaneFinal, Utils.Epsilon), lerpz);
                         Pressure = double.IsFinite(Final) ? Final * 0.001 : throw new NotFiniteNumberException(); //convert to kPa
                     }
                     catch (Exception ex) //fallback data

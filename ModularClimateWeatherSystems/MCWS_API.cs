@@ -12,7 +12,7 @@ namespace ModularClimateWeatherSystems
         private static Dictionary<string, BodyData> externalbodydata;
 
         //--------------------------REGISTER EXTERNAL DATA--------------------------
-        public static bool RegisterTimestepWindData(string body, GlobalPropertyDelegate dlgX, GlobalPropertyDelegate dlgY, GlobalPropertyDelegate dlgZ, string name, float scaleFactor, double step)
+        public static bool RegisterWindData(string body, GlobalPropertyDelegate dlgX, GlobalPropertyDelegate dlgY, GlobalPropertyDelegate dlgZ, string name, float scaleFactor, double step)
         {
             if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(body) || dlgX == null || dlgY == null || dlgZ == null)
             {
@@ -21,7 +21,7 @@ namespace ModularClimateWeatherSystems
             CheckRegistration(body, step);
             if (!externalbodydata[body].HasWind)
             {
-                ToRegister("Wind", name, body, step);
+                ToRegister("Wind", name, body, step, scaleFactor);
                 //Sample some data to verify that the returned array is of the correct format
                 float[,,] checkdataX = dlgX.Invoke(body, 0.0);
                 float[,,] checkdataY = dlgY.Invoke(body, 0.0);
@@ -45,9 +45,8 @@ namespace ModularClimateWeatherSystems
             CannotRegister("Wind", name, body);
             return false;
         }
-        public static bool RegisterWindData(string body, GlobalPropertyDelegate dlgx, GlobalPropertyDelegate dlgy, GlobalPropertyDelegate dlgz, string name, float scaleFactor) => RegisterTimestepWindData(body, dlgx,dlgy,dlgz, name, scaleFactor, DEFAULTINTERVAL);
 
-        public static bool RegisterTimestepTemperatureData(string body, GlobalPropertyDelegate dlg, string name, float scaleFactor, double step)
+        public static bool RegisterTemperatureData(string body, GlobalPropertyDelegate dlg, string name, float scaleFactor, double step)
         {
             if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(body) || dlg == null)
             {
@@ -56,7 +55,7 @@ namespace ModularClimateWeatherSystems
             CheckRegistration(body, step);
             if (!externalbodydata[body].HasTemperature)
             {
-                ToRegister("Temperature", name, body, step);
+                ToRegister("Temperature", name, body, step, scaleFactor);
                 //Sample some data to verify that the returned array is of the correct format
                 float[,,] checkdata = dlg.Invoke(body, 0.0);
                 if (checkdata != null)
@@ -74,9 +73,8 @@ namespace ModularClimateWeatherSystems
             CannotRegister("Temperature", name, body);
             return false;
         }
-        public static bool RegisterTemperatureData(string body, GlobalPropertyDelegate dlg, string name, float scaleFactor) => RegisterTimestepTemperatureData(body, dlg, name, scaleFactor, DEFAULTINTERVAL);
 
-        public static bool RegisterTimestepPressureData(string body, GlobalPropertyDelegate dlg, string name, float scaleFactor, double step)
+        public static bool RegisterPressureData(string body, GlobalPropertyDelegate dlg, string name, float scaleFactor, double step)
         {
             if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(body) || dlg == null)
             {
@@ -85,7 +83,7 @@ namespace ModularClimateWeatherSystems
             CheckRegistration(body, step);
             if (!externalbodydata[body].HasPressure)
             {
-                ToRegister("Pressure", name, body, step);
+                ToRegister("Pressure", name, body, step, scaleFactor);
                 //Sample some data to verify that the returned array is of the correct format
                 float[,,] checkdata = dlg.Invoke(body, 0.0);
                 if (checkdata != null)
@@ -103,7 +101,6 @@ namespace ModularClimateWeatherSystems
             CannotRegister("Pressure", name, body);
             return false;
         }
-        public static bool RegisterPressureData(string body, GlobalPropertyDelegate dlg, string name, float scaleFactor) => RegisterTimestepPressureData(body, dlg, name, scaleFactor, DEFAULTINTERVAL);
 
         //-------------FETCH EXTERNAL DATA-------------
 
@@ -345,7 +342,6 @@ namespace ModularClimateWeatherSystems
                     Vector3 BottomPlane = new Vector3(BottomPlaneX, BottomPlaneY, BottomPlaneZ);
                     Vector3 TopPlane = new Vector3(TopPlaneX, TopPlaneY, TopPlaneZ);
 
-                    //Undo the logarithmic scaling if needed.
                     Vector3 Final = Vector3.Lerp(BottomPlane, TopPlane, (float)lerpz);
                     return Utils.IsVectorFinite(Final) ? Final : throw new NotFiniteNumberException();
                 }
@@ -419,7 +415,7 @@ namespace ModularClimateWeatherSystems
                     float TopPlane = Utils.BiLerp(pressuredata[z2, y1, x1], pressuredata[z2, y1, x2], pressuredata[z2, y2, x1], pressuredata[z2, y2, x2], (float)lerpx, (float)lerpy);
 
                     //apply logarithmic interpolation
-                    double Final = Math.Pow(Math.Max(BottomPlane, 0.0000001), 1d - lerpz) * Math.Pow(Math.Max(TopPlane, 0.0000001), lerpz);
+                    double Final = Math.Pow(Math.Max(BottomPlane, Utils.Epsilon), 1d - lerpz) * Math.Pow(Math.Max(TopPlane, Utils.Epsilon), lerpz);
                     return double.IsFinite(Final) ? Final : throw new NotFiniteNumberException();
                 }
             }
@@ -431,7 +427,6 @@ namespace ModularClimateWeatherSystems
         }
 
         //-------------HELPER FUNCTIONS AND VALUES-----------------
-        internal const double DEFAULTINTERVAL = 300.0;
 
         //I CBA to do a cleaner implementation of this.
         internal static bool CheckArraySizes(float[,,] arr1, float[,,] arr2, float[,,] arr3) => CheckArraySizes(arr1, arr2) && CheckArraySizes(arr1, arr3) && CheckArraySizes(arr2, arr3);
@@ -483,9 +478,9 @@ namespace ModularClimateWeatherSystems
             }
         }
 
-        private static void ToRegister(string type, string name, string body, double step) => Utils.LogAPI(string.Format("Registering '{0}' as a {1} data source for the Celestial Body {2} with timestep length {3:F1}.", name, type, body, step));
-        private static void SuccessfulRegistration(string type, string name, string body) => Utils.LogAPI(string.Format("'{0}' has successfully registered as a {1} data source for the Celestial Body {2}.", name, type, body));
-        private static void CannotRegister(string type, string name, string body) => Utils.LogAPIWarning(string.Format("Could not register '{0}' as a {1} data source for the Celestial Body {2}. Another plugin has already registered.", name, type, body));
+        private static void ToRegister(string type, string name, string body, double step, float scalefactor) => Utils.LogAPI(string.Format("Registering '{0}' as a {1} data source for {2} with timestep length {3:F1} and altitude scale factor {4:F2}.", name, type, body, step, scalefactor));
+        private static void SuccessfulRegistration(string type, string name, string body) => Utils.LogAPI(string.Format("Successfully registered '{0}' as a {1} data source for {2}.", name, type, body));
+        private static void CannotRegister(string type, string name, string body) => Utils.LogAPIWarning(string.Format("Could not register '{0}' as a {1} data source for {2}. Another plugin has already registered.", name, type, body));
         private static void FormatError(string type) => throw new FormatException(string.Format("Returned {0} Data array does not conform to the required format.", type));
         private static void BadArrayError(string type) => throw new ArgumentNullException(string.Format("Returned {0} Data array is null.", type));
     }

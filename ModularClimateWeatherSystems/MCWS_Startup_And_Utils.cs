@@ -116,6 +116,8 @@ namespace ModularClimateWeatherSystems
 
         //------------------------------MATH AND RELATED-------------------------
 
+        internal static double Epsilon => Mathf.Epsilon * 16d; //value that is very nearly zero to prevent the log interpolation from breaking
+
         //Desperate solution to try and save lines, did not end up saving that many lines. Might inline.
         internal static float BiLerp(float first1, float second1, float first2, float second2, float by1, float by2)
         {
@@ -129,7 +131,8 @@ namespace ModularClimateWeatherSystems
             double z = (xBase <= 1.0 ? nX : ((Math.Pow(xBase, -nX * upperbound) - 1) / (Math.Pow(xBase, -1 * upperbound) - 1))) * upperbound;
             int1 = Clamp((int)Math.Floor(z), 0, upperbound); //layer 1
             int2 = Clamp(int1 + 1, 0, upperbound); //layer 2
-
+            return UtilMath.Clamp01(z - Math.Truncate(z)); //hack fix since the interpolation below did not work
+            /*
             double z1 = xBase <= 1.0 ? (double)int1 / (double)upperbound : ((Math.Pow(xBase, int1) - 1) / (Math.Pow(xBase, upperbound) - 1));
             double z2 = xBase <= 1.0 ? (double)int2 / (double)upperbound : ((Math.Pow(xBase, int2) - 1) / (Math.Pow(xBase, upperbound) - 1));
             if (nX >= z2 || z2 <= z1)
@@ -144,6 +147,7 @@ namespace ModularClimateWeatherSystems
             {
                 return UtilMath.Clamp01((nX - z1) / (z2 - z1)); //returns the lerp factor between the two layers
             }
+            */
         }
 
         internal static int Clamp(int value, int min, int max) => Math.Min(Math.Max(value, min), max); //Apparently no such function exists for integers. Why?

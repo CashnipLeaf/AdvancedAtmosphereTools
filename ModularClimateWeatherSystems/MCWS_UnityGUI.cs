@@ -84,7 +84,7 @@ namespace ModularClimateWeatherSystems
 
             //toggle the wind-adjusted prograde indicators
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button(Settings.AdjustedIndicatorsEnabled ? GetLOC("#LOC_MCWS_enableindicators") : GetLOC("#LOC_MCWS_disableindicators"), button))
+            if (GUILayout.Button(Settings.AdjustedIndicatorsEnabled ? GetLOC("#LOC_MCWS_disableindicators") : GetLOC("#LOC_MCWS_enableindicators"), button))
             {
                 Settings.buttonindicatorsenabled = !Settings.buttonindicatorsenabled;
             }
@@ -153,10 +153,6 @@ namespace ModularClimateWeatherSystems
                         foreach (Part p in activevessel.Parts)
                         {
                             totaldrag += p.dragScalar * -p.dragVectorDirLocal;
-                            if (!p.hasLiftModule)
-                            {
-                                totallift += Vector3.ProjectOnPlane(p.transform.rotation * (p.bodyLiftScalar * p.DragCubes.LiftForce), -p.dragVectorDir);
-                            }
                             if (p.hasLiftModule)
                             {
                                 foreach (var m in p.Modules)
@@ -167,6 +163,10 @@ namespace ModularClimateWeatherSystems
                                         totaldrag += wing.dragForce;
                                     }
                                 }
+                            }
+                            else
+                            {
+                                totallift += Vector3.ProjectOnPlane(p.transform.rotation * (p.bodyLiftScalar * p.DragCubes.LiftForce), -p.dragVectorDir);
                             }
                         }
                         Vector3d totalforce = totallift + totaldrag;

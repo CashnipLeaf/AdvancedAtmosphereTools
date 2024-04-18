@@ -99,7 +99,7 @@ namespace ModularClimateWeatherSystems
             windvec = Vector3.Lerp(windvec, Vector3.zero, (float)part.submergedPortion);
 
             //add an offset to the velocity vector used for body drag/lift calcs and update the related fields.
-            if (part.Rigidbody != null && Utils.IsVectorFinite(windvec) && windvec != Vector3.zero)
+            if (part.Rigidbody != null && Utils.IsVectorFinite(windvec) && !Mathf.Approximately(windvec.magnitude, 0.0f))
             {
                 part.dragVector = part.Rigidbody.velocity + Krakensbane.GetFrameVelocity() - windvec;
                 part.dragVectorSqrMag = part.dragVector.sqrMagnitude;
@@ -128,7 +128,7 @@ namespace ModularClimateWeatherSystems
         void CalculateConstantsAtmosphereOverride(ModularFlightIntegrator fi)
         {
             Vector3 windvec = (FH != null && FH.HasWind) ? FH.InternalAppliedWind : Vector3.zero;
-            if (Utils.IsVectorFinite(windvec) && windvec != Vector3.zero)
+            if (Utils.IsVectorFinite(windvec) && !Mathf.Approximately(windvec.magnitude, 0.0f))
             {
                 fi.Vel -= windvec;
                 fi.spd = !fi.Vessel.IgnoreSpeedActive ? fi.Vel.magnitude : 0.0;
@@ -219,7 +219,7 @@ namespace ModularClimateWeatherSystems
                 return;
             }
             Vector3 windvec = FH.InternalAppliedWind;
-            if (!Utils.IsVectorFinite(windvec) || windvec == Vector3.zero)
+            if (!Utils.IsVectorFinite(windvec) || Mathf.Approximately(windvec.magnitude, 0.0f))
             {
                 return;
             }
@@ -240,7 +240,7 @@ namespace ModularClimateWeatherSystems
                 return true;
             }
             Vector3 windvec = FH.InternalAppliedWind;
-            if (!Utils.IsVectorFinite(windvec) || windvec == Vector3.zero)
+            if (!Utils.IsVectorFinite(windvec) || Mathf.Approximately(windvec.magnitude, 0.0f))
             {
                 return true;
             }
