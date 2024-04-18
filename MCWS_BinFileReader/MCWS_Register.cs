@@ -5,10 +5,9 @@ using UnityEngine;
 
 namespace MCWS_BinFileReader
 {
-    using GlobalPropertyDelegate = Func<string, double, float[,,]>; //body, time, global property data (return value)
+    using PropertyDelegate = Func<string, double, float[,,]>; //body, time, global property data (return value)
 
     [KSPAddon(KSPAddon.Startup.SpaceCentre, true)]
-    [DefaultExecutionOrder(100)]
     internal class MCWS_Register : MonoBehaviour
     {
         public static MCWS_Register Instance { get; private set; }
@@ -50,9 +49,9 @@ namespace MCWS_BinFileReader
                 }
                 if (MCWS != null)
                 {
-                    MethodInfo wind = MCWS.GetMethod("RegisterTimestepWindData");
-                    MethodInfo temp = MCWS.GetMethod("RegisterTimestepTemperatureData");
-                    MethodInfo press = MCWS.GetMethod("RegisterTimestepPressureData");
+                    MethodInfo wind = MCWS.GetMethod("RegisterWindData");
+                    MethodInfo temp = MCWS.GetMethod("RegisterTemperatureData");
+                    MethodInfo press = MCWS.GetMethod("RegisterPressureData");
 
                     foreach (KeyValuePair<string, BodyData> pair in Data.bodydata)
                     {
@@ -61,11 +60,12 @@ namespace MCWS_BinFileReader
                         
                         try
                         {
+                            Utils.LogInfo(string.Format("Registering Wind Data for {0}.", body));
                             if (wind != null && pair.Value.HasWind)
                             {
-                                GlobalPropertyDelegate windX = GetWindX;
-                                GlobalPropertyDelegate windY = GetWindY;
-                                GlobalPropertyDelegate windZ = GetWindZ;
+                                PropertyDelegate windX = GetWindX;
+                                PropertyDelegate windY = GetWindY;
+                                PropertyDelegate windZ = GetWindZ;
                                 _ = wind.Invoke(null, new object[] { body, windX, windY, windZ, ModName, pair.Value.WindScaleFactor, pair.Value.WindTimeStep });
                             }
                         }
@@ -76,9 +76,10 @@ namespace MCWS_BinFileReader
 
                         try
                         {
+                            Utils.LogInfo(string.Format("Registering Temperature Data for {0}.", body));
                             if (temp != null && pair.Value.HasTemperature)
                             {
-                                _ = temp.Invoke(null, new object[] { body, (GlobalPropertyDelegate)GetTemp, ModName, pair.Value.TemperatureScaleFactor, pair.Value.TemperatureTimeStep });
+                                _ = temp.Invoke(null, new object[] { body, (PropertyDelegate)GetTemp, ModName, pair.Value.TemperatureScaleFactor, pair.Value.TemperatureTimeStep });
                             }
                         }
                         catch (Exception ex)
@@ -88,9 +89,10 @@ namespace MCWS_BinFileReader
 
                         try
                         {
+                            Utils.LogInfo(string.Format("Registering Pressure Data for {0}.", body));
                             if (press != null && pair.Value.HasPressure)
                             {
-                                _ = press.Invoke(null, new object[] { body, (GlobalPropertyDelegate)GetPress, ModName, pair.Value.PressureScaleFactor, pair.Value.PressureTimeStep });
+                                _ = press.Invoke(null, new object[] { body, (PropertyDelegate)GetPress, ModName, pair.Value.PressureScaleFactor, pair.Value.PressureTimeStep });
                             }
                         }
                         catch (Exception ex)

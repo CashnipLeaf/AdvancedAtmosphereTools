@@ -7,14 +7,13 @@ using UnityEngine;
 namespace MCWS_BinFileReader
 {
     [KSPAddon(KSPAddon.Startup.MainMenu, true)]
-    [DefaultExecutionOrder(100)]
     public class FileReader : MonoBehaviour
     {
         public static FileReader Instance {  get; private set; }
 
         internal Dictionary<string, BodyData> bodydata;
         internal static string GameDataPath => KSPUtil.ApplicationRootPath + "GameData/";
-        private static readonly string[] acceptedorderings = { "windx", "windy" , "windz", "temperature", "pressure"};
+        private static readonly string[] acceptedorderstrings = { "windx", "windy" , "windz", "temperature", "pressure"};
 
         internal bool HasBody(string body) => bodydata != null && bodydata.ContainsKey(body);
 
@@ -45,23 +44,31 @@ namespace MCWS_BinFileReader
                     string body = "";
                     if (!node.TryGetValue("body", ref body) || string.IsNullOrEmpty(body))
                     {
-                        throw new ArgumentNullException();
+                        throw new ArgumentNullException("'body' key was not inputted or was an empty string.");
+                    }
+                    CelestialBody bod = FlightGlobals.GetBodyByName(body);
+                    if (bod == null || !bod.atmosphere)
+                    {
+                        throw new ArgumentException(string.Format("Celestial Body {0} does not exist or does not have an atmosphere. Data will not be read to conserve memory.", body));
                     }
 
                     Utils.LogInfo(string.Format("Loading config for {0}.", body));
                     if (!bodydata.ContainsKey(body))
                     {
                         bodydata.Add(body, new BodyData(body));
+                    }
 
-                        int lon = 0;
-                        int lat = 0;
-                        int alt = 0;
-                        int steps = 0;
-                        double timestep = double.NaN;
-                        float scaleFactor = 1.0f;
+                    int lon = 0;
+                    int lat = 0;
+                    int alt = 0;
+                    int steps = 0;
+                    double timestep = double.NaN;
+                    float scaleFactor = 1.0f;
 
-                        ConfigNode data = new ConfigNode();
-                        if (node.TryGetNode("Combined_Data", ref data))
+                    ConfigNode data = new ConfigNode();
+                    if (node.TryGetNode("Combined_Data", ref data))
+                    {
+                        if (!bodydata[body].HasWind && !bodydata[body].HasTemperature && !bodydata[body].HasPressure)
                         {
                             Utils.LogInfo(string.Format("Loading Combined Data node for {0}.", body));
                             string path = "";
@@ -80,12 +87,12 @@ namespace MCWS_BinFileReader
                                             throw new ArgumentNullException("A null or empty string was present in the readOrder list.");
                                         }
                                         readorder[i] = readorder[i].ToLower();
-                                        if (!acceptedorderings.Contains(readorder[i]))
+                                        if (!acceptedorderstrings.Contains(readorder[i]))
                                         {
-                                            throw new ArgumentOutOfRangeException(string.Format("String {0} is not a valid value for the read order.", readorder[i]));
+                                            throw new ArgumentException(string.Format("String {0} is not a valid value for the read order.", readorder[i]));
                                         }
                                     }
-                                    
+
                                     float[][,,] windarrayx = new float[steps][,,];
                                     float[][,,] windarrayy = new float[steps][,,];
                                     float[][,,] windarrayz = new float[steps][,,];
@@ -119,7 +126,7 @@ namespace MCWS_BinFileReader
                                                         pressarray[i] = floatbuffer;
                                                         break;
                                                     default:
-                                                        throw new ArgumentOutOfRangeException();
+                                                        throw new ArgumentException(string.Format("String {0} is not a valid value for the read order.", readorder[i]));
                                                 }
                                             }
                                         }
@@ -132,7 +139,7 @@ namespace MCWS_BinFileReader
                                 }
                                 else
                                 {
-                                    throw new ArgumentOutOfRangeException();
+                                    throw new ArgumentOutOfRangeException("One or more of the inputted keys was outside the range of acceptable values.");
                                 }
                             }
                             else
@@ -142,13 +149,20 @@ namespace MCWS_BinFileReader
                         }
                         else
                         {
-                            if (node.TryGetNode("Wind_Data", ref data))
+                            Utils.LogWarning(string.Format("Data already exists for {0}.", body));
+                        }
+                    }
+                    else
+                    {
+                        if (node.TryGetNode("Wind_Data", ref data))
+                        {
+                            if (!bodydata[body].HasWind)
                             {
                                 Utils.LogInfo(string.Format("Loading Wind Data node for {0}.", body));
                                 bool combined = false;
                                 data.TryGetValue("combined", ref combined);
 
-                                if ( data.TryGetValue("sizeLon", ref lon) && data.TryGetValue("sizeLat", ref lat) && data.TryGetValue("sizeAlt", ref alt) &&
+                                if (data.TryGetValue("sizeLon", ref lon) && data.TryGetValue("sizeLat", ref lat) && data.TryGetValue("sizeAlt", ref alt) &&
                                      data.TryGetValue("timesteps", ref steps) && data.TryGetValue("timestepLength", ref timestep))
                                 {
                                     data.TryGetValue("scaleFactor", ref scaleFactor);
@@ -172,9 +186,9 @@ namespace MCWS_BinFileReader
                                                         throw new ArgumentNullException("A null or empty string was present in the readOrder list.");
                                                     }
                                                     readorder[i] = readorder[i].ToLower();
-                                                    if (!acceptedorderings.Contains(readorder[i]))
+                                                    if (!acceptedorderstrings.Contains(readorder[i]))
                                                     {
-                                                        throw new ArgumentOutOfRangeException(string.Format("String {0} is not a valid value for the read order.", readorder[i]));
+                                                        throw new ArgumentException(string.Format("String {0} is not a valid value for the read order.", readorder[i]));
                                                     }
                                                 }
                                                 using (BinaryReader reader = new BinaryReader(File.OpenRead(GameDataPath + path)))
@@ -198,7 +212,7 @@ namespace MCWS_BinFileReader
                                                                     windarrayz[i] = floatbuffer;
                                                                     break;
                                                                 default:
-                                                                    throw new ArgumentOutOfRangeException();
+                                                                    throw new ArgumentException(string.Format("String {0} is not a valid value for the read order.", readorder[i]));
                                                             }
                                                         }
                                                     }
@@ -207,7 +221,7 @@ namespace MCWS_BinFileReader
                                             }
                                             else
                                             {
-                                                throw new ArgumentNullException();
+                                                throw new ArgumentException("The 'path' or 'readOrder' key was not inputted or was empty, or the 'readOrder' was an invalid length.");
                                             }
                                         }
                                         else
@@ -216,7 +230,7 @@ namespace MCWS_BinFileReader
                                             string pathy = "";
                                             string pathz = "";
 
-                                            if (data.TryGetValue("path_X", ref pathx) && data.TryGetValue("path_Y", ref pathy) && data.TryGetValue("path_Z", ref pathz) && 
+                                            if (data.TryGetValue("path_X", ref pathx) && data.TryGetValue("path_Y", ref pathy) && data.TryGetValue("path_Z", ref pathz) &&
                                                 !string.IsNullOrEmpty(pathx) && !string.IsNullOrEmpty(pathy) && !string.IsNullOrEmpty(pathz))
                                             {
                                                 using (BinaryReader reader = new BinaryReader(File.OpenRead(GameDataPath + pathx)))
@@ -255,7 +269,7 @@ namespace MCWS_BinFileReader
                                             }
                                             else
                                             {
-                                                throw new ArgumentNullException("One or more file paths were null or empty.");
+                                                throw new ArgumentNullException("One or more file paths were not present or were empty strings.");
                                             }
                                         }
                                         bodydata[body].AddWindData(windarrayx, windarrayy, windarrayz, scaleFactor, timestep);
@@ -263,7 +277,7 @@ namespace MCWS_BinFileReader
                                     }
                                     else
                                     {
-                                        throw new ArgumentOutOfRangeException();
+                                        throw new ArgumentOutOfRangeException("One or more of the inputted keys was outside the range of acceptable values.");
                                     }
                                 }
                                 else
@@ -271,7 +285,14 @@ namespace MCWS_BinFileReader
                                     throw new ArgumentNullException("One or more keys was not present or was empty.");
                                 }
                             }
-                            if (node.TryGetNode("Temperature_Data", ref data))
+                            else
+                            {
+                                Utils.LogWarning(string.Format("Wind Data already exists for {0}.", body));
+                            }
+                        }
+                        if (node.TryGetNode("Temperature_Data", ref data))
+                        {
+                            if (!bodydata[body].HasTemperature)
                             {
                                 Utils.LogInfo(string.Format("Loading Temperature Data node for {0}.", body));
                                 string path = "";
@@ -300,15 +321,22 @@ namespace MCWS_BinFileReader
                                     }
                                     else
                                     {
-                                        throw new ArgumentOutOfRangeException();
+                                        throw new ArgumentOutOfRangeException("One or more of the inputted keys was outside the range of acceptable values.");
                                     }
                                 }
                                 else
                                 {
-                                    throw new ArgumentNullException();
+                                    throw new ArgumentNullException("One or more keys was not present or was empty.");
                                 }
                             }
-                            if (node.TryGetNode("Pressure_Data", ref data))
+                            else
+                            {
+                                Utils.LogWarning(string.Format("Temperature Data already exists for {0}.", body));
+                            }
+                        }
+                        if (node.TryGetNode("Pressure_Data", ref data))
+                        {
+                            if (bodydata[body].HasPressure)
                             {
                                 Utils.LogInfo(string.Format("Loading Pressure Data node for {0}.", body));
                                 string path = "";
@@ -337,19 +365,19 @@ namespace MCWS_BinFileReader
                                     }
                                     else
                                     {
-                                        throw new ArgumentOutOfRangeException();
-                                    } 
+                                        throw new ArgumentOutOfRangeException("One or more of the inputted keys was outside the range of acceptable values.");
+                                    }
                                 }
                                 else
                                 {
                                     throw new ArgumentNullException("One or more keys was not present or was empty.");
                                 }
                             }
+                            else
+                            {
+                                Utils.LogWarning(string.Format("Pressure Data already exists for {0}.", body));
+                            }
                         }
-                    }
-                    else
-                    {
-                        Utils.LogWarning(string.Format("Data is already present for {0}.", body));
                     }
                 }
                 catch (Exception ex)
@@ -370,6 +398,7 @@ namespace MCWS_BinFileReader
             }
             foreach (string deleteme in todelete)
             {
+                Utils.LogInfo(string.Format("Removing empty data object for body {0}.", deleteme));
                 bodydata.Remove(deleteme);
             }
             Utils.LogInfo("Cleanup Complete.");
