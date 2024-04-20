@@ -13,7 +13,8 @@ namespace MCWS_BinFileReader
 
         internal Dictionary<string, BodyData> bodydata;
         internal static string GameDataPath => KSPUtil.ApplicationRootPath + "GameData/";
-        private static readonly string[] acceptedorderstrings = { "windx", "windy" , "windz", "temperature", "pressure"};
+        private static readonly string[] acceptedotherstrings = { "temperature", "pressure", "spacer" };
+        private static readonly string[] acceptedwindstrings = { "windx", "windy", "windz" };
 
         internal bool HasBody(string body) => bodydata != null && bodydata.ContainsKey(body);
 
@@ -31,7 +32,7 @@ namespace MCWS_BinFileReader
             }
         }
 
-        void Awake()
+        void Start()
         {
             Utils.LogInfo("Loading configs");
             
@@ -72,24 +73,33 @@ namespace MCWS_BinFileReader
                         {
                             Utils.LogInfo(string.Format("Loading Combined Data node for {0}.", body));
                             string path = "";
-                            string[] readorder = new string[5];
+                            string[] readorder = new string[1];
+                            List<string> components = new List<string>();
 
                             if (data.TryGetValue("path", ref path) && data.TryGetValue("readOrder", ref readorder) && !string.IsNullOrEmpty(path) && data.TryGetValue("sizeLon", ref lon) &&
                                 data.TryGetValue("sizeLat", ref lat) && data.TryGetValue("sizeAlt", ref alt) && data.TryGetValue("timesteps", ref steps) && data.TryGetValue("timestepLength", ref timestep))
                             {
                                 data.TryGetValue("scaleFactor", ref scaleFactor);
-                                if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && readorder.Length == 5)
+                                if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && readorder.Length > 1)
                                 {
-                                    for (int i = 0; i < 5; i++)
+                                    for (int i = 0; i < readorder.Length; i++) //check the readOrder to make sure it is valid.
                                     {
                                         if (string.IsNullOrEmpty(readorder[i]))
                                         {
                                             throw new ArgumentNullException("A null or empty string was present in the readOrder list.");
                                         }
                                         readorder[i] = readorder[i].ToLower();
-                                        if (!acceptedorderstrings.Contains(readorder[i]))
+                                        if (!acceptedotherstrings.Contains(readorder[i]) && !acceptedwindstrings.Contains(readorder[i]))
                                         {
                                             throw new ArgumentException(string.Format("String {0} is not a valid value for the read order.", readorder[i]));
+                                        }
+                                        if (components.Contains(readorder[i]))
+                                        {
+                                            throw new ArgumentException(string.Format("Duplicate value {0} was present in the readOrder list.", readorder[i]));
+                                        }
+                                        if (readorder[i] != "spacer")
+                                        {
+                                            components.Add(readorder[i]);
                                         }
                                     }
 
@@ -110,6 +120,8 @@ namespace MCWS_BinFileReader
                                                 Buffer.BlockCopy(bufferarray, 0, floatbuffer, 0, Buffer.ByteLength(bufferarray));
                                                 switch (line)
                                                 {
+                                                    case "spacer":
+                                                        break;
                                                     case "windx":
                                                         windarrayx[i] = floatbuffer;
                                                         break;
@@ -152,231 +164,237 @@ namespace MCWS_BinFileReader
                             Utils.LogWarning(string.Format("Data already exists for {0}.", body));
                         }
                     }
-                    else
+                    scaleFactor = 1.0f; //reset the scalefactor if needed
+                    if (node.TryGetNode("Wind_Data", ref data))
                     {
-                        if (node.TryGetNode("Wind_Data", ref data))
+                        if (!bodydata[body].HasWind)
                         {
-                            if (!bodydata[body].HasWind)
+                            Utils.LogInfo(string.Format("Loading Wind Data node for {0}.", body));
+                            bool combined = false;
+                            data.TryGetValue("combined", ref combined);
+
+                            if (data.TryGetValue("sizeLon", ref lon) && data.TryGetValue("sizeLat", ref lat) && data.TryGetValue("sizeAlt", ref alt) &&
+                                 data.TryGetValue("timesteps", ref steps) && data.TryGetValue("timestepLength", ref timestep))
                             {
-                                Utils.LogInfo(string.Format("Loading Wind Data node for {0}.", body));
-                                bool combined = false;
-                                data.TryGetValue("combined", ref combined);
-
-                                if (data.TryGetValue("sizeLon", ref lon) && data.TryGetValue("sizeLat", ref lat) && data.TryGetValue("sizeAlt", ref alt) &&
-                                     data.TryGetValue("timesteps", ref steps) && data.TryGetValue("timestepLength", ref timestep))
+                                data.TryGetValue("scaleFactor", ref scaleFactor);
+                                if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f)
                                 {
-                                    data.TryGetValue("scaleFactor", ref scaleFactor);
-                                    if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f)
+                                    float[][,,] windarrayx = new float[steps][,,];
+                                    float[][,,] windarrayy = new float[steps][,,];
+                                    float[][,,] windarrayz = new float[steps][,,];
+
+                                    if (combined)
                                     {
-                                        float[][,,] windarrayx = new float[steps][,,];
-                                        float[][,,] windarrayy = new float[steps][,,];
-                                        float[][,,] windarrayz = new float[steps][,,];
+                                        string path = "";
+                                        string[] readorder = new string[3];
+                                        string[] components = new string[3];
 
-                                        if (combined)
+                                        if (data.TryGetValue("path", ref path) && data.TryGetValue("readOrder", ref readorder) && !string.IsNullOrEmpty(path) && readorder.Length == 3)
                                         {
-                                            string path = "";
-                                            string[] readorder = new string[3];
-
-                                            if (data.TryGetValue("path", ref path) && data.TryGetValue("readOrder", ref readorder) && !string.IsNullOrEmpty(path) && readorder.Length == 3)
+                                            for (int i = 0; i < 3; i++) //check the readOrder to make sure it is valid.
                                             {
-                                                for (int i = 0; i < 3; i++)
+                                                if (string.IsNullOrEmpty(readorder[i]))
                                                 {
-                                                    if (string.IsNullOrEmpty(readorder[i]))
-                                                    {
-                                                        throw new ArgumentNullException("A null or empty string was present in the readOrder list.");
-                                                    }
-                                                    readorder[i] = readorder[i].ToLower();
-                                                    if (!acceptedorderstrings.Contains(readorder[i]))
-                                                    {
-                                                        throw new ArgumentException(string.Format("String {0} is not a valid value for the read order.", readorder[i]));
-                                                    }
+                                                    throw new ArgumentNullException("A null or empty string was present in the readOrder list.");
                                                 }
-                                                using (BinaryReader reader = new BinaryReader(File.OpenRead(GameDataPath + path)))
+                                                readorder[i] = readorder[i].ToLower();
+                                                if (!acceptedwindstrings.Contains(readorder[i]))
                                                 {
-                                                    foreach (string line in readorder)
+                                                    throw new ArgumentException(string.Format("String {0} is not a valid value for the Wind data read order.", readorder[i]));
+                                                }
+                                                if (components.Contains(readorder[i]))
+                                                {
+                                                    throw new ArgumentException(string.Format("Duplicate value {0} was present in the Wind Data readOrder list.", readorder[i]));
+                                                }
+                                                components[i] = readorder[i];
+                                            }
+                                            using (BinaryReader reader = new BinaryReader(File.OpenRead(GameDataPath + path)))
+                                            {
+                                                foreach (string line in readorder)
+                                                {
+                                                    for (int i = 0; i < steps; i++)
                                                     {
-                                                        for (int i = 0; i < steps; i++)
+                                                        float[,,] floatbuffer = new float[alt, lat, lon];
+                                                        byte[] bufferarray = reader.ReadBytes(lon * lat * alt * sizeof(float));
+                                                        Buffer.BlockCopy(bufferarray, 0, floatbuffer, 0, Buffer.ByteLength(bufferarray));
+                                                        switch (line)
                                                         {
-                                                            float[,,] floatbuffer = new float[alt, lat, lon];
-                                                            byte[] bufferarray = reader.ReadBytes(lon * lat * alt * sizeof(float));
-                                                            Buffer.BlockCopy(bufferarray, 0, floatbuffer, 0, Buffer.ByteLength(bufferarray));
-                                                            switch (line)
-                                                            {
-                                                                case "windx":
-                                                                    windarrayx[i] = floatbuffer;
-                                                                    break;
-                                                                case "windy":
-                                                                    windarrayy[i] = floatbuffer;
-                                                                    break;
-                                                                case "windz":
-                                                                    windarrayz[i] = floatbuffer;
-                                                                    break;
-                                                                default:
-                                                                    throw new ArgumentException(string.Format("String {0} is not a valid value for the read order.", readorder[i]));
-                                                            }
+                                                            case "windx":
+                                                                windarrayx[i] = floatbuffer;
+                                                                break;
+                                                            case "windy":
+                                                                windarrayy[i] = floatbuffer;
+                                                                break;
+                                                            case "windz":
+                                                                windarrayz[i] = floatbuffer;
+                                                                break;
+                                                            default:
+                                                                throw new ArgumentException(string.Format("String {0} is not a valid value for the read order.", readorder[i]));
                                                         }
                                                     }
-                                                    reader.Close();
                                                 }
-                                            }
-                                            else
-                                            {
-                                                throw new ArgumentException("The 'path' or 'readOrder' key was not inputted or was empty, or the 'readOrder' was an invalid length.");
+                                                reader.Close();
                                             }
                                         }
                                         else
                                         {
-                                            string pathx = "";
-                                            string pathy = "";
-                                            string pathz = "";
-
-                                            if (data.TryGetValue("path_X", ref pathx) && data.TryGetValue("path_Y", ref pathy) && data.TryGetValue("path_Z", ref pathz) &&
-                                                !string.IsNullOrEmpty(pathx) && !string.IsNullOrEmpty(pathy) && !string.IsNullOrEmpty(pathz))
-                                            {
-                                                using (BinaryReader reader = new BinaryReader(File.OpenRead(GameDataPath + pathx)))
-                                                {
-                                                    for (int i = 0; i < steps; i++)
-                                                    {
-                                                        float[,,] floatbuffer = new float[alt, lat, lon];
-                                                        byte[] bufferarray = reader.ReadBytes(lon * lat * alt * sizeof(float));
-                                                        Buffer.BlockCopy(bufferarray, 0, floatbuffer, 0, Buffer.ByteLength(bufferarray));
-                                                        windarrayx[i] = floatbuffer;
-                                                    }
-                                                    reader.Close();
-                                                }
-                                                using (BinaryReader reader = new BinaryReader(File.OpenRead(GameDataPath + pathy)))
-                                                {
-                                                    for (int i = 0; i < steps; i++)
-                                                    {
-                                                        float[,,] floatbuffer = new float[alt, lat, lon];
-                                                        byte[] bufferarray = reader.ReadBytes(lon * lat * alt * sizeof(float));
-                                                        Buffer.BlockCopy(bufferarray, 0, floatbuffer, 0, Buffer.ByteLength(bufferarray));
-                                                        windarrayy[i] = floatbuffer;
-                                                    }
-                                                    reader.Close();
-                                                }
-                                                using (BinaryReader reader = new BinaryReader(File.OpenRead(GameDataPath + pathz)))
-                                                {
-                                                    for (int i = 0; i < steps; i++)
-                                                    {
-                                                        float[,,] floatbuffer = new float[alt, lat, lon];
-                                                        byte[] bufferarray = reader.ReadBytes(lon * lat * alt * sizeof(float));
-                                                        Buffer.BlockCopy(bufferarray, 0, floatbuffer, 0, Buffer.ByteLength(bufferarray));
-                                                        windarrayz[i] = floatbuffer;
-                                                    }
-                                                    reader.Close();
-                                                }
-                                            }
-                                            else
-                                            {
-                                                throw new ArgumentNullException("One or more file paths were not present or were empty strings.");
-                                            }
+                                            throw new ArgumentException("The 'path' or 'readOrder' key was not inputted or was empty, or the 'readOrder' was an invalid length.");
                                         }
-                                        bodydata[body].AddWindData(windarrayx, windarrayy, windarrayz, scaleFactor, timestep);
-                                        Utils.LogInfo(string.Format("Successfully loaded Wind Data node for {0}.", body));
                                     }
                                     else
                                     {
-                                        throw new ArgumentOutOfRangeException("One or more of the inputted keys was outside the range of acceptable values.");
+                                        string pathx = "";
+                                        string pathy = "";
+                                        string pathz = "";
+
+                                        if (data.TryGetValue("path_X", ref pathx) && data.TryGetValue("path_Y", ref pathy) && data.TryGetValue("path_Z", ref pathz) &&
+                                            !string.IsNullOrEmpty(pathx) && !string.IsNullOrEmpty(pathy) && !string.IsNullOrEmpty(pathz))
+                                        {
+                                            using (BinaryReader reader = new BinaryReader(File.OpenRead(GameDataPath + pathx)))
+                                            {
+                                                for (int i = 0; i < steps; i++)
+                                                {
+                                                    float[,,] floatbuffer = new float[alt, lat, lon];
+                                                    byte[] bufferarray = reader.ReadBytes(lon * lat * alt * sizeof(float));
+                                                    Buffer.BlockCopy(bufferarray, 0, floatbuffer, 0, Buffer.ByteLength(bufferarray));
+                                                    windarrayx[i] = floatbuffer;
+                                                }
+                                                reader.Close();
+                                            }
+                                            using (BinaryReader reader = new BinaryReader(File.OpenRead(GameDataPath + pathy)))
+                                            {
+                                                for (int i = 0; i < steps; i++)
+                                                {
+                                                    float[,,] floatbuffer = new float[alt, lat, lon];
+                                                    byte[] bufferarray = reader.ReadBytes(lon * lat * alt * sizeof(float));
+                                                    Buffer.BlockCopy(bufferarray, 0, floatbuffer, 0, Buffer.ByteLength(bufferarray));
+                                                    windarrayy[i] = floatbuffer;
+                                                }
+                                                reader.Close();
+                                            }
+                                            using (BinaryReader reader = new BinaryReader(File.OpenRead(GameDataPath + pathz)))
+                                            {
+                                                for (int i = 0; i < steps; i++)
+                                                {
+                                                    float[,,] floatbuffer = new float[alt, lat, lon];
+                                                    byte[] bufferarray = reader.ReadBytes(lon * lat * alt * sizeof(float));
+                                                    Buffer.BlockCopy(bufferarray, 0, floatbuffer, 0, Buffer.ByteLength(bufferarray));
+                                                    windarrayz[i] = floatbuffer;
+                                                }
+                                                reader.Close();
+                                            }
+                                        }
+                                        else
+                                        {
+                                            throw new ArgumentNullException("One or more file paths were not present or were empty strings.");
+                                        }
                                     }
+                                    bodydata[body].AddWindData(windarrayx, windarrayy, windarrayz, scaleFactor, timestep);
+                                    Utils.LogInfo(string.Format("Successfully loaded Wind Data node for {0}.", body));
                                 }
                                 else
                                 {
-                                    throw new ArgumentNullException("One or more keys was not present or was empty.");
+                                    throw new ArgumentOutOfRangeException("One or more of the inputted keys was outside the range of acceptable values.");
                                 }
                             }
                             else
                             {
-                                Utils.LogWarning(string.Format("Wind Data already exists for {0}.", body));
+                                throw new ArgumentNullException("One or more keys was not present or was empty.");
                             }
                         }
-                        if (node.TryGetNode("Temperature_Data", ref data))
+                        else
                         {
-                            if (!bodydata[body].HasTemperature)
+                            Utils.LogWarning(string.Format("Wind Data already exists for {0}.", body));
+                        }
+                    }
+                    scaleFactor = 1.0f; //reset the scalefactor if needed
+                    if (node.TryGetNode("Temperature_Data", ref data))
+                    {
+                        if (!bodydata[body].HasTemperature)
+                        {
+                            Utils.LogInfo(string.Format("Loading Temperature Data node for {0}.", body));
+                            string path = "";
+
+                            if (data.TryGetValue("path", ref path) && data.TryGetValue("sizeLon", ref lon) && data.TryGetValue("sizeLat", ref lat) && data.TryGetValue("sizeAlt", ref alt) &&
+                                 data.TryGetValue("timesteps", ref steps) && data.TryGetValue("timestepLength", ref timestep) && !string.IsNullOrEmpty(path))
                             {
-                                Utils.LogInfo(string.Format("Loading Temperature Data node for {0}.", body));
-                                string path = "";
-
-                                if (data.TryGetValue("path", ref path) && data.TryGetValue("sizeLon", ref lon) && data.TryGetValue("sizeLat", ref lat) && data.TryGetValue("sizeAlt", ref alt) &&
-                                     data.TryGetValue("timesteps", ref steps) && data.TryGetValue("timestepLength", ref timestep) && !string.IsNullOrEmpty(path))
+                                data.TryGetValue("scaleFactor", ref scaleFactor);
+                                if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f)
                                 {
-                                    data.TryGetValue("scaleFactor", ref scaleFactor);
-                                    if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f)
-                                    {
-                                        float[][,,] temparray = new float[steps][,,];
+                                    float[][,,] temparray = new float[steps][,,];
 
-                                        using (BinaryReader reader = new BinaryReader(File.OpenRead(GameDataPath + path)))
-                                        {
-                                            for (int i = 0; i < steps; i++)
-                                            {
-                                                float[,,] floatbuffer = new float[alt, lat, lon];
-                                                byte[] bufferarray = reader.ReadBytes(lon * lat * alt * sizeof(float));
-                                                Buffer.BlockCopy(bufferarray, 0, floatbuffer, 0, Buffer.ByteLength(bufferarray));
-                                                temparray[i] = floatbuffer;
-                                            }
-                                            reader.Close();
-                                        }
-                                        bodydata[body].AddTemperatureData(temparray, scaleFactor, timestep);
-                                        Utils.LogInfo(string.Format("Successfully loaded Temperature Data node for {0}.", body));
-                                    }
-                                    else
+                                    using (BinaryReader reader = new BinaryReader(File.OpenRead(GameDataPath + path)))
                                     {
-                                        throw new ArgumentOutOfRangeException("One or more of the inputted keys was outside the range of acceptable values.");
+                                        for (int i = 0; i < steps; i++)
+                                        {
+                                            float[,,] floatbuffer = new float[alt, lat, lon];
+                                            byte[] bufferarray = reader.ReadBytes(lon * lat * alt * sizeof(float));
+                                            Buffer.BlockCopy(bufferarray, 0, floatbuffer, 0, Buffer.ByteLength(bufferarray));
+                                            temparray[i] = floatbuffer;
+                                        }
+                                        reader.Close();
                                     }
+                                    bodydata[body].AddTemperatureData(temparray, scaleFactor, timestep);
+                                    Utils.LogInfo(string.Format("Successfully loaded Temperature Data node for {0}.", body));
                                 }
                                 else
                                 {
-                                    throw new ArgumentNullException("One or more keys was not present or was empty.");
+                                    throw new ArgumentOutOfRangeException("One or more of the inputted keys was outside the range of acceptable values.");
                                 }
                             }
                             else
                             {
-                                Utils.LogWarning(string.Format("Temperature Data already exists for {0}.", body));
+                                throw new ArgumentNullException("One or more keys was not present or was empty.");
                             }
                         }
-                        if (node.TryGetNode("Pressure_Data", ref data))
+                        else
                         {
-                            if (bodydata[body].HasPressure)
+                            Utils.LogWarning(string.Format("Temperature Data already exists for {0}.", body));
+                        }
+                    }
+                    scaleFactor = 1.0f; //reset the scalefactor if needed
+                    if (node.TryGetNode("Pressure_Data", ref data))
+                    {
+                        if (bodydata[body].HasPressure)
+                        {
+                            Utils.LogInfo(string.Format("Loading Pressure Data node for {0}.", body));
+                            string path = "";
+
+                            if (data.TryGetValue("path", ref path) && data.TryGetValue("sizeLon", ref lon) && data.TryGetValue("sizeLat", ref lat) && data.TryGetValue("sizeAlt", ref alt) &&
+                                 data.TryGetValue("timesteps", ref steps) && data.TryGetValue("timestepLength", ref timestep) && !string.IsNullOrEmpty(path))
                             {
-                                Utils.LogInfo(string.Format("Loading Pressure Data node for {0}.", body));
-                                string path = "";
-
-                                if (data.TryGetValue("path", ref path) && data.TryGetValue("sizeLon", ref lon) && data.TryGetValue("sizeLat", ref lat) && data.TryGetValue("sizeAlt", ref alt) &&
-                                     data.TryGetValue("timesteps", ref steps) && data.TryGetValue("timestepLength", ref timestep) && !string.IsNullOrEmpty(path))
+                                data.TryGetValue("scaleFactor", ref scaleFactor);
+                                if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f)
                                 {
-                                    data.TryGetValue("scaleFactor", ref scaleFactor);
-                                    if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f)
-                                    {
-                                        float[][,,] pressarray = new float[steps][,,];
+                                    float[][,,] pressarray = new float[steps][,,];
 
-                                        using (BinaryReader reader = new BinaryReader(File.OpenRead(GameDataPath + path)))
-                                        {
-                                            for (int i = 0; i < steps; i++)
-                                            {
-                                                float[,,] floatbuffer = new float[alt, lat, lon];
-                                                byte[] bufferarray = reader.ReadBytes(lon * lat * alt * sizeof(float));
-                                                Buffer.BlockCopy(bufferarray, 0, floatbuffer, 0, Buffer.ByteLength(bufferarray));
-                                                pressarray[i] = floatbuffer;
-                                            }
-                                            reader.Close();
-                                        }
-                                        bodydata[body].AddPressureData(pressarray, scaleFactor, timestep);
-                                        Utils.LogInfo(string.Format("Successfully loaded Pressure Data node for {0}.", body));
-                                    }
-                                    else
+                                    using (BinaryReader reader = new BinaryReader(File.OpenRead(GameDataPath + path)))
                                     {
-                                        throw new ArgumentOutOfRangeException("One or more of the inputted keys was outside the range of acceptable values.");
+                                        for (int i = 0; i < steps; i++)
+                                        {
+                                            float[,,] floatbuffer = new float[alt, lat, lon];
+                                            byte[] bufferarray = reader.ReadBytes(lon * lat * alt * sizeof(float));
+                                            Buffer.BlockCopy(bufferarray, 0, floatbuffer, 0, Buffer.ByteLength(bufferarray));
+                                            pressarray[i] = floatbuffer;
+                                        }
+                                        reader.Close();
                                     }
+                                    bodydata[body].AddPressureData(pressarray, scaleFactor, timestep);
+                                    Utils.LogInfo(string.Format("Successfully loaded Pressure Data node for {0}.", body));
                                 }
                                 else
                                 {
-                                    throw new ArgumentNullException("One or more keys was not present or was empty.");
+                                    throw new ArgumentOutOfRangeException("One or more of the inputted keys was outside the range of acceptable values.");
                                 }
                             }
                             else
                             {
-                                Utils.LogWarning(string.Format("Pressure Data already exists for {0}.", body));
+                                throw new ArgumentNullException("One or more keys was not present or was empty.");
                             }
+                        }
+                        else
+                        {
+                            Utils.LogWarning(string.Format("Pressure Data already exists for {0}.", body));
                         }
                     }
                 }
