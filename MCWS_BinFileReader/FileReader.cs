@@ -64,7 +64,7 @@ namespace MCWS_BinFileReader
                     int alt = 0;
                     int steps = 0;
                     double timestep = double.NaN;
-                    float scaleFactor = 1.0f;
+                    
 
                     ConfigNode data = new ConfigNode();
                     if (node.TryGetNode("Combined_Data", ref data))
@@ -79,8 +79,13 @@ namespace MCWS_BinFileReader
                             if (data.TryGetValue("path", ref path) && data.TryGetValue("readOrder", ref readorder) && !string.IsNullOrEmpty(path) && data.TryGetValue("sizeLon", ref lon) &&
                                 data.TryGetValue("sizeLat", ref lat) && data.TryGetValue("sizeAlt", ref alt) && data.TryGetValue("timesteps", ref steps) && data.TryGetValue("timestepLength", ref timestep))
                             {
+                                float scaleFactor = 1.0f;
                                 data.TryGetValue("scaleFactor", ref scaleFactor);
-                                if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && readorder.Length > 1)
+
+                                int offset = 0;
+                                data.TryGetValue("initialOffset", ref offset);
+
+                                if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && readorder.Length > 1 && offset >= 0)
                                 {
                                     for (int i = 0; i < readorder.Length; i++) //check the readOrder to make sure it is valid.
                                     {
@@ -111,6 +116,10 @@ namespace MCWS_BinFileReader
 
                                     using (BinaryReader reader = new BinaryReader(File.OpenRead(GameDataPath + path)))
                                     {
+                                        if(offset > 0) //dispose of the initial offset
+                                        {
+                                            byte[] removeoffset = reader.ReadBytes(offset);
+                                        }
                                         foreach (string line in readorder)
                                         {
                                             for (int i = 0; i < steps; i++)
@@ -164,7 +173,6 @@ namespace MCWS_BinFileReader
                             Utils.LogWarning(string.Format("Data already exists for {0}.", body));
                         }
                     }
-                    scaleFactor = 1.0f; //reset the scalefactor if needed
                     if (node.TryGetNode("Wind_Data", ref data))
                     {
                         if (!bodydata[body].HasWind)
@@ -176,8 +184,12 @@ namespace MCWS_BinFileReader
                             if (data.TryGetValue("sizeLon", ref lon) && data.TryGetValue("sizeLat", ref lat) && data.TryGetValue("sizeAlt", ref alt) &&
                                  data.TryGetValue("timesteps", ref steps) && data.TryGetValue("timestepLength", ref timestep))
                             {
+                                int offset = 0;
+                                data.TryGetValue("initialOffset", ref offset);
+
+                                float scaleFactor = 1.0f;
                                 data.TryGetValue("scaleFactor", ref scaleFactor);
-                                if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f)
+                                if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && offset >= 0)
                                 {
                                     float[][,,] windarrayx = new float[steps][,,];
                                     float[][,,] windarrayy = new float[steps][,,];
@@ -210,6 +222,10 @@ namespace MCWS_BinFileReader
                                             }
                                             using (BinaryReader reader = new BinaryReader(File.OpenRead(GameDataPath + path)))
                                             {
+                                                if (offset > 0) //dispose of the initial offset
+                                                {
+                                                    byte[] removeoffset = reader.ReadBytes(offset);
+                                                }
                                                 foreach (string line in readorder)
                                                 {
                                                     for (int i = 0; i < steps; i++)
@@ -252,6 +268,10 @@ namespace MCWS_BinFileReader
                                         {
                                             using (BinaryReader reader = new BinaryReader(File.OpenRead(GameDataPath + pathx)))
                                             {
+                                                if (offset > 0) //dispose of the initial offset
+                                                {
+                                                    byte[] removeoffset = reader.ReadBytes(offset);
+                                                }
                                                 for (int i = 0; i < steps; i++)
                                                 {
                                                     float[,,] floatbuffer = new float[alt, lat, lon];
@@ -263,6 +283,10 @@ namespace MCWS_BinFileReader
                                             }
                                             using (BinaryReader reader = new BinaryReader(File.OpenRead(GameDataPath + pathy)))
                                             {
+                                                if (offset > 0) //dispose of the initial offset
+                                                {
+                                                    byte[] removeoffset = reader.ReadBytes(offset);
+                                                }
                                                 for (int i = 0; i < steps; i++)
                                                 {
                                                     float[,,] floatbuffer = new float[alt, lat, lon];
@@ -274,6 +298,10 @@ namespace MCWS_BinFileReader
                                             }
                                             using (BinaryReader reader = new BinaryReader(File.OpenRead(GameDataPath + pathz)))
                                             {
+                                                if (offset > 0) //dispose of the initial offset
+                                                {
+                                                    byte[] removeoffset = reader.ReadBytes(offset);
+                                                }
                                                 for (int i = 0; i < steps; i++)
                                                 {
                                                     float[,,] floatbuffer = new float[alt, lat, lon];
@@ -307,7 +335,6 @@ namespace MCWS_BinFileReader
                             Utils.LogWarning(string.Format("Wind Data already exists for {0}.", body));
                         }
                     }
-                    scaleFactor = 1.0f; //reset the scalefactor if needed
                     if (node.TryGetNode("Temperature_Data", ref data))
                     {
                         if (!bodydata[body].HasTemperature)
@@ -318,13 +345,21 @@ namespace MCWS_BinFileReader
                             if (data.TryGetValue("path", ref path) && data.TryGetValue("sizeLon", ref lon) && data.TryGetValue("sizeLat", ref lat) && data.TryGetValue("sizeAlt", ref alt) &&
                                  data.TryGetValue("timesteps", ref steps) && data.TryGetValue("timestepLength", ref timestep) && !string.IsNullOrEmpty(path))
                             {
+                                int offset = 0;
+                                data.TryGetValue("initialOffset", ref offset);
+
+                                float scaleFactor = 1.0f;
                                 data.TryGetValue("scaleFactor", ref scaleFactor);
-                                if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f)
+                                if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && offset >= 0)
                                 {
                                     float[][,,] temparray = new float[steps][,,];
 
                                     using (BinaryReader reader = new BinaryReader(File.OpenRead(GameDataPath + path)))
                                     {
+                                        if (offset > 0) //dispose of the initial offset
+                                        {
+                                            byte[] removeoffset = reader.ReadBytes(offset);
+                                        }
                                         for (int i = 0; i < steps; i++)
                                         {
                                             float[,,] floatbuffer = new float[alt, lat, lon];
@@ -352,7 +387,6 @@ namespace MCWS_BinFileReader
                             Utils.LogWarning(string.Format("Temperature Data already exists for {0}.", body));
                         }
                     }
-                    scaleFactor = 1.0f; //reset the scalefactor if needed
                     if (node.TryGetNode("Pressure_Data", ref data))
                     {
                         if (bodydata[body].HasPressure)
@@ -363,13 +397,21 @@ namespace MCWS_BinFileReader
                             if (data.TryGetValue("path", ref path) && data.TryGetValue("sizeLon", ref lon) && data.TryGetValue("sizeLat", ref lat) && data.TryGetValue("sizeAlt", ref alt) &&
                                  data.TryGetValue("timesteps", ref steps) && data.TryGetValue("timestepLength", ref timestep) && !string.IsNullOrEmpty(path))
                             {
+                                int offset = 0;
+                                data.TryGetValue("initialOffset", ref offset);
+
+                                float scaleFactor = 1.0f;
                                 data.TryGetValue("scaleFactor", ref scaleFactor);
-                                if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f)
+                                if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && offset >= 0)
                                 {
                                     float[][,,] pressarray = new float[steps][,,];
 
                                     using (BinaryReader reader = new BinaryReader(File.OpenRead(GameDataPath + path)))
                                     {
+                                        if (offset > 0) //dispose of the initial offset
+                                        {
+                                            byte[] removeoffset = reader.ReadBytes(offset);
+                                        }
                                         for (int i = 0; i < steps; i++)
                                         {
                                             float[,,] floatbuffer = new float[alt, lat, lon];
