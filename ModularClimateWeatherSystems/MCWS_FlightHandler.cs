@@ -345,8 +345,7 @@ namespace ModularClimateWeatherSystems
                         double BottomPlaneFinal = UtilMath.Lerp((double)BottomPlane1, (double)BottomPlane2, lerpt);
                         double TopPlaneFinal = UtilMath.Lerp((double)TopPlane1, (double)TopPlane2, lerpt);
 
-                        //Logarithmically interpolate on the altitude axis.
-                        double Final = Math.Pow(Math.Max(BottomPlaneFinal, Utils.Epsilon), 1d - lerpz) * Math.Pow(Math.Max(TopPlaneFinal, Utils.Epsilon), lerpz);
+                        double Final = Utils.InterpolatePressure(BottomPlaneFinal,TopPlaneFinal, lerpz);
                         Pressure = double.IsFinite(Final) ? Final * 0.001 : throw new NotFiniteNumberException(); //convert to kPa
                     }
                     catch (Exception ex) //fallback data

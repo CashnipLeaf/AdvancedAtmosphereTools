@@ -150,6 +150,24 @@ namespace ModularClimateWeatherSystems
             */
         }
 
+        internal static double InterpolatePressure(double first, double second, double by)
+        {
+            if (first < 0.0 || second < 0.0) //negative values will break the logarithm, so they are not allowed.
+            {
+                throw new ArgumentOutOfRangeException();
+            }
+            if(second <= Epsilon)
+            {
+                return UtilMath.Lerp(first, second, by);
+            }
+            double scalefactor = Math.Log(first / second);
+            if (double.IsNaN(scalefactor))
+            {
+                throw new NotFiniteNumberException();
+            }
+            return first * Math.Pow(Math.E, -1 * UtilMath.Lerp(0.0, UtilMath.Clamp(scalefactor, float.MinValue, float.MaxValue), by));
+        }
+
         internal static int Clamp(int value, int min, int max) => Math.Min(Math.Max(value, min), max); //Apparently no such function exists for integers. Why?
         internal static bool IsVectorFinite(Vector3 v) => float.IsFinite(v.x) && float.IsFinite(v.y) && float.IsFinite(v.z);
         internal static bool IsVectorFinite(Vector3d vd) => double.IsFinite(vd.x) && double.IsFinite(vd.y) && double.IsFinite(vd.z); //might remove since nothing uses it.

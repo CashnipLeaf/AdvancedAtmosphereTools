@@ -414,8 +414,7 @@ namespace ModularClimateWeatherSystems
                     float BottomPlane = Utils.BiLerp(pressuredata[z1, y1, x1], pressuredata[z1, y1, x2], pressuredata[z1, y2, x1], pressuredata[z1, y2, x2], (float)lerpx, (float)lerpy);
                     float TopPlane = Utils.BiLerp(pressuredata[z2, y1, x1], pressuredata[z2, y1, x2], pressuredata[z2, y2, x1], pressuredata[z2, y2, x2], (float)lerpx, (float)lerpy);
 
-                    //apply logarithmic interpolation
-                    double Final = Math.Pow(Math.Max(BottomPlane, Utils.Epsilon), 1d - lerpz) * Math.Pow(Math.Max(TopPlane, Utils.Epsilon), lerpz);
+                    double Final = Utils.InterpolatePressure(BottomPlane, TopPlane, lerpz);
                     return double.IsFinite(Final) ? Final : throw new NotFiniteNumberException();
                 }
             }

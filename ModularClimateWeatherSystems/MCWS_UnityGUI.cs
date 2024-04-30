@@ -152,21 +152,18 @@ namespace ModularClimateWeatherSystems
                     {
                         foreach (Part p in activevessel.Parts)
                         {
-                            totaldrag += p.dragScalar * -p.dragVectorDirLocal;
-                            if (p.hasLiftModule)
-                            {
-                                foreach (var m in p.Modules)
-                                {
-                                    if (m is ModuleLiftingSurface wing)
-                                    {
-                                        totallift += wing.liftForce;
-                                        totaldrag += wing.dragForce;
-                                    }
-                                }
-                            }
-                            else
+                            totaldrag += p.dragScalar * -p.dragVectorDir;
+                            if (!p.hasLiftModule)
                             {
                                 totallift += Vector3.ProjectOnPlane(p.transform.rotation * (p.bodyLiftScalar * p.DragCubes.LiftForce), -p.dragVectorDir);
+                            }
+                            foreach (var m in p.Modules)
+                            {
+                                if (m is ModuleLiftingSurface wing)
+                                {
+                                    totallift += wing.liftForce;
+                                    totaldrag += wing.dragForce;
+                                }
                             }
                         }
                         Vector3d totalforce = totallift + totaldrag;
