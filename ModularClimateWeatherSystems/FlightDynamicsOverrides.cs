@@ -96,7 +96,8 @@ namespace ModularClimateWeatherSystems
         double AerodynamicAreaOverride(ModularFlightIntegrator fi, Part part)
         {
             Vector3 windvec = (FH != null && FH.HasWind) ? FH.InternalAppliedWind : Vector3.zero;
-            windvec = Vector3.Lerp(windvec, Vector3.zero, (float)part.submergedPortion);
+            float submerged = (float)part.submergedPortion;
+            windvec = Vector3.Lerp(windvec, Vector3.zero, submerged * submerged);
 
             //add an offset to the velocity vector used for body drag/lift calcs and update the related fields.
             if (part.Rigidbody != null && Utils.IsVectorFinite(windvec) && !Mathf.Approximately(windvec.magnitude, 0.0f))
@@ -223,7 +224,8 @@ namespace ModularClimateWeatherSystems
             {
                 return;
             }
-            pointVelocity -= Vector3.Lerp(windvec, Vector3.zero, (float)__instance.part.submergedPortion);
+            float submerged = (float)__instance.part.submergedPortion;
+            pointVelocity -= Vector3.Lerp(windvec, Vector3.zero, submerged * submerged);
         }
     }
 

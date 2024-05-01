@@ -14,14 +14,14 @@ namespace ModularClimateWeatherSystems
         private bool GUIEnabled = false;
 
         //if developer mode is enabled, a modified green logo will replace the normal white Logo.
-        internal static string LogoPath => "ModularClimateWeatherSystems/Textures/" + (Settings.DevMode ? "MCWS_Debug" : "MCWS_Logo");
+        internal const string LogoPath = "ModularClimateWeatherSystems/Textures/MCWS_Logo";
         internal const string modNAME = "MCWS";
         internal const string modID = "MCWS_NS";
 
         private Rect windowPos;        
         private static float Xpos => 100f * UIscale;
         private static float Ypos => 100f * UIscale;
-        private static float Xwidth => (Settings.DevMode ? 345.0f : 285.0f) * Mathf.Clamp(UIscale, 0.75f, 1.5f);
+        private static float Xwidth => 285.0f * Mathf.Clamp(UIscale, 0.75f, 1.5f);
         private static float Yheight => 60f * UIscale;
         private static float UIscale => GameSettings.UI_SCALE;
         
@@ -95,7 +95,6 @@ namespace ModularClimateWeatherSystems
                 Vector3 craftdragvector = activevessel.srf_velocity;
                 Vector3 craftdragvectorwind = activevessel.srf_velocity - InternalAppliedWind;
                 Vector3 craftdragvectortransformed = Vesselframe.inverse * craftdragvector;
-                Vector3 craftdragvectortransformedwind = Vesselframe.inverse * craftdragvectorwind;
 
                 double alpha = 0.0;
                 double slip = 0.0;
@@ -212,42 +211,23 @@ namespace ModularClimateWeatherSystems
                     GUILayout.FlexibleSpace();
                 }
 
-                if (Settings.DevMode) //TODO: remove because the DevMode setting no longer exists.
-                {
-                    DrawHeader("Developer Mode Information");
-                    DrawElement("Connected to FAR", FARConnected.ToString()); //connected to FAR
-                    DrawElement("Body Internal Name", mainbody.name); //internal name of the current celestial body
-                    DrawElement("Wind Speed Multiplier", string.Format("{0:F2}", Settings.GlobalWindSpeedMultiplier));
-                    DrawElement("Wind Vector (Vessel)", normalwind.ToString()); //wind vector retrieved from the wind objects
-                    DrawElement("Wind Vector (World)", transformedwind.ToString()); //wind vector after being transformed relative to the craft's frame of reference
-                    DrawElement("Wind Vector (Applied)", InternalAppliedWind.ToString()); //wind vector after being multiplied by the wind speed multiplier
-                    DrawElement("World Position", activevessel.GetWorldPos3D().ToString("F1"));
-                    DrawElement("Drag Vector (World)", craftdragvector.ToString());
-                    DrawElement("Drag Vector (Vessel)", craftdragvectortransformed.ToString());
-                    DrawElement("Drag Vector + Wind (World)", craftdragvectorwind.ToString());
-                    DrawElement("Drag Vector + Wind (Vessel)", craftdragvectortransformedwind.ToString());
-                    DrawElement("Universal Time", string.Format("{0:F1}", CurrentTime));
-                }
-                else
-                {
-                    //aerodynamics
-                    DrawHeader(GetLOC("#LOC_MCWS_aero"));
-                    DrawElement(GetLOC("#LOC_MCWS_staticpress"), staticpress);
-                    DrawElement(GetLOC("#LOC_MCWS_dynamicpress"), dynamicpress);
-                    DrawElement(GetLOC("#LOC_MCWS_density"), density);
-                    DrawElement(GetLOC("#LOC_MCWS_statictemp"), statictemp);
-                    DrawElement(GetLOC("#LOC_MCWS_exttemp"), exttemp);
-                    DrawElement(GetLOC("#LOC_MCWS_soundspeed"), soundspeed);
+                //aerodynamics
+                DrawHeader(GetLOC("#LOC_MCWS_aero"));
+                DrawElement(GetLOC("#LOC_MCWS_staticpress"), staticpress);
+                DrawElement(GetLOC("#LOC_MCWS_dynamicpress"), dynamicpress);
+                DrawElement(GetLOC("#LOC_MCWS_density"), density);
+                DrawElement(GetLOC("#LOC_MCWS_statictemp"), statictemp);
+                DrawElement(GetLOC("#LOC_MCWS_exttemp"), exttemp);
+                DrawElement(GetLOC("#LOC_MCWS_soundspeed"), soundspeed);
 
-                    DrawCentered("----------"); //gap between pressure/temperature and aero forces
+                DrawCentered("----------"); //gap between pressure/temperature and aero forces
 
-                    DrawElement(GetLOC("#LOC_MCWS_aoa"), aoa);
-                    DrawElement(GetLOC("#LOC_MCWS_sideslip"), sideslip);
-                    DrawElement(GetLOC("#LOC_MCWS_lift"), lift);
-                    DrawElement(GetLOC("#LOC_MCWS_drag"), drag);
-                    DrawElement(GetLOC("#LOC_MCWS_LID"), lid);
-                    DrawElement(GetLOC("#LOC_MCWS_lifttodrag"), ldratio);
-                }
+                DrawElement(GetLOC("#LOC_MCWS_aoa"), aoa);
+                DrawElement(GetLOC("#LOC_MCWS_sideslip"), sideslip);
+                DrawElement(GetLOC("#LOC_MCWS_lift"), lift);
+                DrawElement(GetLOC("#LOC_MCWS_drag"), drag);
+                DrawElement(GetLOC("#LOC_MCWS_LID"), lid);
+                DrawElement(GetLOC("#LOC_MCWS_lifttodrag"), ldratio);
             }
             else
             {

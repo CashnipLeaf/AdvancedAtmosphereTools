@@ -9,8 +9,10 @@ namespace ModularClimateWeatherSystems
 {
     //Sets up plugin settings.
     [KSPAddon(KSPAddon.Startup.MainMenu, true)]
-    public class MCWS_Startup : MonoBehaviour
+    partial class MCWS_Startup : MonoBehaviour
     {
+        internal Dictionary<string, BodyData> bodydata;
+        
         public static MCWS_Startup Instance { get; private set; }
         public MCWS_Startup()
         {
@@ -98,13 +100,36 @@ namespace ModularClimateWeatherSystems
                 Utils.LogError("Exception thrown when checking for FerramAerospaceResearch: " + ex.ToString());
                 Settings.FAR_Exists = false;
             }
+            ReadConfigs();
+
             Utils.LogInfo("MCWS Setup Complete.");
+            DontDestroyOnLoad(this);
         }
+
+        internal bool BodyExists(string body) => bodydata != null && bodydata.ContainsKey(body);
+        internal bool HasWind(string body) => BodyExists(body) && bodydata[body].HasWind;
+        internal bool HasFlowMaps(string body) => BodyExists(body) && bodydata[body].HasFlowmaps;
+        internal bool HasTemperature(string body) => BodyExists(body) && bodydata[body].HasTemperature;
+        internal bool HasPressure(string body) => BodyExists(body) && bodydata[body].HasPressure;
+
+        internal double WindTimeStep(string body) => HasWind(body) ? bodydata[body].WindTimeStep : double.NaN;
+        internal double TemperatureTimeStep(string body) => HasTemperature(body) ? bodydata[body].TemperatureTimeStep : double.NaN;
+        internal double PressureTimeStep(string body) => HasPressure(body) ? bodydata[body].PressureTimeStep : double.NaN;
+
+        internal double WindScaling(string body) => HasWind(body) ? bodydata[body].WindScaleFactor : 1d;
+        internal double TemperatureScaling(string body) => HasTemperature(body) ?   bodydata[body].TemperatureScaleFactor : 1d;
+        internal double PressureScaling(string body) => HasPressure(body) ? bodydata[body].PressureScaleFactor : 1d;
+
+        internal float[][,,] WindData(string body, double time) => HasWind(body) ? new float[3][,,] { bodydata[body].GetWindX(time), bodydata[body].GetWindY(time), bodydata[body].GetWindZ(time) } : null;
+        internal float[,,] TemperatureData(string body, double time) => HasTemperature(body) ? bodydata[body].GetTemperature(time) : null;
+        internal float[,,] PressureData(string body, double time) => HasPressure(body) ? bodydata[body].GetPressure(time) : null;
+
+        internal Vector3 GetFlowMapWind(string body, double lon, double lat, double alt, double time) => HasFlowMaps(body) ? bodydata[body].GetFlowmapWind(lon, lat, alt, time) : Vector3.zero;
     }
 
-    internal static class Utils //This used to be its own file, but it shrank so much that I thought it would be better to merge it with the startup file.
+    internal static class Utils 
     {
-        internal const string version = "0.9.0";
+        internal const string version = "0.9.1";
         internal static string GameDataPath => KSPUtil.ApplicationRootPath + "GameData/";
         internal static Dictionary<string, string> LOCCache; //localization cache
 
@@ -115,8 +140,7 @@ namespace ModularClimateWeatherSystems
         internal static void LogError(string message) => Debug.LogError("[MCWS][ERROR] " + message); //Errors that invoke fail-safe protections.
 
         //------------------------------MATH AND RELATED-------------------------
-
-        internal static double Epsilon => Mathf.Epsilon * 16d; //value that is very nearly zero to prevent the log interpolation from breaking
+        internal static double Epsilon => float.Epsilon * 16d; //value that is very nearly zero to prevent the log interpolation from breaking
 
         //Desperate solution to try and save lines, did not end up saving that many lines. Might inline.
         internal static float BiLerp(float first1, float second1, float first2, float second2, float by1, float by2)
@@ -131,23 +155,7 @@ namespace ModularClimateWeatherSystems
             double z = (xBase <= 1.0 ? nX : ((Math.Pow(xBase, -nX * upperbound) - 1) / (Math.Pow(xBase, -1 * upperbound) - 1))) * upperbound;
             int1 = Clamp((int)Math.Floor(z), 0, upperbound); //layer 1
             int2 = Clamp(int1 + 1, 0, upperbound); //layer 2
-            return UtilMath.Clamp01(z - Math.Truncate(z)); //hack fix since the interpolation below did not work
-            /*
-            double z1 = xBase <= 1.0 ? (double)int1 / (double)upperbound : ((Math.Pow(xBase, int1) - 1) / (Math.Pow(xBase, upperbound) - 1));
-            double z2 = xBase <= 1.0 ? (double)int2 / (double)upperbound : ((Math.Pow(xBase, int2) - 1) / (Math.Pow(xBase, upperbound) - 1));
-            if (nX >= z2 || z2 <= z1)
-            {
-                return 1.0;
-            }
-            else if (nX <= z1)
-            {
-                return 0.0;
-            }
-            else
-            {
-                return UtilMath.Clamp01((nX - z1) / (z2 - z1)); //returns the lerp factor between the two layers
-            }
-            */
+            return UtilMath.Clamp01(z - Math.Truncate(z));
         }
 
         internal static double InterpolatePressure(double first, double second, double by)
@@ -156,7 +164,7 @@ namespace ModularClimateWeatherSystems
             {
                 throw new ArgumentOutOfRangeException();
             }
-            if(second <= Epsilon)
+            if (first <= Epsilon || second <= Epsilon)
             {
                 return UtilMath.Lerp(first, second, by);
             }
@@ -170,6 +178,164 @@ namespace ModularClimateWeatherSystems
 
         internal static int Clamp(int value, int min, int max) => Math.Min(Math.Max(value, min), max); //Apparently no such function exists for integers. Why?
         internal static bool IsVectorFinite(Vector3 v) => float.IsFinite(v.x) && float.IsFinite(v.y) && float.IsFinite(v.z);
-        internal static bool IsVectorFinite(Vector3d vd) => double.IsFinite(vd.x) && double.IsFinite(vd.y) && double.IsFinite(vd.z); //might remove since nothing uses it.
+    }
+
+    internal class BodyData
+    {
+        private float[][,,] WindDataX;
+        private float[][,,] WindDataY;
+        private float[][,,] WindDataZ;
+        internal float WindScaleFactor = float.NaN;
+        internal double WindTimeStep = double.NaN;
+        internal bool HasWind => WindDataX != null && WindDataY != null && WindDataZ != null && !double.IsNaN(WindTimeStep) && !float.IsNaN(WindScaleFactor);
+
+        private float[][,,] TemperatureData;
+        internal float TemperatureScaleFactor = float.NaN;
+        internal double TemperatureTimeStep = double.NaN;
+        internal bool HasTemperature => TemperatureData != null && !double.IsNaN(TemperatureTimeStep) && !float.IsNaN(TemperatureScaleFactor);
+
+        private float[][,,] PressureData;
+        internal float PressureScaleFactor = float.NaN;
+        internal double PressureTimeStep = double.NaN;
+        internal bool HasPressure => PressureData != null && !double.IsNaN(PressureTimeStep) && !float.IsNaN(PressureScaleFactor);
+
+        internal List<FlowMap> Flowmaps;
+        internal bool HasFlowmaps => Flowmaps != null && Flowmaps.Count > 0;
+
+        internal BodyData()
+        {
+            Flowmaps = new List<FlowMap>();
+        }
+
+        internal void AddWindData(float[][,,] WindX, float[][,,] WindY, float[][,,] WindZ, float scalefactor, double timestep)
+        {
+            WindDataX = WindX;
+            WindDataY = WindY;
+            WindDataZ = WindZ;
+            WindScaleFactor = scalefactor;
+            WindTimeStep = timestep;
+        }
+
+        internal void AddTemperatureData(float[][,,] Temp, float scalefactor, double timestep)
+        {
+            TemperatureData = Temp;
+            TemperatureScaleFactor = scalefactor;
+            TemperatureTimeStep = timestep;
+        }
+
+        internal void AddPressureData(float[][,,] Press, float scalefactor, double timestep)
+        {
+            PressureData = Press;
+            PressureScaleFactor = scalefactor;
+            PressureTimeStep = timestep;
+        }
+
+        internal void AddFlowMap(FlowMap flowmap) => Flowmaps.Add(flowmap);
+
+        internal float[,,] GetWindX(double time) => HasWind ? WindDataX[(int)Math.Floor(time / WindTimeStep) % WindDataX.Length] : null;
+        internal float[,,] GetWindY(double time) => HasWind ? WindDataY[(int)Math.Floor(time / WindTimeStep) % WindDataY.Length] : null;
+        internal float[,,] GetWindZ(double time) => HasWind ? WindDataZ[(int)Math.Floor(time / WindTimeStep) % WindDataZ.Length] : null;
+        internal float[,,] GetTemperature(double time) => HasTemperature ? TemperatureData[(int)Math.Floor(time / TemperatureTimeStep) % TemperatureData.Length] : null;
+        internal float[,,] GetPressure(double time) => HasPressure ? PressureData[(int)Math.Floor(time / PressureTimeStep) % PressureData.Length] : null;
+
+        internal Vector3 GetFlowmapWind(double lon, double lat, double alt, double time)
+        {
+            Vector3 windvec = Vector3.zero;
+            foreach (FlowMap map in Flowmaps)
+            {
+                windvec += map.GetWindVec(lon, lat, alt, time);
+            }
+            return windvec;
+        }
+    }
+
+    internal class FlowMap
+    {
+        internal Texture2D flowmap;
+        internal bool useThirdChannel; //whether or not to use the Blue channel to add a vertical component to the winds.
+        internal FloatCurve AltitudeSpeedMultCurve;
+        internal FloatCurve EW_AltitudeSpeedMultCurve;
+        internal FloatCurve NS_AltitudeSpeedMultCurve;
+        internal FloatCurve V_AltitudeSpeedMultCurve;
+        internal FloatCurve WindSpeedMultiplierTimeCurve;
+        internal float EWwind;
+        internal float NSwind;
+        internal float vWind;
+
+        private float timeoffset;
+        internal float TimeOffset
+        {
+            get => timeoffset;
+            set => timeoffset = WindSpeedMultiplierTimeCurve.maxTime != 0.0f ? value % WindSpeedMultiplierTimeCurve.maxTime : 0.0f;
+        }
+
+        internal int x;
+        internal int y;
+
+        internal FlowMap(Texture2D path, bool use3rdChannel, FloatCurve altmult, FloatCurve ewaltmultcurve, FloatCurve nsaltmultcurve, FloatCurve valtmultcurve, float EWwind, float NSwind, float vWind, FloatCurve speedtimecurve, float offset)
+        {
+            flowmap = path;
+            useThirdChannel = use3rdChannel;
+            AltitudeSpeedMultCurve = altmult;
+            EW_AltitudeSpeedMultCurve = ewaltmultcurve;
+            NS_AltitudeSpeedMultCurve = nsaltmultcurve;
+            V_AltitudeSpeedMultCurve = valtmultcurve;
+            WindSpeedMultiplierTimeCurve = speedtimecurve;
+            this.EWwind = EWwind;
+            this.NSwind = NSwind;
+            this.vWind = vWind;
+            TimeOffset = offset;
+
+            x = flowmap.width;
+            y = flowmap.height;
+        }
+
+        internal Vector3 GetWindVec(double lon, double lat, double alt, double time)
+        {
+            //AltitudeSpeedMultiplierCurve cannot go below 0.
+            float speedmult = Math.Max(AltitudeSpeedMultCurve.Evaluate((float)alt), 0.0f) * GetValAtLoopTime(WindSpeedMultiplierTimeCurve, time - timeoffset);
+            if (speedmult > 0.0f)
+            {
+                //adjust longitude so the center of the map is the prime meridian for the purposes of these calculations
+                lon += 90.0;
+                if (lon > 180.0) { lon -= 360; }
+                if (lon <= -180.0) { lon += 360; }
+                double mapx = ((lon / 360.0) * x) + (x * 0.5) - 0.5;
+                double mapy = ((lat / 180.0) * y) + (y * 0.5) - 0.5;
+                double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
+                double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
+
+                //locate the four nearby points, but don't go over the poles.
+                int leftx = (int)(Math.Truncate(mapx) + x) % x;
+                int topy = Utils.Clamp((int)Math.Truncate(mapy), 0, y - 1);
+                int rightx = (int)(Math.Truncate(mapx) + 1 + x) % x;
+                int bottomy = Utils.Clamp((int)Math.Truncate(mapy) + 1, 0, y - 1);
+
+                Color[] colors = new Color[4];
+                Vector3[] vectors = new Vector3[4];
+                colors[0] = flowmap.GetPixel(leftx, topy);
+                colors[1] = flowmap.GetPixel(rightx, topy);
+                colors[2] = flowmap.GetPixel(leftx, bottomy);
+                colors[3] = flowmap.GetPixel(rightx, bottomy);
+
+                for (int i = 0; i < 4; i++)
+                {
+                    Vector3 windvec = Vector3.zero;
+
+                    windvec.z = (colors[i].r * 2.0f) - 1.0f;
+                    windvec.x = (colors[i].g * 2.0f) - 1.0f;
+                    windvec.y = useThirdChannel ? (colors[i].b * 2.0f) - 1.0f : 0.0f;
+                    vectors[i] = windvec;
+                }
+                Vector3 wind = Vector3.Lerp(Vector3.Lerp(vectors[0], vectors[1], (float)lerpx), Vector3.Lerp(vectors[2], vectors[3], (float)lerpx), (float)lerpy);
+                wind.x = wind.x * NSwind * NS_AltitudeSpeedMultCurve.Evaluate((float)alt);
+                wind.y = wind.y * vWind * V_AltitudeSpeedMultCurve.Evaluate((float)alt);
+                wind.z = wind.z * EWwind * EW_AltitudeSpeedMultCurve.Evaluate((float)alt);
+                return wind * speedmult;
+            }
+            return Vector3.zero;
+        }
+
+        internal static float GetValAtLoopTime(FloatCurve curve, double time) => curve.Evaluate(((float)time + curve.maxTime) % curve.maxTime);
     }
 }

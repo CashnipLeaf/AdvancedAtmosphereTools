@@ -82,6 +82,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="MCWS_BinAndFlowmapReader.cs" />
     <Compile Include="MCWS_CustomSettings.cs" />
     <Compile Include="MCWS_Startup_And_Utils.cs" />
     <Compile Include="MCWS_API.cs" />

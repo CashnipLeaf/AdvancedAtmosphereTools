@@ -103,57 +103,26 @@ namespace ModularClimateWeatherSystems
         }
 
         //-------------FETCH EXTERNAL DATA-------------
+        internal static bool HasExternalWind(string body) => BodyExists(body) && externalbodydata[body].HasWind;
+        internal static bool HasExternalTemperature(string body) => BodyExists(body) && externalbodydata[body].HasTemperature;
+        internal static bool HasExternalPressure(string body) => BodyExists(body) && externalbodydata[body].HasPressure;
 
-        //These are terrible. Don't do this. 
-        internal static bool[] HasExternalData(string body)
-        {
-            bool[] steps = new bool[3] { false, false, false };
-            if (BodyExists(body))
-            {
-                steps[0] = externalbodydata[body].HasWind;
-                steps[1] = externalbodydata[body].HasTemperature;
-                steps[2] = externalbodydata[body].HasPressure;
-            }
-            return steps;
-        }
-        internal static double[] GetTimeSteps(string body)
-        {
-            double[] steps = new double[3] { double.NaN, double.NaN, double.NaN };
-            if (BodyExists(body))
-            {
-                steps[0] = externalbodydata[body].WindTimeStep;
-                steps[1] = externalbodydata[body].TemperatureTimeStep;
-                steps[2] = externalbodydata[body].PressureTimeStep;
-            }
-            return steps;
-        }
-        internal static string[] GetSources(string body)
-        {
-            string[] sources = new string[3] { "None", "None", "None" };
-            if (BodyExists(body))
-            {
-                sources[0] = externalbodydata[body].WindSource;
-                sources[1] = externalbodydata[body].TemperatureSource;
-                sources[2] = externalbodydata[body].PressureSource;
-            }
-            return sources;
-        }
-        internal static double[] GetScaling(string body)
-        {
-            double[] factors = new double[3] { 1.0, 1.0, 1.0 };
-            if (BodyExists(body))
-            {
-                factors[0] = externalbodydata[body].WindScaleFactor;
-                factors[1] = externalbodydata[body].TempScaleFactor;
-                factors[2] = externalbodydata[body].PressScaleFactor;
-            }
-            return factors;
-        }
+        internal static double ExternalWindTimeStep(string body) => HasExternalWind(body) ? externalbodydata[body].WindTimeStep : double.NaN;
+        internal static double ExternalTemperatureTimeStep(string body) => HasExternalTemperature(body) ? externalbodydata[body].TemperatureTimeStep : double.NaN;
+        internal static double ExternalPressureTimeStep(string body) => HasExternalPressure(body) ? externalbodydata[body].PressureTimeStep : double.NaN;
+
+        internal static string ExternalWindSource(string body) => HasExternalWind(body) ? externalbodydata[body].WindSource : "None";
+        internal static string ExternalTemperatureSource(string body) => HasExternalWind(body) ? externalbodydata[body].TemperatureSource : "None";
+        internal static string ExternalPressureSource(string body) => HasExternalWind(body) ? externalbodydata[body].PressureSource : "None";
+
+        internal static double ExternalWindScaling(string body) => HasExternalWind(body) ? externalbodydata[body].WindScaleFactor : 1d;
+        internal static double ExternalTemperatureScaling(string body) => HasExternalTemperature(body) ? externalbodydata[body].TempScaleFactor : 1d;
+        internal static double ExternalPressureScaling(string body) => HasExternalPressure(body) ? externalbodydata[body].PressScaleFactor : 1d;
 
         //functions with less overhead for internal use only
-        internal static float[][,,] FetchGlobalWindData(string body, double time) => BodyExists(body) ? externalbodydata[body].GetWind(time) : null;
-        internal static float[,,] FetchGlobalTemperatureData(string body, double time) => BodyExists(body) ? externalbodydata[body].GetTemperature(time) : null;
-        internal static float[,,] FetchGlobalPressureData(string body, double time) => BodyExists(body) ? externalbodydata[body].GetPressure(time) : null;
+        internal static float[][,,] FetchGlobalWindData(string body, double time) => HasExternalWind(body) ? externalbodydata[body].GetWind(time) : null;
+        internal static float[,,] FetchGlobalTemperatureData(string body, double time) => HasExternalTemperature(body) ? externalbodydata[body].GetTemperature(time) : null;
+        internal static float[,,] FetchGlobalPressureData(string body, double time) => HasExternalPressure(body) ? externalbodydata[body].GetPressure(time) : null;
 
         //-------------BODY DATA CLASS------------------
         internal class BodyData
@@ -256,15 +225,20 @@ namespace ModularClimateWeatherSystems
             double timelerp = CanGetData ? UtilMath.Clamp01((Instance.CurrentTime % Instance.Presstimestep) / Instance.Presstimestep) : throw new InvalidOperationException(NotFlightScene);
             return timelerp > 0.5 ? Instance.pressuredata2 : Instance.pressuredata1;
         }
-        
+
         //Get Global Data for any body at any time. No interpolation is performed on MCWS's end here, so make sure you can deal with these values.
+        private static MCWS_Startup InternalData => MCWS_Startup.Instance;
+
         public static float[][,,] GetGlobalWindData(string body, double time)
         {
             CheckInputs(body, time);
             try
             {
                 CelestialBody bod = FlightGlobals.GetBodyByName(body);
-                return (bod != null && bod.atmosphere && BodyExists(body)) ? externalbodydata[body].GetWind(time) : null;
+                if(bod != null && bod.atmosphere)
+                {
+                    return BodyExists(body) ? externalbodydata[body].GetWind(time) : InternalData.WindData(body, time);
+                } 
             }
             catch (Exception ex)
             {
@@ -278,7 +252,10 @@ namespace ModularClimateWeatherSystems
             try
             {
                 CelestialBody bod = FlightGlobals.GetBodyByName(body);
-                return (bod != null && bod.atmosphere && BodyExists(body)) ? externalbodydata[body].GetTemperature(time) : null;
+                if(bod != null && bod.atmosphere)
+                {
+                    return BodyExists(body) ? externalbodydata[body].GetTemperature(time) : InternalData.TemperatureData(body, time);
+                }
             }
             catch (Exception ex)
             {
@@ -292,7 +269,10 @@ namespace ModularClimateWeatherSystems
             try
             {
                 CelestialBody bod = FlightGlobals.GetBodyByName(body);
-                return (bod != null && bod.atmosphere && BodyExists(body)) ? externalbodydata[body].GetPressure(time) : null;
+                if(bod != null && bod.atmosphere)
+                {
+                    return BodyExists(body) ? externalbodydata[body].GetPressure(time) : InternalData.PressureData(body, time);
+                }  
             }
             catch (Exception ex) 
             { 
@@ -309,7 +289,7 @@ namespace ModularClimateWeatherSystems
             try
             {
                 float[][,,] winddata = GetGlobalWindData(body, time);
-                if (BodyExists(body) && bod != null && bod.atmosphere && alt <= bod.atmosphereDepth && winddata != null)
+                if (bod != null && bod.atmosphere && alt <= bod.atmosphereDepth && winddata != null)
                 {
                     float[,,] winddataX = winddata[0];
                     float[,,] winddataY = winddata[1];
@@ -327,7 +307,8 @@ namespace ModularClimateWeatherSystems
 
                     double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
                     double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
-                    double lerpz = Utils.ScaleAltitude(UtilMath.Clamp01(alt / bod.atmosphereDepth), externalbodydata[body].WindScaleFactor, winddataX.GetUpperBound(0), out int z1, out int z2);
+                    double scalefactor = HasExternalWind(body) ? externalbodydata[body].WindScaleFactor : InternalData.WindScaling(body);
+                    double lerpz = Utils.ScaleAltitude(UtilMath.Clamp01(alt / bod.atmosphereDepth), scalefactor, winddataX.GetUpperBound(0), out int z1, out int z2);
 
                     //Bilinearly interpolate on the longitude and latitude axes
                     float BottomPlaneX = Utils.BiLerp(winddataX[z1, y1, x1], winddataX[z1, y1, x2], winddataX[z1, y2, x1], winddataX[z1, y2, x2], (float)lerpx, (float)lerpy);
@@ -350,13 +331,13 @@ namespace ModularClimateWeatherSystems
             {
                 Utils.LogAPIWarning("An Exception occurred when retrieving point wind data. A zero vector was returned as a failsafe. Exception thrown: " + ex.ToString());
             }
-            return Vector3.zero;
+            return InternalData.GetFlowMapWind(body, lon, lat, alt, time);
         }
         public static double GetPointTemperatureData(string body, double lon, double lat, double alt, double time)
         {
             CheckPosition(lon, lat, alt);
             CelestialBody bod = FlightGlobals.GetBodyByName(body);
-            bool validbody = BodyExists(body) && bod != null && bod.atmosphere && alt <= bod.atmosphereDepth;
+            bool validbody = bod != null && bod.atmosphere && alt <= bod.atmosphereDepth;
             try
             {
                 float[,,] temperaturedata = GetGlobalTemperatureData(body, time);
@@ -373,7 +354,8 @@ namespace ModularClimateWeatherSystems
 
                     double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
                     double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
-                    double lerpz = Utils.ScaleAltitude(UtilMath.Clamp01(alt / bod.atmosphereDepth), externalbodydata[body].TempScaleFactor, temperaturedata.GetUpperBound(0), out int z1, out int z2);
+                    double scalefactor = HasExternalTemperature(body) ? externalbodydata[body].TempScaleFactor : InternalData.TemperatureScaling(body);
+                    double lerpz = Utils.ScaleAltitude(UtilMath.Clamp01(alt / bod.atmosphereDepth), scalefactor, temperaturedata.GetUpperBound(0), out int z1, out int z2);
 
                     float BottomPlane = Utils.BiLerp(temperaturedata[z1, y1, x1], temperaturedata[z1, y1, x2], temperaturedata[z1, y2, x1], temperaturedata[z1, y2, x2], (float)lerpx, (float)lerpy);
                     float TopPlane = Utils.BiLerp(temperaturedata[z2, y1, x1], temperaturedata[z2, y1, x2], temperaturedata[z2, y2, x1], temperaturedata[z2, y2, x2], (float)lerpx, (float)lerpy);
@@ -392,7 +374,7 @@ namespace ModularClimateWeatherSystems
         {
             CheckPosition(lon, lat, alt);
             CelestialBody bod = FlightGlobals.GetBodyByName(body);
-            bool validbody = BodyExists(body) && bod != null && bod.atmosphere && alt <= bod.atmosphereDepth;
+            bool validbody = bod != null && bod.atmosphere && alt <= bod.atmosphereDepth;
             try
             {
                 float[,,] pressuredata = GetGlobalPressureData(body, time);
@@ -409,7 +391,8 @@ namespace ModularClimateWeatherSystems
 
                     double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
                     double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
-                    double lerpz = Utils.ScaleAltitude(UtilMath.Clamp01(alt / bod.atmosphereDepth), externalbodydata[body].PressScaleFactor, pressuredata.GetUpperBound(0), out int z1, out int z2);
+                    double scalefactor = HasExternalPressure(body) ? externalbodydata[body].PressScaleFactor : InternalData.PressureScaling(body);
+                    double lerpz = Utils.ScaleAltitude(UtilMath.Clamp01(alt / bod.atmosphereDepth), scalefactor, pressuredata.GetUpperBound(0), out int z1, out int z2);
 
                     float BottomPlane = Utils.BiLerp(pressuredata[z1, y1, x1], pressuredata[z1, y1, x2], pressuredata[z1, y2, x1], pressuredata[z1, y2, x2], (float)lerpx, (float)lerpy);
                     float TopPlane = Utils.BiLerp(pressuredata[z2, y1, x1], pressuredata[z2, y1, x2], pressuredata[z2, y2, x1], pressuredata[z2, y2, x2], (float)lerpx, (float)lerpy);

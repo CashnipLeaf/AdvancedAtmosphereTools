@@ -100,7 +100,6 @@ namespace ModularClimateWeatherSystems
 
     internal static class Settings
     {
-        internal static bool DevMode = false;
         internal static string Minutesforcoords = "Degrees";
         internal static float GlobalWindSpeedMultiplier = 1.0f;
         internal static bool FAR_Exists = false;

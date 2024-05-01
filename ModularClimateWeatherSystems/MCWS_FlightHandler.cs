@@ -19,8 +19,8 @@ namespace ModularClimateWeatherSystems
         private CelestialBody mainbody;
         private CelestialBody previousbody;
         private Matrix4x4 Vesselframe = Matrix4x4.identity;
-        internal bool FARConnected = false;
         internal double CurrentTime => Planetarium.GetUniversalTime();
+        internal static MCWS_Startup Data => MCWS_Startup.Instance;
         internal const double DEFAULTINTERVAL = 300.0;
 
         internal double Windtimestep = DEFAULTINTERVAL;
@@ -32,13 +32,28 @@ namespace ModularClimateWeatherSystems
         internal double Presstimestep = DEFAULTINTERVAL;
         internal double Presstimeofnextstep = DEFAULTINTERVAL;
 
-        internal bool[] HasData = new bool[3] { false, false, false };
-        internal bool HasWind => HasData[0];
-        internal bool HasTemp => HasData[1];
-        internal bool HasPress => HasData[2];
+        private enum SourceType
+        {
+            None, Internal, External
+        }
 
-        internal string[] Sources = new string[3] { "None", "None", "None" };
-        internal double[] ScaleFactors = new double[3] { 1d, 1d, 1d }; 
+        private SourceType WindType = SourceType.None;
+        private SourceType TemperatureType = SourceType.None;
+        private SourceType PressureType = SourceType.None;
+
+        internal bool HasWind => WindType != SourceType.None;
+        internal bool HasTemp => TemperatureType != SourceType.None;
+        internal bool HasPress => PressureType != SourceType.None;
+
+        internal string WindSource = none;
+        internal string TempSource = none;
+        internal string PressSource = none;
+        private const string internaldata = "Internal Data";
+        private const string none = "None";
+
+        internal double WindScaleFactor = 1d;
+        internal double TempScaleFactor = 1d;
+        internal double PressScaleFactor = 1d;
 
         internal Vector3 RawWind = Vector3.zero;
         internal Vector3 AppliedWind = Vector3.zero;
@@ -102,7 +117,7 @@ namespace ModularClimateWeatherSystems
             if (Settings.FAR_Exists)
             {
                 Utils.LogInfo("Registering MCWS with FerramAerospaceResearch.");
-                FARConnected = RegisterWithFAR();
+                RegisterWithFAR();
             }
 
             //set up wind variability. seed the variability generator based on current time.
@@ -119,6 +134,8 @@ namespace ModularClimateWeatherSystems
                 return;
             }
             activevessel = FlightGlobals.ActiveVessel;
+            double lon = activevessel.longitude;
+            double lat = activevessel.latitude;
             double alt = activevessel.altitude;
             mainbody = activevessel.mainBody;
 
@@ -136,31 +153,68 @@ namespace ModularClimateWeatherSystems
                     ClearGlobalData();
                     if (mainbody.atmosphere)
                     {
-                        HasData = MCWS_API.HasExternalData(mainbody.name);
-                        double[] timesteps = MCWS_API.GetTimeSteps(mainbody.name);
-                        Sources = MCWS_API.GetSources(mainbody.name);
-                        ScaleFactors = MCWS_API.GetScaling(mainbody.name);
-
-                        if (HasData[0])
+                        string bodyname = mainbody.name;
+                        if (MCWS_API.HasExternalWind(bodyname))
                         {
-                            Windtimestep = double.IsFinite(timesteps[0]) && timesteps[0] > 0.0 ? timesteps[0] : DEFAULTINTERVAL;
+                            WindType = SourceType.External;
+                            WindSource = MCWS_API.ExternalWindSource(bodyname);
+                            WindScaleFactor = MCWS_API.ExternalWindScaling(bodyname);
+                        }
+                        else
+                        {
+                            WindType = Data.HasWind(bodyname) ? SourceType.Internal : SourceType.None;
+                            WindSource = Data.HasWind(bodyname) ? internaldata : none;
+                            WindScaleFactor = Data.WindScaling(bodyname);
+                        }
+                        if (HasWind)
+                        {
+                            double step = (WindType == SourceType.External) ? MCWS_API.ExternalWindTimeStep(bodyname) : Data.WindTimeStep(bodyname);
+                            Windtimestep = double.IsFinite(step) && step > 0.0 ? step : DEFAULTINTERVAL;
                             double prevstep = Math.Truncate(CurrentTime / Windtimestep) * Windtimestep;
                             Windtimeofnextstep = prevstep + Windtimestep;
                             GetNewWindData(mainbody.name, prevstep, Windtimeofnextstep);
                         }
-                        if (HasData[1])
+
+                        if (MCWS_API.HasExternalTemperature(bodyname))
                         {
-                            Temptimestep = double.IsFinite(timesteps[1]) && timesteps[1] > 0.0 ? timesteps[1] : DEFAULTINTERVAL;
+                            TemperatureType = SourceType.External;
+                            TempSource = MCWS_API.ExternalTemperatureSource(bodyname);
+                            TempScaleFactor = MCWS_API.ExternalTemperatureScaling(bodyname);
+                        }
+                        else
+                        {
+                            TemperatureType = Data.HasTemperature(bodyname) ? SourceType.Internal : SourceType.None;
+                            TempSource = Data.HasTemperature(bodyname) ? internaldata : none;
+                            TempScaleFactor = Data.TemperatureScaling(bodyname);
+                        }
+                        if (HasTemp)
+                        {
+                            double step = (TemperatureType == SourceType.External) ? MCWS_API.ExternalTemperatureTimeStep(bodyname) : Data.TemperatureTimeStep(bodyname);
+                            Temptimestep = double.IsFinite(step) && step > 0.0 ? step : DEFAULTINTERVAL;
                             double prevstep = Math.Truncate(CurrentTime / Temptimestep) * Temptimestep;
                             Temptimeofnextstep = prevstep + Temptimestep;
-                            GetNewTemperatureData(mainbody.name, prevstep, Temptimeofnextstep);
+                            GetNewWindData(mainbody.name, prevstep, Temptimeofnextstep);
                         }
-                        if (HasData[2])
+
+                        if (MCWS_API.HasExternalPressure(bodyname))
                         {
-                            Presstimestep = double.IsFinite(timesteps[2]) && timesteps[2] > 0.0 ? timesteps[2] : DEFAULTINTERVAL;
+                            PressureType = SourceType.External;
+                            PressSource = MCWS_API.ExternalPressureSource(bodyname);
+                            PressScaleFactor = MCWS_API.ExternalPressureScaling(bodyname);
+                        }
+                        else
+                        {
+                            PressureType = Data.HasPressure(bodyname) ? SourceType.Internal : SourceType.None;
+                            PressSource = Data.HasPressure(bodyname) ? internaldata : none;
+                            PressScaleFactor = Data.PressureScaling(bodyname);
+                        }
+                        if (HasPress)
+                        {
+                            double step = (PressureType == SourceType.External) ? MCWS_API.ExternalPressureTimeStep(bodyname) : Data.PressureTimeStep(bodyname);
+                            Presstimestep = double.IsFinite(step) && step > 0.0 ? step : DEFAULTINTERVAL;
                             double prevstep = Math.Truncate(CurrentTime / Presstimestep) * Presstimestep;
                             Presstimeofnextstep = prevstep + Presstimestep;
-                            GetNewPressureData(mainbody.name, prevstep, Presstimeofnextstep);
+                            GetNewWindData(mainbody.name, prevstep, Presstimeofnextstep);
                         }
                     }
                 }
@@ -179,19 +233,19 @@ namespace ModularClimateWeatherSystems
                     vary1 = vary2;
                     vary2 = varywind.NextDouble();
                 }
-                if (CurrentTime >= Windtimeofnextstep && HasData[0])
+                if (CurrentTime >= Windtimeofnextstep && HasWind)
                 {
                     double prevstep = Math.Truncate(CurrentTime / Windtimestep) * Windtimestep;
                     Windtimeofnextstep = prevstep + Windtimestep;
                     GetNewWindData(mainbody.name, prevstep, Windtimeofnextstep);
                 }
-                if (CurrentTime >= Temptimeofnextstep && HasData[1])
+                if (CurrentTime >= Temptimeofnextstep && HasTemp)
                 {
                     double prevstep = Math.Truncate(CurrentTime / Temptimestep) * Temptimestep;
                     Temptimeofnextstep = prevstep + Temptimestep;
                     GetNewTemperatureData(mainbody.name, prevstep, Temptimeofnextstep);
                 }
-                if (CurrentTime >= Presstimeofnextstep && HasData[2])
+                if (CurrentTime >= Presstimeofnextstep && HasPress)
                 {
                     double prevstep = Math.Truncate(CurrentTime / Presstimestep) * Presstimestep;
                     Presstimeofnextstep = prevstep + Presstimestep;
@@ -211,11 +265,11 @@ namespace ModularClimateWeatherSystems
                 Temperature = FI != null ? mainbody.GetFullTemperature(alt, FI.atmosphereTemperatureOffset) : mainbody.GetTemperature(alt);
                 Pressure = mainbody.GetPressure(alt);
 
-                double normalizedlon = (activevessel.longitude + 180.0) / 360.0;
-                double normalizedlat = (180.0 - (activevessel.latitude + 90.0)) / 180.0;
+                double normalizedlon = (lon + 180.0) / 360.0;
+                double normalizedlat = (180.0 - (lat + 90.0)) / 180.0;
                 double normalizedalt = alt / mainbody.atmosphereDepth;
 
-                if (HasData[0] && winddataX1 != null && winddataX2 != null && winddataY1 != null && winddataY2 != null && winddataZ1 != null && winddataZ2 != null)
+                if (HasWind && winddataX1 != null && winddataX2 != null && winddataY1 != null && winddataY2 != null && winddataZ1 != null && winddataZ2 != null)
                 {
                     try //some very nasty 4D interpolation
                     {
@@ -231,7 +285,7 @@ namespace ModularClimateWeatherSystems
 
                         double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
                         double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
-                        double lerpz = Utils.ScaleAltitude(normalizedalt, ScaleFactors[0], winddataX1.GetUpperBound(0), out int z1, out int z2);
+                        double lerpz = Utils.ScaleAltitude(normalizedalt, WindScaleFactor, winddataX1.GetUpperBound(0), out int z1, out int z2);
                         double lerpt = UtilMath.Clamp01((CurrentTime % Windtimestep) / Windtimestep);
 
                         //Bilinearly interpolate on the longitude and latitude axes 
@@ -252,7 +306,6 @@ namespace ModularClimateWeatherSystems
 
                         float BottomPlaneZ2 = Utils.BiLerp(winddataZ2[z1, y1, x1], winddataZ2[z1, y1, x2], winddataZ2[z1, y2, x1], winddataZ2[z1, y2, x2], (float)lerpx, (float)lerpy);
                         float TopPlaneZ2 = Utils.BiLerp(winddataZ2[z2, y1, x1], winddataZ2[z2, y1, x2], winddataZ2[z2, y2, x1], winddataZ2[z2, y2, x2], (float)lerpx, (float)lerpy);
-                        //This is Fine™
 
                         //create some vectors out of the floats from the last calculations.
                         Vector3 BottomPlane1 = new Vector3(BottomPlaneX1, BottomPlaneY1, BottomPlaneZ1);
@@ -270,15 +323,38 @@ namespace ModularClimateWeatherSystems
                         //add wind speed multiplier
                         RawWind = normalwind * Settings.GlobalWindSpeedMultiplier;
                         AppliedWind = Vesselframe * RawWind;
+                        goto SkipFlowMaps;
                     }
                     catch (Exception ex) //fallback data
                     {
-                        Utils.LogError("Exception thrown when deriving point Wind data for " + mainbody.name + ":" + ex.ToString());
+                        Utils.LogError("Exception thrown when deriving point Wind data for " + mainbody.name + ": " + ex.ToString());
                         winddataX1 = winddataX2 = winddataY1 = winddataY2 = winddataZ1 = winddataZ2 = null;
                         normalwind = transformedwind = AppliedWind = RawWind = Vector3.zero;
                     }
                 }
-                if (HasData[1] && temperaturedata1 != null && temperaturedata2 != null)
+                if (Data.HasFlowMaps(mainbody.name))
+                {
+                    try
+                    {
+                        Vector3 Windvec = Data.GetFlowMapWind(mainbody.name, lon, lat, alt, CurrentTime);
+
+                        //add the variability factor to the wind vector, then transform it to the global coordinate frame
+                        normalwind = Utils.IsVectorFinite(Windvec) ? Windvec * VaryFactor : throw new NotFiniteNumberException();
+                        transformedwind = Vesselframe * normalwind;
+
+                        //add wind speed multiplier
+                        RawWind = normalwind * Settings.GlobalWindSpeedMultiplier;
+                        AppliedWind = Vesselframe * RawWind;
+                    }
+                    catch (Exception ex) //fallback data
+                    {
+                        Utils.LogError("Exception thrown when reading Flowmaps for " + mainbody.name + ": " + ex.ToString());
+                        normalwind = transformedwind = AppliedWind = RawWind = Vector3.zero;
+                    }
+                }
+
+            SkipFlowMaps:
+                if (HasTemp && temperaturedata1 != null && temperaturedata2 != null)
                 {
                     try //some less nasty 4D interpolation
                     {
@@ -294,7 +370,7 @@ namespace ModularClimateWeatherSystems
 
                         double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
                         double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
-                        double lerpz = Utils.ScaleAltitude(normalizedalt, ScaleFactors[1], temperaturedata1.GetUpperBound(0), out int z1, out int z2);
+                        double lerpz = Utils.ScaleAltitude(normalizedalt, TempScaleFactor, temperaturedata1.GetUpperBound(0), out int z1, out int z2);
                         double lerpt = UtilMath.Clamp01((CurrentTime % Temptimestep) / Temptimestep);
 
                         //Bilinearly interpolate on the longitude and latitude axes
@@ -310,12 +386,12 @@ namespace ModularClimateWeatherSystems
                     }
                     catch (Exception ex) //fallback data
                     {
-                        Utils.LogError("Exception thrown when deriving point Temperature data for " + mainbody.name + ":" + ex.ToString());
+                        Utils.LogError("Exception thrown when deriving point Temperature data for " + mainbody.name + ": " + ex.ToString());
                         temperaturedata1 = temperaturedata2 = null;
                         Temperature = FI != null ? mainbody.GetFullTemperature(alt, FI.atmosphereTemperatureOffset) : mainbody.GetTemperature(alt);
                     }
                 }
-                if (HasData[2] && pressuredata1 != null && pressuredata2 != null)
+                if (HasPress && pressuredata1 != null && pressuredata2 != null)
                 {
                     try //some nasty 4D interpolation
                     {
@@ -331,7 +407,7 @@ namespace ModularClimateWeatherSystems
 
                         double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
                         double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
-                        double lerpz = Utils.ScaleAltitude(normalizedalt, ScaleFactors[2], pressuredata1.GetUpperBound(0), out int z1, out int z2);
+                        double lerpz = Utils.ScaleAltitude(normalizedalt, PressScaleFactor, pressuredata1.GetUpperBound(0), out int z1, out int z2);
                         double lerpt = UtilMath.Clamp01((CurrentTime % Presstimestep) / Presstimestep);
 
                         //Bilinearly interpolate on the longitude and latitude axes
@@ -350,7 +426,7 @@ namespace ModularClimateWeatherSystems
                     }
                     catch (Exception ex) //fallback data
                     {
-                        Utils.LogError("Exception thrown when deriving point Pressure data for " + mainbody.name + ":" + ex.ToString());
+                        Utils.LogError("Exception thrown when deriving point Pressure data for " + mainbody.name + ": " + ex.ToString());
                         pressuredata1 = pressuredata2 = null;
                         Pressure = mainbody.GetPressure(alt);
                     }
@@ -374,11 +450,11 @@ namespace ModularClimateWeatherSystems
 
         private void GetNewWindData(string body, double step1, double step2)
         {
-            Utils.LogInfo("Fetching new Wind data for " + body + " from " + Sources[0] + ".");
+            Utils.LogInfo("Fetching new Wind data for " + body + " from " + WindSource + ".");
             try
             {
-                float[][,,] winddata1 = MCWS_API.FetchGlobalWindData(body, step1);
-                float[][,,] winddata2 = MCWS_API.FetchGlobalWindData(body, step2);
+                float[][,,] winddata1 = (WindType == SourceType.External) ? MCWS_API.FetchGlobalWindData(body, step1) : Data.WindData(body, step1);
+                float[][,,] winddata2 = (WindType == SourceType.External) ? MCWS_API.FetchGlobalWindData(body, step2) : Data.WindData(body, step2);
                 if (winddata1 != null && winddata2 != null)
                 {
                     if (!MCWS_API.CheckArraySizes(winddata1[0], winddata2[0]))
@@ -401,11 +477,11 @@ namespace ModularClimateWeatherSystems
         }
         private void GetNewTemperatureData(string body, double step1, double step2)
         {
-            Utils.LogInfo("Fetching new Temperature data for " + body + " from " + Sources[1] + ".");
+            Utils.LogInfo("Fetching new Temperature data for " + body + " from " + TempSource + ".");
             try
             {
-                temperaturedata1 = MCWS_API.FetchGlobalTemperatureData(body, step1);
-                temperaturedata2 = MCWS_API.FetchGlobalTemperatureData(body, step2);
+                temperaturedata1 = (TemperatureType == SourceType.External) ? MCWS_API.FetchGlobalTemperatureData(body, step1) : Data.TemperatureData(body, step1);
+                temperaturedata2 = (TemperatureType == SourceType.External) ? MCWS_API.FetchGlobalTemperatureData(body, step2) : Data.TemperatureData(body, step2);
                 if (!MCWS_API.CheckArraySizes(temperaturedata1, temperaturedata2))
                 {
                     throw new FormatException("The two Temperature data arrays are not of identical dimensions.");
@@ -419,11 +495,11 @@ namespace ModularClimateWeatherSystems
         }
         private void GetNewPressureData(string body, double step1, double step2)
         {
-            Utils.LogInfo("Fetching new Pressure data for " + body + " from " + Sources[2] + ".");
+            Utils.LogInfo("Fetching new Pressure data for " + body + " from " + PressSource + ".");
             try
             {
-                pressuredata1 = MCWS_API.FetchGlobalPressureData(body, step1);
-                pressuredata2 = MCWS_API.FetchGlobalPressureData(body, step2);
+                pressuredata1 = (PressureType == SourceType.External) ? MCWS_API.FetchGlobalPressureData(body, step1) : Data.PressureData(body, step1);
+                pressuredata2 = (PressureType == SourceType.External) ? MCWS_API.FetchGlobalPressureData(body, step2) : Data.PressureData(body, step2);
                 if (!MCWS_API.CheckArraySizes(pressuredata1, pressuredata2))
                 {
                     throw new FormatException("The two Pressure data arrays are not of identical dimensions.");
@@ -439,9 +515,9 @@ namespace ModularClimateWeatherSystems
         private void ClearGlobalData()
         {
             winddataX1 = winddataX2 = winddataY1 = winddataY2 = winddataZ1 = winddataZ2 = temperaturedata1 = temperaturedata2 = pressuredata1 = pressuredata2 = null;
-            HasData[0] = HasData[1] = HasData[2] = false;
-            ScaleFactors[0] = ScaleFactors[1] = ScaleFactors[2] = 1.0;
-            Sources[0] = Sources[1] = Sources[2] = "None";
+            WindType = TemperatureType = PressureType = SourceType.None;
+            WindScaleFactor = TempScaleFactor = PressScaleFactor = 1d;
+            WindSource = TempSource = PressSource = "None";
         }
 
         //----------------FerramAerospaceResearch Compatibility--------------
