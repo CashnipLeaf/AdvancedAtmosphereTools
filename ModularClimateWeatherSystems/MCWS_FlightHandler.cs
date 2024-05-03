@@ -390,6 +390,12 @@ namespace ModularClimateWeatherSystems
 
                         //Bilinearly interpolate on the altitude and time axes
                         double Final = UtilMath.Lerp(UtilMath.Lerp((double)BottomPlane1, (double)TopPlane1, lerpz), UtilMath.Lerp((double)BottomPlane2, (double)TopPlane2, lerpz), lerpt);
+                        if (alt > TempModelTop)
+                        {
+                            double extralerp = (alt - PressModelTop) / (mainbody.atmosphereDepth - PressModelTop);
+                            double realtemp = FI != null ? mainbody.GetFullTemperature(alt, FI.atmosphereTemperatureOffset) : mainbody.GetTemperature(alt);
+                            Final = UtilMath.Lerp(Final, realtemp, Math.Pow(extralerp, 0.25));
+                        }
                         Temperature = double.IsFinite(Final) ? Final : throw new NotFiniteNumberException();
                     }
                     catch (Exception ex) //fallback data
@@ -432,10 +438,13 @@ namespace ModularClimateWeatherSystems
                         double TopPlaneFinal = UtilMath.Lerp((double)TopPlane1, (double)TopPlane2, lerpt);
 
                         double Final = Utils.InterpolatePressure(BottomPlaneFinal,TopPlaneFinal, lerpz);
-                        if (normalizedalt > 1d)
+                        if (alt > PressModelTop)
                         {
-                            double extralerpz = (normalizedalt - 1) / ((mainbody.atmosphereDepth / PressModelTop) - 1);
-                            Final = UtilMath.Lerp(Final, 0d, extralerpz);
+                            double extralerp = (alt - PressModelTop) / (mainbody.atmosphereDepth - PressModelTop);
+                            double press0 = mainbody.GetPressure(0);
+                            double press1 = mainbody.GetPressure(PressModelTop);
+                            double scaleheight = PressModelTop / Math.Log(press0 / press1, Math.E);
+                            Final = UtilMath.Lerp(Final * Math.Pow(Math.E, -((alt - PressModelTop) / scaleheight)), mainbody.GetPressure(alt) * 1000, Math.Pow(extralerp, 0.125));
                         }
                         Pressure = double.IsFinite(Final) ? Final * 0.001 : throw new NotFiniteNumberException(); //convert to kPa
                     }

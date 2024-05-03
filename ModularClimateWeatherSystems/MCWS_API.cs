@@ -373,6 +373,11 @@ namespace ModularClimateWeatherSystems
                     float TopPlane = Utils.BiLerp(temperaturedata[z2, y1, x1], temperaturedata[z2, y1, x2], temperaturedata[z2, y2, x1], temperaturedata[z2, y2, x2], (float)lerpx, (float)lerpy);
 
                     double Final = UtilMath.Lerp((double)BottomPlane, (double)TopPlane, lerpz);
+                    if (alt > modeltop)
+                    {
+                        double extralerp = ((alt / modeltop) - 1) / ((bod.atmosphereDepth / modeltop) - 1);
+                        Final = UtilMath.Lerp(Final, bod.GetTemperature(alt), Math.Pow(extralerp, 0.25));
+                    }
                     return double.IsFinite(Final) ? Final : throw new NotFiniteNumberException();
                 }
             }
@@ -414,8 +419,11 @@ namespace ModularClimateWeatherSystems
                     double Final = Utils.InterpolatePressure(BottomPlane, TopPlane, lerpz);
                     if (alt > modeltop)
                     {
-                        double extralerp = ((alt / modeltop) - 1) / ((bod.atmosphereDepth / modeltop) - 1);
-                        UtilMath.Lerp(Final, 0, extralerp);
+                        double extralerp = (alt - modeltop) / (bod.atmosphereDepth - modeltop);
+                        double press0 = bod.GetPressure(0);
+                        double press1 = bod.GetPressure(modeltop);
+                        double scaleheight = modeltop / Math.Log(press0 / press1, Math.E);
+                        Final = UtilMath.Lerp(Final * Math.Pow(Math.E, -((alt - modeltop) / scaleheight)), bod.GetPressure(alt) * 1000, Math.Pow(extralerp, 0.125));
                     }
                     return double.IsFinite(Final) ? Final : throw new NotFiniteNumberException();
                 }

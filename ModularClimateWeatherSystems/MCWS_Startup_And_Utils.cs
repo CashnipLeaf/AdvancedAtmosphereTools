@@ -159,7 +159,7 @@ namespace ModularClimateWeatherSystems
             double z = (xBase <= 1.0 ? nX : ((Math.Pow(xBase, -nX * upperbound) - 1) / (Math.Pow(xBase, -1 * upperbound) - 1))) * upperbound;
             int1 = Clamp((int)Math.Floor(z), 0, upperbound); //layer 1
             int2 = Clamp(int1 + 1, 0, upperbound); //layer 2
-            return UtilMath.Clamp01(z - Math.Truncate(z));
+            return nX >= 1d ? 1d : UtilMath.Clamp01(z - Math.Truncate(z));
         }
 
         internal static double InterpolatePressure(double first, double second, double by)
