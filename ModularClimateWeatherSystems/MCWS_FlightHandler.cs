@@ -193,7 +193,7 @@ namespace ModularClimateWeatherSystems
                             Temptimestep = double.IsFinite(step) && step > 0.0 ? step : DEFAULTINTERVAL;
                             double prevstep = Math.Truncate(CurrentTime / Temptimestep) * Temptimestep;
                             Temptimeofnextstep = prevstep + Temptimestep;
-                            GetNewWindData(mainbody.name, prevstep, Temptimeofnextstep);
+                            GetNewTemperatureData(mainbody.name, prevstep, Temptimeofnextstep);
                         }
 
                         if (MCWS_API.HasExternalPressure(bodyname))
@@ -214,7 +214,7 @@ namespace ModularClimateWeatherSystems
                             Presstimestep = double.IsFinite(step) && step > 0.0 ? step : DEFAULTINTERVAL;
                             double prevstep = Math.Truncate(CurrentTime / Presstimestep) * Presstimestep;
                             Presstimeofnextstep = prevstep + Presstimestep;
-                            GetNewWindData(mainbody.name, prevstep, Presstimeofnextstep);
+                            GetNewPressureData(mainbody.name, prevstep, Presstimeofnextstep);
                         }
                     }
                 }
@@ -278,7 +278,7 @@ namespace ModularClimateWeatherSystems
                         double mapy = normalizedlat * winddataX1.GetUpperBound(1);
 
                         int x1 = (int)UtilMath.Clamp(Math.Truncate(mapx), 0, winddataX1.GetUpperBound(2));
-                        int x2 = UtilMath.WrapAround(x1 + 1, 0, winddataX1.GetUpperBound(2));
+                        int x2 = UtilMath.WrapAround(x1 + 1, 0, winddataX1.GetLength(2));
 
                         int y1 = Utils.Clamp((int)Math.Floor(mapy), 0, winddataX1.GetUpperBound(1));
                         int y2 = Utils.Clamp(y1 + 1, 0, winddataX1.GetUpperBound(1));
@@ -323,7 +323,6 @@ namespace ModularClimateWeatherSystems
                         //add wind speed multiplier
                         RawWind = normalwind * Settings.GlobalWindSpeedMultiplier;
                         AppliedWind = Vesselframe * RawWind;
-                        goto SkipFlowMaps;
                     }
                     catch (Exception ex) //fallback data
                     {
@@ -332,7 +331,7 @@ namespace ModularClimateWeatherSystems
                         normalwind = transformedwind = AppliedWind = RawWind = Vector3.zero;
                     }
                 }
-                if (Data.HasFlowMaps(mainbody.name))
+                else if (Data.HasFlowMaps(mainbody.name))
                 {
                     try
                     {
@@ -353,7 +352,6 @@ namespace ModularClimateWeatherSystems
                     }
                 }
 
-            SkipFlowMaps:
                 if (HasTemp && temperaturedata1 != null && temperaturedata2 != null)
                 {
                     try //some less nasty 4D interpolation
@@ -363,7 +361,7 @@ namespace ModularClimateWeatherSystems
                         double mapy = normalizedlat * temperaturedata1.GetUpperBound(1);
 
                         int x1 = (int)UtilMath.Clamp(Math.Truncate(mapx), 0, temperaturedata1.GetUpperBound(2));
-                        int x2 = UtilMath.WrapAround(x1 + 1, 0, temperaturedata1.GetUpperBound(2));
+                        int x2 = UtilMath.WrapAround(x1 + 1, 0, temperaturedata1.GetLength(2));
 
                         int y1 = Utils.Clamp((int)Math.Floor(mapy), 0, temperaturedata1.GetUpperBound(1));
                         int y2 = Utils.Clamp(y1 + 1, 0, temperaturedata1.GetUpperBound(1));
@@ -400,7 +398,7 @@ namespace ModularClimateWeatherSystems
                         double mapy = normalizedlat * pressuredata1.GetUpperBound(1);
 
                         int x1 = (int)UtilMath.Clamp(Math.Truncate(mapx), 0, pressuredata1.GetUpperBound(2));
-                        int x2 = UtilMath.WrapAround(x1 + 1, 0, pressuredata1.GetUpperBound(2));
+                        int x2 = UtilMath.WrapAround(x1 + 1, 0, pressuredata1.GetLength(2));
 
                         int y1 = Utils.Clamp((int)Math.Floor(mapy), 0, pressuredata1.GetUpperBound(1));
                         int y2 = Utils.Clamp(y1 + 1, 0, pressuredata1.GetUpperBound(1));

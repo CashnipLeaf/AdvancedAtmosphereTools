@@ -129,7 +129,7 @@ namespace ModularClimateWeatherSystems
 
     internal static class Utils 
     {
-        internal const string version = "0.9.1";
+        internal const string version = "0.9.2";
         internal static string GameDataPath => KSPUtil.ApplicationRootPath + "GameData/";
         internal static Dictionary<string, string> LOCCache; //localization cache
 
@@ -182,6 +182,8 @@ namespace ModularClimateWeatherSystems
 
     internal class BodyData
     {
+        private readonly string body;
+        
         private float[][,,] WindDataX;
         private float[][,,] WindDataY;
         private float[][,,] WindDataZ;
@@ -202,32 +204,57 @@ namespace ModularClimateWeatherSystems
         internal List<FlowMap> Flowmaps;
         internal bool HasFlowmaps => Flowmaps != null && Flowmaps.Count > 0;
 
-        internal BodyData()
+        internal BodyData(string body)
         {
             Flowmaps = new List<FlowMap>();
+            this.body = body;
         }
 
         internal void AddWindData(float[][,,] WindX, float[][,,] WindY, float[][,,] WindZ, float scalefactor, double timestep)
         {
-            WindDataX = WindX;
-            WindDataY = WindY;
-            WindDataZ = WindZ;
-            WindScaleFactor = scalefactor;
-            WindTimeStep = timestep;
+            if (HasWind)
+            {
+                Utils.LogWarning(string.Format("Wind data already exists for {0}.", body));
+            }
+            else
+            {
+                WindDataX = WindX;
+                WindDataY = WindY;
+                WindDataZ = WindZ;
+                WindScaleFactor = scalefactor;
+                WindTimeStep = timestep;
+                Utils.LogInfo(string.Format("Successfully added Wind Data to {0}.", body));
+            }
         }
 
         internal void AddTemperatureData(float[][,,] Temp, float scalefactor, double timestep)
         {
-            TemperatureData = Temp;
-            TemperatureScaleFactor = scalefactor;
-            TemperatureTimeStep = timestep;
+            if (HasTemperature)
+            {
+                Utils.LogWarning(string.Format("Temperature data already exists for {0}.", body));
+            }
+            else
+            {
+                TemperatureData = Temp;
+                TemperatureScaleFactor = scalefactor;
+                TemperatureTimeStep = timestep;
+                Utils.LogInfo(string.Format("Successfully added Temperature Data to {0}.", body));
+            }
         }
 
         internal void AddPressureData(float[][,,] Press, float scalefactor, double timestep)
         {
-            PressureData = Press;
-            PressureScaleFactor = scalefactor;
-            PressureTimeStep = timestep;
+            if (HasPressure)
+            {
+                Utils.LogWarning(string.Format("Pressure data already exists for {0}.", body));
+            }
+            else
+            {
+                PressureData = Press;
+                PressureScaleFactor = scalefactor;
+                PressureTimeStep = timestep;
+                Utils.LogInfo(string.Format("Successfully added Pressure Data to {0}.", body));
+            }
         }
 
         internal void AddFlowMap(FlowMap flowmap) => Flowmaps.Add(flowmap);
@@ -262,12 +289,7 @@ namespace ModularClimateWeatherSystems
         internal float NSwind;
         internal float vWind;
 
-        private float timeoffset;
-        internal float TimeOffset
-        {
-            get => timeoffset;
-            set => timeoffset = WindSpeedMultiplierTimeCurve.maxTime != 0.0f ? value % WindSpeedMultiplierTimeCurve.maxTime : 0.0f;
-        }
+        internal float timeoffset;
 
         internal int x;
         internal int y;
@@ -284,7 +306,7 @@ namespace ModularClimateWeatherSystems
             this.EWwind = EWwind;
             this.NSwind = NSwind;
             this.vWind = vWind;
-            TimeOffset = offset;
+            timeoffset = WindSpeedMultiplierTimeCurve.maxTime != 0.0f ? offset % WindSpeedMultiplierTimeCurve.maxTime : 0.0f;
 
             x = flowmap.width;
             y = flowmap.height;
@@ -293,23 +315,20 @@ namespace ModularClimateWeatherSystems
         internal Vector3 GetWindVec(double lon, double lat, double alt, double time)
         {
             //AltitudeSpeedMultiplierCurve cannot go below 0.
-            float speedmult = Math.Max(AltitudeSpeedMultCurve.Evaluate((float)alt), 0.0f) * GetValAtLoopTime(WindSpeedMultiplierTimeCurve, time - timeoffset);
+            float speedmult = Math.Max(AltitudeSpeedMultCurve.Evaluate((float)alt), 0.0f) * WindSpeedMultiplierTimeCurve.Evaluate((float)(time - timeoffset + WindSpeedMultiplierTimeCurve.maxTime) % WindSpeedMultiplierTimeCurve.maxTime);
             if (speedmult > 0.0f)
             {
                 //adjust longitude so the center of the map is the prime meridian for the purposes of these calculations
-                lon += 90.0;
-                if (lon > 180.0) { lon -= 360; }
-                if (lon <= -180.0) { lon += 360; }
-                double mapx = ((lon / 360.0) * x) + (x * 0.5) - 0.5;
-                double mapy = ((lat / 180.0) * y) + (y * 0.5) - 0.5;
+                double mapx = (((lon + 270.0) / 360.0) * x) - 0.5;
+                double mapy = (((lat + 90.0) / 180.0) * y) - 0.5;
                 double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
                 double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
 
                 //locate the four nearby points, but don't go over the poles.
-                int leftx = (int)(Math.Truncate(mapx) + x) % x;
+                int leftx = UtilMath.WrapAround((int)Math.Truncate(mapx), 0, x);
                 int topy = Utils.Clamp((int)Math.Truncate(mapy), 0, y - 1);
-                int rightx = (int)(Math.Truncate(mapx) + 1 + x) % x;
-                int bottomy = Utils.Clamp((int)Math.Truncate(mapy) + 1, 0, y - 1);
+                int rightx = UtilMath.WrapAround(leftx + 1, 0, x);
+                int bottomy = Utils.Clamp(topy + 1, 0, y - 1);
 
                 Color[] colors = new Color[4];
                 Vector3[] vectors = new Vector3[4];
@@ -335,7 +354,5 @@ namespace ModularClimateWeatherSystems
             }
             return Vector3.zero;
         }
-
-        internal static float GetValAtLoopTime(FloatCurve curve, double time) => curve.Evaluate(((float)time + curve.maxTime) % curve.maxTime);
     }
 }

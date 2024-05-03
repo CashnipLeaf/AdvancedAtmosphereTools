@@ -8,12 +8,9 @@ namespace ModularClimateWeatherSystems
 {
     partial class MCWS_Startup
     {
-        private static readonly string[] acceptedotherstrings = { "temperature", "pressure", "spacer" };
-        private static readonly string[] acceptedwindstrings = { "windx", "windy", "windz" };
-
         void ReadConfigs()
         {
-            Utils.LogInfo("Loading configs");
+            Utils.LogInfo("Loading configs.");
 
             bodydata = new Dictionary<string, BodyData>();
             ConfigNode[] DataNodes = GameDatabase.Instance.GetConfigNodes("MCWS_DATA");
@@ -35,131 +32,80 @@ namespace ModularClimateWeatherSystems
                 Utils.LogInfo(string.Format("Loading config for {0}.", body));
                 if (!bodydata.ContainsKey(body))
                 {
-                    bodydata.Add(body, new BodyData());
+                    bodydata.Add(body, new BodyData(body));
                 }
-
-                int lon = 0;
-                int lat = 0;
-                int alt = 0;
-                int steps = 0;
-                double timestep = double.NaN;
 
                 ConfigNode data = new ConfigNode();
                 if (node.TryGetNode("Combined_Data", ref data))
                 {
                     try
                     {
-                        if (!bodydata[body].HasWind && !bodydata[body].HasTemperature && !bodydata[body].HasPressure)
+                        Utils.LogInfo(string.Format("Loading Combined Data node for {0}.", body));
+                        string path = "";
+                        string[] readorder = new string[1];
+                        bool hascommons = ReadCommons(data, out int lon, out int lat, out int alt, out int steps, out float timestep);
+
+                        if (hascommons && data.TryGetValue("path", ref path) && !string.IsNullOrEmpty(path) && data.TryGetValue("readOrder", ref readorder))
                         {
-                            Utils.LogInfo(string.Format("Loading Combined Data node for {0}.", body));
-                            string path = "";
-                            string[] readorder = new string[1];
-                            List<string> components = new List<string>();
+                            ReadOptionals(data, out int offset, out float scaleFactor, out bool invertalt, out bool virtualtop);
 
-                            if (data.TryGetValue("path", ref path) && data.TryGetValue("readOrder", ref readorder) && !string.IsNullOrEmpty(path) && data.TryGetValue("sizeLon", ref lon) &&
-                                data.TryGetValue("sizeLat", ref lat) && data.TryGetValue("sizeAlt", ref alt) && data.TryGetValue("timesteps", ref steps) && data.TryGetValue("timestepLength", ref timestep))
+                            if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && readorder.Length > 1 && offset >= 0)
                             {
-                                int offset = 0;
-                                float scaleFactor = 1.0f;
-                                bool invertalt = false;
-                                bool virtualtop = false;
+                                float[][,,] windarrayx = new float[1][,,];
+                                bool windx = false;
+                                float[][,,] windarrayy = new float[1][,,];
+                                bool windy = false;
+                                float[][,,] windarrayz = new float[1][,,];
+                                bool windz = false;
 
-                                data.TryGetValue("initialOffset", ref offset);
-                                data.TryGetValue("scaleFactor", ref scaleFactor);
-                                data.TryGetValue("invertAltitude", ref invertalt);
-                                data.TryGetValue("virtualTopLayer", ref virtualtop);
-
-                                if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && readorder.Length > 1 && offset >= 0)
+                                float[][][,,] dataarray = ReadCombinedFile(path, lon, lat, alt, steps, readorder.Length, offset, virtualtop, invertalt);
+                                for (int v = 0; v < readorder.Length; v++)
                                 {
-                                    for (int i = 0; i < readorder.Length; i++) //check the readOrder to make sure it is valid.
+                                    string line = readorder[v].ToLower();
+                                    switch (line)
                                     {
-                                        if (string.IsNullOrEmpty(readorder[i]))
-                                        {
-                                            throw new ArgumentNullException("A null or empty string was present in the readOrder list.");
-                                        }
-                                        readorder[i] = readorder[i].ToLower();
-                                        if (!acceptedotherstrings.Contains(readorder[i]) && !acceptedwindstrings.Contains(readorder[i]))
-                                        {
-                                            throw new ArgumentException(string.Format("String {0} is not a valid value for the read order.", readorder[i]));
-                                        }
-                                        if (readorder[i] != "spacer" && components.Contains(readorder[i]))
-                                        {
-                                            throw new ArgumentException(string.Format("Duplicate value {0} was present in the readOrder list.", readorder[i]));
-                                        }
-                                        components.Add(readorder[i]);
+                                        case "windx":
+                                            windarrayx = dataarray[v];
+                                            windx = true;
+                                            break;
+                                        case "windy":
+                                            windarrayy = dataarray[v];
+                                            windy = true;
+                                            break;
+                                        case "windz":
+                                            windarrayz = dataarray[v];
+                                            windz = true;
+                                            break;
+                                        case "temperature":
+                                            bodydata[body].AddTemperatureData(dataarray[v], scaleFactor, timestep);
+                                            break;
+                                        case "pressure":
+                                            bodydata[body].AddPressureData(dataarray[v], scaleFactor, timestep);
+                                            break;
+                                        default:
+                                            break; //skip over something that isnt data
                                     }
-
-                                    float[][,,] windarrayx = new float[steps][,,];
-                                    float[][,,] windarrayy = new float[steps][,,];
-                                    float[][,,] windarrayz = new float[steps][,,];
-                                    float[][,,] temparray = new float[steps][,,];
-                                    float[][,,] pressarray = new float[steps][,,];
-                                    int Blocksize = lon * lat * sizeof(float);
-
-                                    using (BinaryReader reader = new BinaryReader(File.OpenRead(Utils.GameDataPath + path)))
-                                    {
-                                        if (offset > 0) //dispose of the initial offset
-                                        {
-                                            reader.ReadBytes(offset);
-                                        }
-                                        foreach (string line in readorder)
-                                        {
-                                            for (int i = 0; i < steps; i++)
-                                            {
-                                                float[,,] floatbuffer = new float[(virtualtop ? alt + 1 : alt), lat, lon];
-                                                for (int j = 0; j < alt; j++)
-                                                {
-                                                    byte[] bufferarray = reader.ReadBytes(Blocksize);
-                                                    Buffer.BlockCopy(bufferarray, 0, floatbuffer, Blocksize * (invertalt ? (alt - 1 - j) : j), Buffer.ByteLength(bufferarray));
-                                                }
-                                                if (virtualtop)
-                                                {
-                                                    Buffer.BlockCopy(floatbuffer, Blocksize * alt - 1, floatbuffer, Blocksize * alt, Blocksize); //add virtual top layer
-                                                }
-                                                switch (line)
-                                                {
-                                                    case "spacer":
-                                                        break;
-                                                    case "windx":
-                                                        windarrayx[i] = floatbuffer;
-                                                        break;
-                                                    case "windy":
-                                                        windarrayy[i] = floatbuffer;
-                                                        break;
-                                                    case "windz":
-                                                        windarrayz[i] = floatbuffer;
-                                                        break;
-                                                    case "temperature":
-                                                        temparray[i] = floatbuffer;
-                                                        break;
-                                                    case "pressure":
-                                                        pressarray[i] = floatbuffer;
-                                                        break;
-                                                    default:
-                                                        throw new ArgumentException(string.Format("String {0} is not a valid value for the read order.", readorder[i]));
-                                                }
-                                            }
-                                        }
-                                        reader.Close();
-                                    }
-                                    bodydata[body].AddWindData(windarrayx, windarrayy, windarrayz, scaleFactor, timestep);
-                                    bodydata[body].AddTemperatureData(temparray, scaleFactor, timestep);
-                                    bodydata[body].AddPressureData(pressarray, scaleFactor, timestep);
-                                    Utils.LogInfo(string.Format("Successfully loaded Combined Data node for {0}.", body));
                                 }
-                                else
+                                if (windx || windy || windz)
                                 {
-                                    throw new ArgumentOutOfRangeException("One or more of the inputted keys was outside the range of acceptable values.");
+                                    if (windx && windy && windz) //only add wind data if all three components are present.
+                                    {
+                                        bodydata[body].AddWindData(windarrayx, windarrayy, windarrayz, scaleFactor, timestep);
+                                    }
+                                    else
+                                    {
+                                        Utils.LogWarning(string.Format("Unable to add Wind data to {0}. One or more components is missing.", body));
+                                    }
                                 }
                             }
                             else
                             {
-                                throw new ArgumentNullException("One or more keys was not present or was empty.");
+                                throw new ArgumentOutOfRangeException("One or more of the inputted keys was outside the range of acceptable values.");
                             }
                         }
                         else
                         {
-                            Utils.LogWarning(string.Format("Data already exists for {0}.", body));
+                            throw new ArgumentNullException("One or more keys was not present or was empty.");
                         }
                     }
                     catch (Exception ex)
@@ -171,198 +117,95 @@ namespace ModularClimateWeatherSystems
                 {
                     try
                     {
-                        if (!bodydata[body].HasWind)
+                        Utils.LogInfo(string.Format("Loading Wind Data node for {0}.", body));
+                        bool combined = false;
+                        data.TryGetValue("combined", ref combined);
+                        bool hascommons = ReadCommons(data, out int lon, out int lat, out int alt, out int steps, out float timestep);
+
+                        if (hascommons)
                         {
-                            Utils.LogInfo(string.Format("Loading Wind Data node for {0}.", body));
-                            bool combined = false;
-                            data.TryGetValue("combined", ref combined);
+                            ReadOptionals(data, out int offset, out float scaleFactor, out bool invertalt, out bool virtualtop);
 
-                            if (data.TryGetValue("sizeLon", ref lon) && data.TryGetValue("sizeLat", ref lat) && data.TryGetValue("sizeAlt", ref alt) &&
-                                 data.TryGetValue("timesteps", ref steps) && data.TryGetValue("timestepLength", ref timestep))
+                            if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && offset >= 0)
                             {
-                                int offset = 0;
-                                float scaleFactor = 1.0f;
-                                bool invertalt = false;
-                                bool virtualtop = false;
+                                float[][,,] windarrayx = new float[1][,,];
+                                bool windx = false;
+                                float[][,,] windarrayy = new float[1][,,];
+                                bool windy = false;
+                                float[][,,] windarrayz = new float[1][,,];
+                                bool windz = false;
 
-                                data.TryGetValue("initialOffset", ref offset);
-                                data.TryGetValue("scaleFactor", ref scaleFactor);
-                                data.TryGetValue("invertAltitude", ref invertalt);
-                                data.TryGetValue("virtualTopLayer", ref virtualtop);
-
-                                if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && offset >= 0)
+                                if (combined)
                                 {
-                                    float[][,,] windarrayx = new float[steps][,,];
-                                    float[][,,] windarrayy = new float[steps][,,];
-                                    float[][,,] windarrayz = new float[steps][,,];
-                                    int Blocksize = lon * lat * sizeof(float);
+                                    string path = "";
+                                    string[] readorder = new string[3];
 
-                                    if (combined)
+                                    if (data.TryGetValue("path", ref path) && data.TryGetValue("readOrder", ref readorder) && !string.IsNullOrEmpty(path) && readorder.Length == 3)
                                     {
-                                        string path = "";
-                                        string[] readorder = new string[3];
-                                        string[] components = new string[3];
-
-                                        if (data.TryGetValue("path", ref path) && data.TryGetValue("readOrder", ref readorder) && !string.IsNullOrEmpty(path) && readorder.Length == 3)
+                                        float[][][,,] windarr = ReadCombinedFile(path, lon, lat, alt, steps, 3, offset, virtualtop, invertalt);
+                                        for (int v = 0; v < 3; v++)
                                         {
-                                            for (int i = 0; i < 3; i++) //check the readOrder to make sure it is valid.
+                                            string line = readorder[v].ToLower();
+                                            switch (line)
                                             {
-                                                if (string.IsNullOrEmpty(readorder[i]))
-                                                {
-                                                    throw new ArgumentNullException("A null or empty string was present in the readOrder list.");
-                                                }
-                                                readorder[i] = readorder[i].ToLower();
-                                                if (!acceptedwindstrings.Contains(readorder[i]))
-                                                {
-                                                    throw new ArgumentException(string.Format("String {0} is not a valid value for the Wind data read order.", readorder[i]));
-                                                }
-                                                if (components.Contains(readorder[i]))
-                                                {
-                                                    throw new ArgumentException(string.Format("Duplicate value {0} was present in the Wind Data readOrder list.", readorder[i]));
-                                                }
-                                                components[i] = readorder[i];
+                                                case "windx":
+                                                    windarrayx = windarr[v];
+                                                    windx = true;
+                                                    break;
+                                                case "windy":
+                                                    windarrayy = windarr[v];
+                                                    windy = true;
+                                                    break;
+                                                case "windz":
+                                                    windarrayz = windarr[v];
+                                                    windz = true;
+                                                    break;
+                                                default:
+                                                    break;
                                             }
-                                            using (BinaryReader reader = new BinaryReader(File.OpenRead(Utils.GameDataPath + path)))
-                                            {
-                                                if (offset > 0) //dispose of the initial offset
-                                                {
-                                                    reader.ReadBytes(offset);
-                                                }
-                                                foreach (string line in readorder)
-                                                {
-                                                    for (int i = 0; i < steps; i++)
-                                                    {
-                                                        float[,,] floatbuffer = new float[(virtualtop ? alt + 1 : alt), lat, lon];
-                                                        for (int j = 0; j < alt; j++)
-                                                        {
-                                                            byte[] bufferarray = reader.ReadBytes(Blocksize);
-                                                            Buffer.BlockCopy(bufferarray, 0, floatbuffer, Blocksize * (invertalt ? (alt - 1 - j) : j), Buffer.ByteLength(bufferarray));
-                                                        }
-                                                        if (virtualtop)
-                                                        {
-                                                            Buffer.BlockCopy(floatbuffer, Blocksize * alt - 1, floatbuffer, Blocksize * alt, Blocksize);
-                                                        }
-                                                        switch (line)
-                                                        {
-                                                            case "windx":
-                                                                windarrayx[i] = floatbuffer;
-                                                                break;
-                                                            case "windy":
-                                                                windarrayy[i] = floatbuffer;
-                                                                break;
-                                                            case "windz":
-                                                                windarrayz[i] = floatbuffer;
-                                                                break;
-                                                            default:
-                                                                throw new ArgumentException(string.Format("String {0} is not a valid value for the read order.", readorder[i]));
-                                                        }
-                                                    }
-                                                }
-                                                reader.Close();
-                                            }
-                                        }
-                                        else
-                                        {
-                                            throw new ArgumentException("The 'path' or 'readOrder' key was not inputted or was empty, or the 'readOrder' was an invalid length.");
                                         }
                                     }
                                     else
                                     {
-                                        string pathx = "";
-                                        string pathy = "";
-                                        string pathz = "";
-
-                                        if (data.TryGetValue("path_X", ref pathx) && data.TryGetValue("path_Y", ref pathy) && data.TryGetValue("path_Z", ref pathz) &&
-                                            !string.IsNullOrEmpty(pathx) && !string.IsNullOrEmpty(pathy) && !string.IsNullOrEmpty(pathz))
-                                        {
-                                            using (BinaryReader reader = new BinaryReader(File.OpenRead(Utils.GameDataPath + pathx)))
-                                            {
-                                                if (offset > 0) //dispose of the initial offset
-                                                {
-                                                    reader.ReadBytes(offset);
-                                                }
-                                                for (int i = 0; i < steps; i++)
-                                                {
-                                                    float[,,] floatbuffer = new float[(virtualtop ? alt + 1 : alt), lat, lon];
-                                                    for (int j = 0; j < alt; j++)
-                                                    {
-                                                        byte[] bufferarray = reader.ReadBytes(Blocksize);
-                                                        Buffer.BlockCopy(bufferarray, 0, floatbuffer, Blocksize * (invertalt ? (alt - 1 - j) : j), Buffer.ByteLength(bufferarray));
-                                                    }
-                                                    if (virtualtop)
-                                                    {
-                                                        Buffer.BlockCopy(floatbuffer, Blocksize * alt - 1, floatbuffer, Blocksize * alt, Blocksize); //add virtual top layer
-                                                    }
-                                                    windarrayx[i] = floatbuffer;
-                                                }
-                                                reader.Close();
-                                            }
-                                            using (BinaryReader reader = new BinaryReader(File.OpenRead(Utils.GameDataPath + pathy)))
-                                            {
-                                                if (offset > 0) //dispose of the initial offset
-                                                {
-                                                    reader.ReadBytes(offset);
-                                                }
-                                                for (int i = 0; i < steps; i++)
-                                                {
-                                                    float[,,] floatbuffer = new float[(virtualtop ? alt + 1 : alt), lat, lon];
-                                                    for (int j = 0; j < alt; j++)
-                                                    {
-                                                        byte[] bufferarray = reader.ReadBytes(Blocksize);
-                                                        Buffer.BlockCopy(bufferarray, 0, floatbuffer, Blocksize * (invertalt ? (alt - 1 - j) : j), Buffer.ByteLength(bufferarray));
-                                                    }
-                                                    if (virtualtop)
-                                                    {
-                                                        Buffer.BlockCopy(floatbuffer, Blocksize * alt - 1, floatbuffer, Blocksize * alt, Blocksize); //add virtual top layer
-                                                    }
-                                                    windarrayy[i] = floatbuffer;
-                                                }
-                                                reader.Close();
-                                            }
-                                            using (BinaryReader reader = new BinaryReader(File.OpenRead(Utils.GameDataPath + pathz)))
-                                            {
-                                                if (offset > 0) //dispose of the initial offset
-                                                {
-                                                    reader.ReadBytes(offset);
-                                                }
-                                                for (int i = 0; i < steps; i++)
-                                                {
-                                                    float[,,] floatbuffer = new float[(virtualtop ? alt + 1 : alt), lat, lon];
-                                                    for (int j = 0; j < alt; j++)
-                                                    {
-                                                        byte[] bufferarray = reader.ReadBytes(Blocksize);
-                                                        Buffer.BlockCopy(bufferarray, 0, floatbuffer, Blocksize * (invertalt ? (alt - 1 - j) : j), Buffer.ByteLength(bufferarray));
-                                                    }
-                                                    if (virtualtop)
-                                                    {
-                                                        Buffer.BlockCopy(floatbuffer, Blocksize * alt - 1, floatbuffer, Blocksize * alt, Blocksize); //add virtual top layer
-                                                    }
-                                                    windarrayz[i] = floatbuffer;
-                                                }
-                                                reader.Close();
-                                            }
-                                        }
-                                        else
-                                        {
-                                            throw new ArgumentNullException("One or more file paths were not present or were empty strings.");
-                                        }
+                                        throw new ArgumentException("The 'path' or 'readOrder' key was not inputted or was empty, or the 'readOrder' was an invalid length.");
                                     }
-                                    bodydata[body].AddWindData(windarrayx, windarrayy, windarrayz, scaleFactor, timestep);
-                                    Utils.LogInfo(string.Format("Successfully loaded Wind Data node for {0}.", body));
                                 }
                                 else
                                 {
-                                    throw new ArgumentOutOfRangeException("One or more of the inputted keys was outside the range of acceptable values.");
+                                    string pathx = "";
+                                    string pathy = "";
+                                    string pathz = "";
+
+                                    if (data.TryGetValue("path_X", ref pathx) && data.TryGetValue("path_Y", ref pathy) && data.TryGetValue("path_Z", ref pathz) &&
+                                        !string.IsNullOrEmpty(pathx) && !string.IsNullOrEmpty(pathy) && !string.IsNullOrEmpty(pathz))
+                                    {
+                                        windarrayx = ReadBinaryFile(pathx, lon, lat, alt, steps, offset, virtualtop, invertalt);
+                                        windarrayy = ReadBinaryFile(pathy, lon, lat, alt, steps, offset, virtualtop, invertalt);
+                                        windarrayz = ReadBinaryFile(pathz, lon, lat, alt, steps, offset, virtualtop, invertalt);
+                                        windx = windy = windz = true;
+                                    }
+                                    else
+                                    {
+                                        throw new ArgumentNullException("One or more file paths were not present or were empty strings.");
+                                    }
+                                }
+                                if (windx && windy && windz)
+                                {
+                                    bodydata[body].AddWindData(windarrayx, windarrayy, windarrayz, scaleFactor, timestep);
+                                }
+                                else
+                                {
+                                    Utils.LogWarning(string.Format("Unable to add Wind data to {0}. One or more components is missing.", body));
                                 }
                             }
                             else
                             {
-                                throw new ArgumentNullException("One or more keys was not present or was empty.");
+                                throw new ArgumentOutOfRangeException("One or more of the inputted keys was outside the range of acceptable values.");
                             }
                         }
                         else
                         {
-                            Utils.LogWarning(string.Format("Wind Data already exists for {0}.", body));
+                            throw new ArgumentNullException("One or more keys was not present or was empty.");
                         }
                     }
                     catch (Exception ex)
@@ -374,67 +217,27 @@ namespace ModularClimateWeatherSystems
                 {
                     try
                     {
-                        if (!bodydata[body].HasTemperature)
+                        Utils.LogInfo(string.Format("Loading Temperature Data node for {0}.", body));
+                        string path = "";
+                        bool hascommons = ReadCommons(data, out int lon, out int lat, out int alt, out int steps, out float timestep);
+
+                        if (hascommons && data.TryGetValue("path", ref path) && !string.IsNullOrEmpty(path))
                         {
-                            Utils.LogInfo(string.Format("Loading Temperature Data node for {0}.", body));
-                            string path = "";
+                            ReadOptionals(data, out int offset, out float scaleFactor, out bool invertalt, out bool virtualtop);
 
-                            if (data.TryGetValue("path", ref path) && data.TryGetValue("sizeLon", ref lon) && data.TryGetValue("sizeLat", ref lat) && data.TryGetValue("sizeAlt", ref alt) &&
-                                 data.TryGetValue("timesteps", ref steps) && data.TryGetValue("timestepLength", ref timestep) && !string.IsNullOrEmpty(path))
+                            if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && offset >= 0)
                             {
-                                int offset = 0;
-                                float scaleFactor = 1.0f;
-                                bool invertalt = false;
-                                bool virtualtop = false;
-
-                                data.TryGetValue("initialOffset", ref offset);
-                                data.TryGetValue("scaleFactor", ref scaleFactor);
-                                data.TryGetValue("invertAltitude", ref invertalt);
-                                data.TryGetValue("virtualTopLayer", ref virtualtop);
-
-                                if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && offset >= 0)
-                                {
-                                    float[][,,] temparray = new float[steps][,,];
-                                    int Blocksize = lon * lat * sizeof(float);
-
-                                    using (BinaryReader reader = new BinaryReader(File.OpenRead(Utils.GameDataPath + path)))
-                                    {
-                                        if (offset > 0) //dispose of the initial offset
-                                        {
-                                            reader.ReadBytes(offset);
-                                        }
-                                        for (int i = 0; i < steps; i++)
-                                        {
-                                            float[,,] floatbuffer = new float[(virtualtop ? alt + 1 : alt), lat, lon];
-                                            for (int j = 0; j < alt; j++)
-                                            {
-                                                byte[] bufferarray = reader.ReadBytes(Blocksize);
-                                                Buffer.BlockCopy(bufferarray, 0, floatbuffer, Blocksize * (invertalt ? (alt - 1 - j) : j), Buffer.ByteLength(bufferarray));
-                                            }
-                                            if (virtualtop)
-                                            {
-                                                Buffer.BlockCopy(floatbuffer, Blocksize * alt - 1, floatbuffer, Blocksize * alt, Blocksize); //add virtual all-nearly zeroes layer
-                                            }
-                                            temparray[i] = floatbuffer;
-                                        }
-                                        reader.Close();
-                                    }
-                                    bodydata[body].AddTemperatureData(temparray, scaleFactor, timestep);
-                                    Utils.LogInfo(string.Format("Successfully loaded Temperature Data node for {0}.", body));
-                                }
-                                else
-                                {
-                                    throw new ArgumentOutOfRangeException("One or more of the inputted keys was outside the range of acceptable values.");
-                                }
+                                float[][,,] temparray = ReadBinaryFile(path, lon, lat, alt, steps, offset, virtualtop, invertalt);
+                                bodydata[body].AddTemperatureData(temparray, scaleFactor, timestep);
                             }
                             else
                             {
-                                throw new ArgumentNullException("One or more keys was not present or was empty.");
+                                throw new ArgumentOutOfRangeException("One or more of the inputted keys was outside the range of acceptable values.");
                             }
                         }
                         else
                         {
-                            Utils.LogWarning(string.Format("Temperature Data already exists for {0}.", body));
+                            throw new ArgumentNullException("One or more keys was not present or was empty.");
                         }
                     }
                     catch (Exception ex)
@@ -446,68 +249,52 @@ namespace ModularClimateWeatherSystems
                 {
                     try
                     {
-                        if (bodydata[body].HasPressure)
+                        Utils.LogInfo(string.Format("Loading Pressure Data node for {0}.", body));
+                        string path = "";
+
+                        bool hascommons = ReadCommons(data, out int lon, out int lat, out int alt, out int steps, out float timestep);
+                        if (hascommons && data.TryGetValue("path", ref path) && !string.IsNullOrEmpty(path))
                         {
-                            Utils.LogInfo(string.Format("Loading Pressure Data node for {0}.", body));
-                            string path = "";
+                            ReadOptionals(data, out int offset, out float scaleFactor, out bool invertalt, out bool virtualtop);
 
-                            if (data.TryGetValue("path", ref path) && data.TryGetValue("sizeLon", ref lon) && data.TryGetValue("sizeLat", ref lat) && data.TryGetValue("sizeAlt", ref alt) &&
-                                 data.TryGetValue("timesteps", ref steps) && data.TryGetValue("timestepLength", ref timestep) && !string.IsNullOrEmpty(path))
+                            if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && offset >= 0)
                             {
-                                int offset = 0;
-                                float scaleFactor = 1.0f;
-                                bool invertalt = false;
-                                bool virtualtop = false;
+                                float[][,,] pressarray = new float[steps][,,];
+                                int Blocksize = lon * lat * sizeof(float);
 
-                                data.TryGetValue("initialOffset", ref offset);
-                                data.TryGetValue("scaleFactor", ref scaleFactor);
-                                data.TryGetValue("invertAltitude", ref invertalt);
-                                data.TryGetValue("virtualTopLayer", ref virtualtop);
-
-                                if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && offset >= 0)
+                                using (BinaryReader reader = new BinaryReader(File.OpenRead(Utils.GameDataPath + path)))
                                 {
-                                    float[][,,] pressarray = new float[steps][,,];
-                                    int Blocksize = lon * lat * sizeof(float);
-
-                                    using (BinaryReader reader = new BinaryReader(File.OpenRead(Utils.GameDataPath + path)))
+                                    if (offset > 0) //dispose of the initial offset
                                     {
-                                        if (offset > 0) //dispose of the initial offset
-                                        {
-                                            reader.ReadBytes(offset);
-                                        }
-                                        for (int i = 0; i < steps; i++)
-                                        {
-                                            float[,,] floatbuffer = new float[(virtualtop ? alt + 1 : alt), lat, lon];
-                                            for (int j = 0; j < alt; j++)
-                                            {
-                                                byte[] bufferarray = reader.ReadBytes(Blocksize);
-                                                Buffer.BlockCopy(bufferarray, 0, floatbuffer, Blocksize * (invertalt ? (alt - 1 - j) : j), Buffer.ByteLength(bufferarray));
-                                            }
-                                            if (virtualtop)
-                                            {
-                                                float[] zeroes = Enumerable.Repeat(float.Epsilon * 2, lat * lon).ToArray();
-                                                Buffer.BlockCopy(zeroes, 0, floatbuffer, Blocksize * (alt), Blocksize); //add virtual all-nearly zeroes layer
-                                            }
-                                            pressarray[i] = floatbuffer;
-                                        }
-                                        reader.Close();
+                                        reader.ReadBytes(offset);
                                     }
-                                    bodydata[body].AddPressureData(pressarray, scaleFactor, timestep);
-                                    Utils.LogInfo(string.Format("Successfully loaded Pressure Data node for {0}.", body));
+                                    for (int i = 0; i < steps; i++)
+                                    {
+                                        float[,,] floatbuffer = new float[(virtualtop ? alt + 1 : alt), lat, lon];
+                                        for (int j = 0; j < alt; j++)
+                                        {
+                                            byte[] bufferarray = reader.ReadBytes(Blocksize);
+                                            Buffer.BlockCopy(bufferarray, 0, floatbuffer, Blocksize * (invertalt ? (alt - 1 - j) : j), Buffer.ByteLength(bufferarray));
+                                        }
+                                        if (virtualtop)
+                                        {
+                                            float[] zeroes = Enumerable.Repeat(0.0f, lat * lon).ToArray();
+                                            Buffer.BlockCopy(zeroes, 0, floatbuffer, Blocksize * alt, Blocksize); //add virtual all-nearly zeroes layer
+                                        }
+                                        pressarray[i] = floatbuffer;
+                                    }
+                                    reader.Close();
                                 }
-                                else
-                                {
-                                    throw new ArgumentOutOfRangeException("One or more of the inputted keys was outside the range of acceptable values.");
-                                }
+                                bodydata[body].AddPressureData(pressarray, scaleFactor, timestep);
                             }
                             else
                             {
-                                throw new ArgumentNullException("One or more keys was not present or was empty.");
+                                throw new ArgumentOutOfRangeException("One or more of the inputted keys was outside the range of acceptable values.");
                             }
                         }
                         else
                         {
-                            Utils.LogWarning(string.Format("Pressure Data already exists for {0}.", body));
+                            throw new ArgumentNullException("One or more keys was not present or was empty.");
                         }
                     }
                     catch (Exception ex)
@@ -552,11 +339,97 @@ namespace ModularClimateWeatherSystems
             Utils.LogInfo("Cleanup Complete.");
         }
 
+        //read a binary file containing one kind of data
+        internal float[][,,] ReadBinaryFile(string path, int lon, int lat, int alt, int steps, int offset, bool virtualtop, bool invertalt)
+        {
+            int Blocksize = lon * lat * sizeof(float);
+            float[][,,] newarray = new float[steps][,,];
+            using (BinaryReader reader = new BinaryReader(File.OpenRead(Utils.GameDataPath + path)))
+            {
+                if (offset > 0) //dispose of the initial offset
+                {
+                    reader.ReadBytes(offset);
+                }
+                for (int i = 0; i < steps; i++)
+                {
+                    float[,,] floatbuffer = new float[(virtualtop ? alt + 1 : alt), lat, lon];
+                    for (int j = 0; j < alt; j++)
+                    {
+                        byte[] bufferarray = reader.ReadBytes(Blocksize);
+                        Buffer.BlockCopy(bufferarray, 0, floatbuffer, Blocksize * (invertalt ? (alt - 1 - j) : j), Buffer.ByteLength(bufferarray));
+                    }
+                    if (virtualtop)
+                    {
+                        Buffer.BlockCopy(floatbuffer, Blocksize * alt - 1, floatbuffer, Blocksize * alt, Blocksize); //add virtual top layer
+                    }
+                    newarray[i] = floatbuffer;
+                }
+                reader.Close();
+            }
+            return newarray;
+        }
+
+        //read a binary file containing multiple kinds of data
+        internal float[][][,,] ReadCombinedFile(string path, int lon, int lat, int alt, int steps, int numvars, int offset, bool virtualtop, bool invertalt)
+        {
+            int Blocksize = lon * lat * sizeof(float);
+            float[][][,,] newbigarray = new float[numvars][][,,];
+            using (BinaryReader reader = new BinaryReader(File.OpenRead(Utils.GameDataPath + path)))
+            {
+                if (offset > 0) //dispose of the initial offset
+                {
+                    reader.ReadBytes(offset);
+                }
+                for (int x = 0; x < numvars; x++)
+                {
+                    float[][,,] newarray = new float[steps][,,];
+                    for (int i = 0; i < steps; i++)
+                    {
+                        float[,,] floatbuffer = new float[(virtualtop ? alt + 1 : alt), lat, lon];
+                        for (int j = 0; j < alt; j++)
+                        {
+                            byte[] bufferarray = reader.ReadBytes(Blocksize);
+                            Buffer.BlockCopy(bufferarray, 0, floatbuffer, Blocksize * (invertalt ? (alt - 1 - j) : j), Buffer.ByteLength(bufferarray));
+                        }
+                        if (virtualtop)
+                        {
+                            Buffer.BlockCopy(floatbuffer, Blocksize * alt - 1, floatbuffer, Blocksize * alt, Blocksize); //add virtual top layer
+                        }
+                        newarray[i] = floatbuffer;
+                    }
+                    newbigarray[x] = newarray;
+                }
+                reader.Close();
+            }
+            return newbigarray;
+        }
+
+        //get the optional variables easily.
+        internal void ReadOptionals(ConfigNode cn, out int offset, out float scaleFactor, out bool invertalt, out bool virtualtop) 
+        {
+            offset = 0;
+            scaleFactor = 1.0f;
+            invertalt = false;
+            virtualtop = false;
+
+            cn.TryGetValue("initialOffset", ref offset);
+            cn.TryGetValue("scaleFactor", ref scaleFactor);
+            cn.TryGetValue("invertAltitude", ref invertalt);
+            cn.TryGetValue("virtualTopLayer", ref virtualtop);
+        }
+
+        internal bool ReadCommons(ConfigNode cn, out int lon, out int lat, out int alt, out int steps, out float timestep)
+        {
+            lon = lat = alt = steps = 0; 
+            timestep = 0.0f; 
+            return cn.TryGetValue("sizeLon", ref lon) && cn.TryGetValue("sizeLat", ref lat) && cn.TryGetValue("sizeAlt", ref alt) && cn.TryGetValue("timesteps", ref steps) && cn.TryGetValue("timestepLength", ref timestep);
+        }
+
         internal FlowMap ReadFlowMapNode(ConfigNode cn)
         {
             bool thirdchannel = false;
-            float minalt = 0.0f; //support wind currents affecting splashed craft
-            float maxalt = 1000000000.0f; //1Gm. If you somehow have an atmosphere taller than this, you need professional help.
+            float minalt = 0.0f;
+            float maxalt = float.MaxValue;
             float windSpeed = 0.0f;
             float EWwind = 0.0f;
             float NSwind = 0.0f;
@@ -719,6 +592,6 @@ namespace ModularClimateWeatherSystems
                 curve.Add(1000, 1.0f, 0, 0);
             }
             return curve;
-        }
+        } 
     }
 }

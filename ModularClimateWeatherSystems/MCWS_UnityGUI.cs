@@ -13,17 +13,15 @@ namespace ModularClimateWeatherSystems
         private bool toolbarButtonAdded = false;
         private bool GUIEnabled = false;
 
-        //if developer mode is enabled, a modified green logo will replace the normal white Logo.
         internal const string LogoPath = "ModularClimateWeatherSystems/Textures/MCWS_Logo";
         internal const string modNAME = "MCWS";
         internal const string modID = "MCWS_NS";
 
         private Rect windowPos;        
-        private static float Xpos => 100f * UIscale;
-        private static float Ypos => 100f * UIscale;
-        private static float Xwidth => 285.0f * Mathf.Clamp(UIscale, 0.75f, 1.5f);
-        private static float Yheight => 60f * UIscale;
-        private static float UIscale => GameSettings.UI_SCALE;
+        private static float Xpos => 100f * GameSettings.UI_SCALE;
+        private static float Ypos => 100f * GameSettings.UI_SCALE;
+        private static float Xwidth => 285.0f * Mathf.Clamp(GameSettings.UI_SCALE, 0.75f, 1.5f);
+        private static float Yheight => 60f * GameSettings.UI_SCALE;
         
         private static string Speedunit => Localizer.Format(GetLOC("#LOC_MCWS_meterspersec"));
         private static string Pressunit => Localizer.Format(GetLOC("#LOC_MCWS_kpa"));

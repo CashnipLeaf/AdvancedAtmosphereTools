@@ -300,7 +300,7 @@ namespace ModularClimateWeatherSystems
                     double mapy = ((180.0 - (lat + 90.0)) / 180.0) * winddataX.GetUpperBound(1);
 
                     int x1 = (int)UtilMath.Clamp(Math.Truncate(mapx), 0, winddataX.GetUpperBound(2));
-                    int x2 = UtilMath.WrapAround(x1 + 1, 0, winddataX.GetUpperBound(2));
+                    int x2 = UtilMath.WrapAround(x1 + 1, 0, winddataX.GetLength(2));
 
                     int y1 = Utils.Clamp((int)Math.Floor(mapy), 0, winddataX.GetUpperBound(1));
                     int y2 = Utils.Clamp(y1 + 1, 0, winddataX.GetUpperBound(1));
@@ -347,7 +347,7 @@ namespace ModularClimateWeatherSystems
                     double mapy = ((180.0 - (lat + 90.0)) / 180.0) * temperaturedata.GetUpperBound(1);
 
                     int x1 = (int)UtilMath.Clamp(Math.Truncate(mapx), 0, temperaturedata.GetUpperBound(2));
-                    int x2 = UtilMath.WrapAround(x1 + 1, 0, temperaturedata.GetUpperBound(2));
+                    int x2 = UtilMath.WrapAround(x1 + 1, 0, temperaturedata.GetLength(2));
 
                     int y1 = Utils.Clamp((int)Math.Floor(mapy), 0, temperaturedata.GetUpperBound(1));
                     int y2 = Utils.Clamp(y1 + 1, 0, temperaturedata.GetUpperBound(1));
@@ -370,6 +370,7 @@ namespace ModularClimateWeatherSystems
             }
             return validbody ? bod.GetTemperature(alt) : PhysicsGlobals.SpaceTemperature;
         }
+
         public static double GetPointPressureData(string body, double lon, double lat, double alt, double time)
         {
             CheckPosition(lon, lat, alt);
@@ -384,7 +385,7 @@ namespace ModularClimateWeatherSystems
                     double mapy = ((180.0 - (lat + 90.0)) / 180.0) * pressuredata.GetUpperBound(1);
 
                     int x1 = (int)UtilMath.Clamp(Math.Truncate(mapx), 0, pressuredata.GetUpperBound(2));
-                    int x2 = (int)UtilMath.WrapAround(mapx + 1, 0, pressuredata.GetUpperBound(2));
+                    int x2 = (int)UtilMath.WrapAround(mapx + 1, 0, pressuredata.GetLength(2));
 
                     int y1 = Utils.Clamp((int)Math.Floor(mapy), 0, pressuredata.GetUpperBound(1));
                     int y2 = Utils.Clamp(y1 + 1, 0, pressuredata.GetUpperBound(1));

@@ -86,7 +86,6 @@ namespace ModularClimateWeatherSystems
 
         void NewAeroUpdate(ModularFlightIntegrator fi, Part part)
         {
-            //run the (slightly hijacked) base aerodynamics update.
             //This override really just occupies the slot so that no other mod can take it.
             fi.BaseFIUpdateAerodynamics(part);
         }
@@ -267,7 +266,7 @@ namespace ModularClimateWeatherSystems
                             double truespeed = Math.Sqrt(sqrmag);
                             Vector3d truedir = vel / truespeed;
 
-                            double newmach = truespeed / __instance.vessel.speedOfSound;
+                            double newmach = __instance.vessel.speedOfSound != 0.0 ? truespeed / __instance.vessel.speedOfSound : 0.0;
 
                             double intakeairspeed = (Mathf.Clamp01(Vector3.Dot((Vector3)truedir, __instance.intakeTransform.forward)) * truespeed) + __instance.intakeSpeed;
                             __instance.airSpeedGui = (float)intakeairspeed;
