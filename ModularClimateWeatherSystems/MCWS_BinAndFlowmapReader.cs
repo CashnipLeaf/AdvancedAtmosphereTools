@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using UnityEngine;
 
 namespace ModularClimateWeatherSystems
@@ -47,7 +46,7 @@ namespace ModularClimateWeatherSystems
 
                         if (hascommons && data.TryGetValue("path", ref path) && !string.IsNullOrEmpty(path) && data.TryGetValue("readOrder", ref readorder))
                         {
-                            ReadOptionals(data, out int offset, out float scaleFactor, out bool invertalt, out bool virtualtop);
+                            ReadOptionals(data, out int offset, out float scaleFactor, out bool invertalt, out double modelTop);
 
                             if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && readorder.Length > 1 && offset >= 0)
                             {
@@ -58,7 +57,7 @@ namespace ModularClimateWeatherSystems
                                 float[][,,] windarrayz = new float[1][,,];
                                 bool windz = false;
 
-                                float[][][,,] dataarray = ReadCombinedFile(path, lon, lat, alt, steps, readorder.Length, offset, virtualtop, invertalt);
+                                float[][][,,] dataarray = ReadCombinedFile(path, lon, lat, alt, steps, readorder.Length, offset, invertalt);
                                 for (int v = 0; v < readorder.Length; v++)
                                 {
                                     string line = readorder[v].ToLower();
@@ -77,10 +76,10 @@ namespace ModularClimateWeatherSystems
                                             windz = true;
                                             break;
                                         case "temperature":
-                                            bodydata[body].AddTemperatureData(dataarray[v], scaleFactor, timestep);
+                                            bodydata[body].AddTemperatureData(dataarray[v], scaleFactor, timestep, modelTop);
                                             break;
                                         case "pressure":
-                                            bodydata[body].AddPressureData(dataarray[v], scaleFactor, timestep);
+                                            bodydata[body].AddPressureData(dataarray[v], scaleFactor, timestep, modelTop);
                                             break;
                                         default:
                                             break; //skip over something that isnt data
@@ -90,7 +89,7 @@ namespace ModularClimateWeatherSystems
                                 {
                                     if (windx && windy && windz) //only add wind data if all three components are present.
                                     {
-                                        bodydata[body].AddWindData(windarrayx, windarrayy, windarrayz, scaleFactor, timestep);
+                                        bodydata[body].AddWindData(windarrayx, windarrayy, windarrayz, scaleFactor, timestep, modelTop);
                                     }
                                     else
                                     {
@@ -124,7 +123,7 @@ namespace ModularClimateWeatherSystems
 
                         if (hascommons)
                         {
-                            ReadOptionals(data, out int offset, out float scaleFactor, out bool invertalt, out bool virtualtop);
+                            ReadOptionals(data, out int offset, out float scaleFactor, out bool invertalt, out double modelTop);
 
                             if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && offset >= 0)
                             {
@@ -142,7 +141,7 @@ namespace ModularClimateWeatherSystems
 
                                     if (data.TryGetValue("path", ref path) && data.TryGetValue("readOrder", ref readorder) && !string.IsNullOrEmpty(path) && readorder.Length == 3)
                                     {
-                                        float[][][,,] windarr = ReadCombinedFile(path, lon, lat, alt, steps, 3, offset, virtualtop, invertalt);
+                                        float[][][,,] windarr = ReadCombinedFile(path, lon, lat, alt, steps, 3, offset, invertalt);
                                         for (int v = 0; v < 3; v++)
                                         {
                                             string line = readorder[v].ToLower();
@@ -179,9 +178,9 @@ namespace ModularClimateWeatherSystems
                                     if (data.TryGetValue("path_X", ref pathx) && data.TryGetValue("path_Y", ref pathy) && data.TryGetValue("path_Z", ref pathz) &&
                                         !string.IsNullOrEmpty(pathx) && !string.IsNullOrEmpty(pathy) && !string.IsNullOrEmpty(pathz))
                                     {
-                                        windarrayx = ReadBinaryFile(pathx, lon, lat, alt, steps, offset, virtualtop, invertalt);
-                                        windarrayy = ReadBinaryFile(pathy, lon, lat, alt, steps, offset, virtualtop, invertalt);
-                                        windarrayz = ReadBinaryFile(pathz, lon, lat, alt, steps, offset, virtualtop, invertalt);
+                                        windarrayx = ReadBinaryFile(pathx, lon, lat, alt, steps, offset, invertalt);
+                                        windarrayy = ReadBinaryFile(pathy, lon, lat, alt, steps, offset, invertalt);
+                                        windarrayz = ReadBinaryFile(pathz, lon, lat, alt, steps, offset, invertalt);
                                         windx = windy = windz = true;
                                     }
                                     else
@@ -191,7 +190,7 @@ namespace ModularClimateWeatherSystems
                                 }
                                 if (windx && windy && windz)
                                 {
-                                    bodydata[body].AddWindData(windarrayx, windarrayy, windarrayz, scaleFactor, timestep);
+                                    bodydata[body].AddWindData(windarrayx, windarrayy, windarrayz, scaleFactor, timestep, modelTop);
                                 }
                                 else
                                 {
@@ -223,12 +222,12 @@ namespace ModularClimateWeatherSystems
 
                         if (hascommons && data.TryGetValue("path", ref path) && !string.IsNullOrEmpty(path))
                         {
-                            ReadOptionals(data, out int offset, out float scaleFactor, out bool invertalt, out bool virtualtop);
+                            ReadOptionals(data, out int offset, out float scaleFactor, out bool invertalt, out double modelTop);
 
                             if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && offset >= 0)
                             {
-                                float[][,,] temparray = ReadBinaryFile(path, lon, lat, alt, steps, offset, virtualtop, invertalt);
-                                bodydata[body].AddTemperatureData(temparray, scaleFactor, timestep);
+                                float[][,,] temparray = ReadBinaryFile(path, lon, lat, alt, steps, offset, invertalt);
+                                bodydata[body].AddTemperatureData(temparray, scaleFactor, timestep, modelTop);
                             }
                             else
                             {
@@ -255,37 +254,12 @@ namespace ModularClimateWeatherSystems
                         bool hascommons = ReadCommons(data, out int lon, out int lat, out int alt, out int steps, out float timestep);
                         if (hascommons && data.TryGetValue("path", ref path) && !string.IsNullOrEmpty(path))
                         {
-                            ReadOptionals(data, out int offset, out float scaleFactor, out bool invertalt, out bool virtualtop);
+                            ReadOptionals(data, out int offset, out float scaleFactor, out bool invertalt, out double modelTop);
 
                             if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && offset >= 0)
                             {
-                                float[][,,] pressarray = new float[steps][,,];
-                                int Blocksize = lon * lat * sizeof(float);
-
-                                using (BinaryReader reader = new BinaryReader(File.OpenRead(Utils.GameDataPath + path)))
-                                {
-                                    if (offset > 0) //dispose of the initial offset
-                                    {
-                                        reader.ReadBytes(offset);
-                                    }
-                                    for (int i = 0; i < steps; i++)
-                                    {
-                                        float[,,] floatbuffer = new float[(virtualtop ? alt + 1 : alt), lat, lon];
-                                        for (int j = 0; j < alt; j++)
-                                        {
-                                            byte[] bufferarray = reader.ReadBytes(Blocksize);
-                                            Buffer.BlockCopy(bufferarray, 0, floatbuffer, Blocksize * (invertalt ? (alt - 1 - j) : j), Buffer.ByteLength(bufferarray));
-                                        }
-                                        if (virtualtop)
-                                        {
-                                            float[] zeroes = Enumerable.Repeat(0.0f, lat * lon).ToArray();
-                                            Buffer.BlockCopy(zeroes, 0, floatbuffer, Blocksize * alt, Blocksize); //add virtual all-nearly zeroes layer
-                                        }
-                                        pressarray[i] = floatbuffer;
-                                    }
-                                    reader.Close();
-                                }
-                                bodydata[body].AddPressureData(pressarray, scaleFactor, timestep);
+                                float[][,,] pressarray = ReadBinaryFile(path, lon, lat, alt, steps, offset, invertalt);
+                                bodydata[body].AddPressureData(pressarray, scaleFactor, timestep, modelTop);
                             }
                             else
                             {
@@ -340,7 +314,7 @@ namespace ModularClimateWeatherSystems
         }
 
         //read a binary file containing one kind of data
-        internal float[][,,] ReadBinaryFile(string path, int lon, int lat, int alt, int steps, int offset, bool virtualtop, bool invertalt)
+        internal float[][,,] ReadBinaryFile(string path, int lon, int lat, int alt, int steps, int offset, bool invertalt)
         {
             int Blocksize = lon * lat * sizeof(float);
             float[][,,] newarray = new float[steps][,,];
@@ -352,15 +326,11 @@ namespace ModularClimateWeatherSystems
                 }
                 for (int i = 0; i < steps; i++)
                 {
-                    float[,,] floatbuffer = new float[(virtualtop ? alt + 1 : alt), lat, lon];
+                    float[,,] floatbuffer = new float[alt, lat, lon];
                     for (int j = 0; j < alt; j++)
                     {
                         byte[] bufferarray = reader.ReadBytes(Blocksize);
                         Buffer.BlockCopy(bufferarray, 0, floatbuffer, Blocksize * (invertalt ? (alt - 1 - j) : j), Buffer.ByteLength(bufferarray));
-                    }
-                    if (virtualtop)
-                    {
-                        Buffer.BlockCopy(floatbuffer, Blocksize * alt - 1, floatbuffer, Blocksize * alt, Blocksize); //add virtual top layer
                     }
                     newarray[i] = floatbuffer;
                 }
@@ -370,7 +340,7 @@ namespace ModularClimateWeatherSystems
         }
 
         //read a binary file containing multiple kinds of data
-        internal float[][][,,] ReadCombinedFile(string path, int lon, int lat, int alt, int steps, int numvars, int offset, bool virtualtop, bool invertalt)
+        internal float[][][,,] ReadCombinedFile(string path, int lon, int lat, int alt, int steps, int numvars, int offset, bool invertalt)
         {
             int Blocksize = lon * lat * sizeof(float);
             float[][][,,] newbigarray = new float[numvars][][,,];
@@ -385,15 +355,11 @@ namespace ModularClimateWeatherSystems
                     float[][,,] newarray = new float[steps][,,];
                     for (int i = 0; i < steps; i++)
                     {
-                        float[,,] floatbuffer = new float[(virtualtop ? alt + 1 : alt), lat, lon];
+                        float[,,] floatbuffer = new float[alt, lat, lon];
                         for (int j = 0; j < alt; j++)
                         {
                             byte[] bufferarray = reader.ReadBytes(Blocksize);
                             Buffer.BlockCopy(bufferarray, 0, floatbuffer, Blocksize * (invertalt ? (alt - 1 - j) : j), Buffer.ByteLength(bufferarray));
-                        }
-                        if (virtualtop)
-                        {
-                            Buffer.BlockCopy(floatbuffer, Blocksize * alt - 1, floatbuffer, Blocksize * alt, Blocksize); //add virtual top layer
                         }
                         newarray[i] = floatbuffer;
                     }
@@ -405,17 +371,17 @@ namespace ModularClimateWeatherSystems
         }
 
         //get the optional variables easily.
-        internal void ReadOptionals(ConfigNode cn, out int offset, out float scaleFactor, out bool invertalt, out bool virtualtop) 
+        internal void ReadOptionals(ConfigNode cn, out int offset, out float scaleFactor, out bool invertalt, out double modelTop) 
         {
             offset = 0;
             scaleFactor = 1.0f;
             invertalt = false;
-            virtualtop = false;
+            modelTop = 0.0;
 
             cn.TryGetValue("initialOffset", ref offset);
             cn.TryGetValue("scaleFactor", ref scaleFactor);
             cn.TryGetValue("invertAltitude", ref invertalt);
-            cn.TryGetValue("virtualTopLayer", ref virtualtop);
+            cn.TryGetValue("modelTop", ref modelTop);
         }
 
         internal bool ReadCommons(ConfigNode cn, out int lon, out int lat, out int alt, out int steps, out float timestep)

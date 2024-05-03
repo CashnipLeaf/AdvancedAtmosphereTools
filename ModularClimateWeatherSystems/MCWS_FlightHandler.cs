@@ -55,6 +55,10 @@ namespace ModularClimateWeatherSystems
         internal double TempScaleFactor = 1d;
         internal double PressScaleFactor = 1d;
 
+        internal double WindModelTop = 0.0;
+        internal double TempModelTop = 0.0;
+        internal double PressModelTop = 0.0;
+
         internal Vector3 RawWind = Vector3.zero;
         internal Vector3 AppliedWind = Vector3.zero;
 
@@ -172,6 +176,7 @@ namespace ModularClimateWeatherSystems
                             Windtimestep = double.IsFinite(step) && step > 0.0 ? step : DEFAULTINTERVAL;
                             double prevstep = Math.Truncate(CurrentTime / Windtimestep) * Windtimestep;
                             Windtimeofnextstep = prevstep + Windtimestep;
+                            WindModelTop = (WindType == SourceType.External) ? MCWS_API.ExternalWindModelTop(bodyname) : Data.WindModelTop(bodyname);
                             GetNewWindData(mainbody.name, prevstep, Windtimeofnextstep);
                         }
 
@@ -193,6 +198,7 @@ namespace ModularClimateWeatherSystems
                             Temptimestep = double.IsFinite(step) && step > 0.0 ? step : DEFAULTINTERVAL;
                             double prevstep = Math.Truncate(CurrentTime / Temptimestep) * Temptimestep;
                             Temptimeofnextstep = prevstep + Temptimestep;
+                            TempModelTop = (TemperatureType == SourceType.External) ? MCWS_API.ExternalTemperatureModelTop(bodyname) : Data.TemperatureModelTop(bodyname);
                             GetNewTemperatureData(mainbody.name, prevstep, Temptimeofnextstep);
                         }
 
@@ -214,6 +220,7 @@ namespace ModularClimateWeatherSystems
                             Presstimestep = double.IsFinite(step) && step > 0.0 ? step : DEFAULTINTERVAL;
                             double prevstep = Math.Truncate(CurrentTime / Presstimestep) * Presstimestep;
                             Presstimeofnextstep = prevstep + Presstimestep;
+                            PressModelTop = (PressureType == SourceType.External) ? MCWS_API.ExternalPressureModelTop(bodyname) : Data.PressureModelTop(bodyname);
                             GetNewPressureData(mainbody.name, prevstep, Presstimeofnextstep);
                         }
                     }
@@ -267,13 +274,14 @@ namespace ModularClimateWeatherSystems
 
                 double normalizedlon = (lon + 180.0) / 360.0;
                 double normalizedlat = (180.0 - (lat + 90.0)) / 180.0;
-                double normalizedalt = alt / mainbody.atmosphereDepth;
 
                 if (HasWind && winddataX1 != null && winddataX2 != null && winddataY1 != null && winddataY2 != null && winddataZ1 != null && winddataZ2 != null)
                 {
                     try //some very nasty 4D interpolation
                     {
+                        double normalizedalt = alt / (WindModelTop > 0.0 ? WindModelTop : mainbody.atmosphereDepth);
                         //derive the locations of the data in the arrays
+
                         double mapx = UtilMath.WrapAround((normalizedlon * winddataX1.GetLength(2)) - 0.5, 0, winddataX1.GetLength(2));
                         double mapy = normalizedlat * winddataX1.GetUpperBound(1);
 
@@ -356,6 +364,8 @@ namespace ModularClimateWeatherSystems
                 {
                     try //some less nasty 4D interpolation
                     {
+                        double normalizedalt = alt / (TempModelTop > 0.0 ? TempModelTop : mainbody.atmosphereDepth);
+
                         //derive the locations of the data in the arrays
                         double mapx = UtilMath.WrapAround((normalizedlon * temperaturedata1.GetLength(2)) - 0.5, 0, temperaturedata1.GetLength(2));
                         double mapy = normalizedlat * temperaturedata1.GetUpperBound(1);
@@ -393,6 +403,8 @@ namespace ModularClimateWeatherSystems
                 {
                     try //some nasty 4D interpolation
                     {
+                        double normalizedalt = alt / (PressModelTop > 0.0 ? PressModelTop: mainbody.atmosphereDepth);
+
                         //derive the locations of the data in the arrays
                         double mapx = UtilMath.WrapAround((normalizedlon * pressuredata1.GetLength(2)) - 0.5, 0.0, pressuredata1.GetLength(2));
                         double mapy = normalizedlat * pressuredata1.GetUpperBound(1);
@@ -420,6 +432,11 @@ namespace ModularClimateWeatherSystems
                         double TopPlaneFinal = UtilMath.Lerp((double)TopPlane1, (double)TopPlane2, lerpt);
 
                         double Final = Utils.InterpolatePressure(BottomPlaneFinal,TopPlaneFinal, lerpz);
+                        if (normalizedalt > 1d)
+                        {
+                            double extralerpz = (normalizedalt - 1) / ((mainbody.atmosphereDepth / PressModelTop) - 1);
+                            Final = UtilMath.Lerp(Final, 0d, extralerpz);
+                        }
                         Pressure = double.IsFinite(Final) ? Final * 0.001 : throw new NotFiniteNumberException(); //convert to kPa
                     }
                     catch (Exception ex) //fallback data

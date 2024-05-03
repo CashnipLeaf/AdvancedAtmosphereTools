@@ -120,6 +120,10 @@ namespace ModularClimateWeatherSystems
         internal double TemperatureScaling(string body) => HasTemperature(body) ?   bodydata[body].TemperatureScaleFactor : 1d;
         internal double PressureScaling(string body) => HasPressure(body) ? bodydata[body].PressureScaleFactor : 1d;
 
+        internal double WindModelTop(string body) => HasWind(body) ? bodydata[body].WindModelTop : 0.0;
+        internal double TemperatureModelTop(string body) => HasTemperature(body) ? bodydata[body].TemperatureModelTop : 0.0;
+        internal double PressureModelTop(string body) => HasPressure(body) ? bodydata[body].PressureModelTop : 0.0;
+
         internal float[][,,] WindData(string body, double time) => HasWind(body) ? new float[3][,,] { bodydata[body].GetWindX(time), bodydata[body].GetWindY(time), bodydata[body].GetWindZ(time) } : null;
         internal float[,,] TemperatureData(string body, double time) => HasTemperature(body) ? bodydata[body].GetTemperature(time) : null;
         internal float[,,] PressureData(string body, double time) => HasPressure(body) ? bodydata[body].GetPressure(time) : null;
@@ -189,16 +193,19 @@ namespace ModularClimateWeatherSystems
         private float[][,,] WindDataZ;
         internal float WindScaleFactor = float.NaN;
         internal double WindTimeStep = double.NaN;
+        internal double WindModelTop = 0.0;
         internal bool HasWind => WindDataX != null && WindDataY != null && WindDataZ != null && !double.IsNaN(WindTimeStep) && !float.IsNaN(WindScaleFactor);
 
         private float[][,,] TemperatureData;
         internal float TemperatureScaleFactor = float.NaN;
         internal double TemperatureTimeStep = double.NaN;
+        internal double TemperatureModelTop = 0.0;
         internal bool HasTemperature => TemperatureData != null && !double.IsNaN(TemperatureTimeStep) && !float.IsNaN(TemperatureScaleFactor);
 
         private float[][,,] PressureData;
         internal float PressureScaleFactor = float.NaN;
         internal double PressureTimeStep = double.NaN;
+        internal double PressureModelTop = 0.0f;
         internal bool HasPressure => PressureData != null && !double.IsNaN(PressureTimeStep) && !float.IsNaN(PressureScaleFactor);
 
         internal List<FlowMap> Flowmaps;
@@ -210,7 +217,7 @@ namespace ModularClimateWeatherSystems
             this.body = body;
         }
 
-        internal void AddWindData(float[][,,] WindX, float[][,,] WindY, float[][,,] WindZ, float scalefactor, double timestep)
+        internal void AddWindData(float[][,,] WindX, float[][,,] WindY, float[][,,] WindZ, float scalefactor, double timestep, double modeltop)
         {
             if (HasWind)
             {
@@ -223,11 +230,12 @@ namespace ModularClimateWeatherSystems
                 WindDataZ = WindZ;
                 WindScaleFactor = scalefactor;
                 WindTimeStep = timestep;
+                WindModelTop = modeltop;
                 Utils.LogInfo(string.Format("Successfully added Wind Data to {0}.", body));
             }
         }
 
-        internal void AddTemperatureData(float[][,,] Temp, float scalefactor, double timestep)
+        internal void AddTemperatureData(float[][,,] Temp, float scalefactor, double timestep, double modeltop)
         {
             if (HasTemperature)
             {
@@ -238,11 +246,12 @@ namespace ModularClimateWeatherSystems
                 TemperatureData = Temp;
                 TemperatureScaleFactor = scalefactor;
                 TemperatureTimeStep = timestep;
+                TemperatureModelTop = modeltop;
                 Utils.LogInfo(string.Format("Successfully added Temperature Data to {0}.", body));
             }
         }
 
-        internal void AddPressureData(float[][,,] Press, float scalefactor, double timestep)
+        internal void AddPressureData(float[][,,] Press, float scalefactor, double timestep, double modeltop)
         {
             if (HasPressure)
             {
@@ -253,6 +262,7 @@ namespace ModularClimateWeatherSystems
                 PressureData = Press;
                 PressureScaleFactor = scalefactor;
                 PressureTimeStep = timestep;
+                PressureModelTop = modeltop;
                 Utils.LogInfo(string.Format("Successfully added Pressure Data to {0}.", body));
             }
         }
