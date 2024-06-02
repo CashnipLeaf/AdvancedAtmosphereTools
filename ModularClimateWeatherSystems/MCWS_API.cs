@@ -341,7 +341,7 @@ namespace ModularClimateWeatherSystems
                         double press0 = bod.GetPressure(0);
                         double press1 = bod.GetPressure(PressModelTop);
                         double scaleheight = PressModelTop / Math.Log(press0 / press1, Math.E);
-                        double newpress = UtilMath.Lerp(press * Math.Pow(Math.E, -((alt - PressModelTop) / scaleheight)), bod.GetPressure(alt) * 1000, Math.Pow(extralerp, 0.125)) * 0.001;
+                        double newpress = UtilMath.Lerp(press * Math.Pow(Math.E, -((alt - PressModelTop) / scaleheight)), bod.GetPressure(alt) * 1000, Math.Pow(extralerp, 0.125));
                         return double.IsFinite(newpress) ? newpress : throw new NotFiniteNumberException();
                     default:
                         break;

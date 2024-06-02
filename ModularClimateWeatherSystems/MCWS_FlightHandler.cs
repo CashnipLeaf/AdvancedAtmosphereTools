@@ -222,7 +222,7 @@ namespace ModularClimateWeatherSystems
                 int extpresscode = MCWS_API.GetExternalPressure(mainbody.name, lon, lat, alt, CurrentTime, out double extpress);
                 if (extpresscode == 0)
                 {
-                    Pressure = extpress;
+                    Pressure = extpress * 0.001;
                     HasPress = true;
                 }
                 else if (Data.HasPressure(mainbody.name))
