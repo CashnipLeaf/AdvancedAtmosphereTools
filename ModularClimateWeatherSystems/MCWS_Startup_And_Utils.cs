@@ -11,8 +11,8 @@ namespace ModularClimateWeatherSystems
     [KSPAddon(KSPAddon.Startup.MainMenu, true)]
     partial class MCWS_Startup : MonoBehaviour
     {
-        internal Dictionary<string, BodyData> bodydata;
-        
+        internal Dictionary<string, MCWS_BodyData> bodydata;
+
         public static MCWS_Startup Instance { get; private set; }
         public MCWS_Startup()
         {
@@ -24,7 +24,7 @@ namespace ModularClimateWeatherSystems
             else
             {
                 Utils.LogWarning("Destroying duplicate instance. Check your install for duplicate mod folders.");
-                Destroy(this);
+                DestroyImmediate(this);
             }
         }
 
@@ -69,7 +69,7 @@ namespace ModularClimateWeatherSystems
             {
                 Utils.LogError("Exception thrown when registering MCWS with the toolbar controller: " + e.ToString());
             }
-            
+
             Utils.LogInfo("Checking for an instance of FerramAerospaceResearch.");
             try
             {
@@ -112,28 +112,65 @@ namespace ModularClimateWeatherSystems
         internal bool HasTemperature(string body) => BodyExists(body) && bodydata[body].HasTemperature;
         internal bool HasPressure(string body) => BodyExists(body) && bodydata[body].HasPressure;
 
-        internal double WindTimeStep(string body) => HasWind(body) ? bodydata[body].WindTimeStep : double.NaN;
-        internal double TemperatureTimeStep(string body) => HasTemperature(body) ? bodydata[body].TemperatureTimeStep : double.NaN;
-        internal double PressureTimeStep(string body) => HasPressure(body) ? bodydata[body].PressureTimeStep : double.NaN;
+        internal int GetWind(string body, double lon, double lat, double alt, double time, out Vector3 windvec)
+        {
+            windvec = Vector3.zero;
+            return HasWind(body) ? bodydata[body].GetWind(lon, lat, alt, time, out windvec) : 1;
+        }
+        internal int GetTemperature(string body, double lon, double lat, double alt, double time, out double temp)
+        {
+            temp = 0.0;
+            return HasTemperature(body) ? bodydata[body].GetTemperature(lon, lat, alt, time, out temp) : 1;
+        }
+        internal int GetPressure(string body, double lon, double lat, double alt, double time, out double press)
+        {
+            press = 0.0;
+            return HasPressure(body) ? bodydata[body].GetPressure(lon, lat, alt, time, out press) : 1;
+        }
 
-        internal double WindScaling(string body) => HasWind(body) ? bodydata[body].WindScaleFactor : 1d;
-        internal double TemperatureScaling(string body) => HasTemperature(body) ?   bodydata[body].TemperatureScaleFactor : 1d;
-        internal double PressureScaling(string body) => HasPressure(body) ? bodydata[body].PressureScaleFactor : 1d;
+        internal double WindModelTop(string body) => HasWind(body) ? bodydata[body].WindModelTop : double.MaxValue;
+        internal double TemperatureModelTop(string body) => HasTemperature(body) ? bodydata[body].TempModelTop : double.MaxValue;
+        internal double PressureModelTop(string body) => HasPressure(body) ? bodydata[body].PressModelTop : double.MaxValue;
 
-        internal double WindModelTop(string body) => HasWind(body) ? bodydata[body].WindModelTop : 0.0;
-        internal double TemperatureModelTop(string body) => HasTemperature(body) ? bodydata[body].TemperatureModelTop : 0.0;
-        internal double PressureModelTop(string body) => HasPressure(body) ? bodydata[body].PressureModelTop : 0.0;
+        internal float[][,,] WindData(string body, double time)
+        {
+            if (HasWind(body))
+            {
+                if (bodydata[body].GetWindData(time, out float[][,,] data) == 0)
+                {
+                    return data;
+                }
+            }
+            return null;
+        }
+        internal float[,,] TemperatureData(string body, double time)
+        {
+            if (HasTemperature(body))
+            {
+                if (bodydata[body].GetTemperatureData(time, out float[,,] data) == 0)
+                {
+                    return data;
+                }
+            }
+            return null;
+        }
 
-        internal float[][,,] WindData(string body, double time) => HasWind(body) ? new float[3][,,] { bodydata[body].GetWindX(time), bodydata[body].GetWindY(time), bodydata[body].GetWindZ(time) } : null;
-        internal float[,,] TemperatureData(string body, double time) => HasTemperature(body) ? bodydata[body].GetTemperature(time) : null;
-        internal float[,,] PressureData(string body, double time) => HasPressure(body) ? bodydata[body].GetPressure(time) : null;
-
-        internal Vector3 GetFlowMapWind(string body, double lon, double lat, double alt, double time) => HasFlowMaps(body) ? bodydata[body].GetFlowmapWind(lon, lat, alt, time) : Vector3.zero;
+        internal float[,,] PressureData(string body, double time)
+        {
+            if (HasPressure(body))
+            {
+                if (bodydata[body].GetPressureData(time, out float[,,] data) == 0)
+                {
+                    return data;
+                }
+            }
+            return null;
+        }
     }
 
     internal static class Utils 
     {
-        internal const string version = "0.9.2";
+        internal const string version = "0.9.3";
         internal static string GameDataPath => KSPUtil.ApplicationRootPath + "GameData/";
         internal static Dictionary<string, string> LOCCache; //localization cache
 
@@ -182,187 +219,5 @@ namespace ModularClimateWeatherSystems
 
         internal static int Clamp(int value, int min, int max) => Math.Min(Math.Max(value, min), max); //Apparently no such function exists for integers. Why?
         internal static bool IsVectorFinite(Vector3 v) => float.IsFinite(v.x) && float.IsFinite(v.y) && float.IsFinite(v.z);
-    }
-
-    internal class BodyData
-    {
-        private readonly string body;
-        
-        private float[][,,] WindDataX;
-        private float[][,,] WindDataY;
-        private float[][,,] WindDataZ;
-        internal float WindScaleFactor = float.NaN;
-        internal double WindTimeStep = double.NaN;
-        internal double WindModelTop = 0.0;
-        internal bool HasWind => WindDataX != null && WindDataY != null && WindDataZ != null && !double.IsNaN(WindTimeStep) && !float.IsNaN(WindScaleFactor);
-
-        private float[][,,] TemperatureData;
-        internal float TemperatureScaleFactor = float.NaN;
-        internal double TemperatureTimeStep = double.NaN;
-        internal double TemperatureModelTop = 0.0;
-        internal bool HasTemperature => TemperatureData != null && !double.IsNaN(TemperatureTimeStep) && !float.IsNaN(TemperatureScaleFactor);
-
-        private float[][,,] PressureData;
-        internal float PressureScaleFactor = float.NaN;
-        internal double PressureTimeStep = double.NaN;
-        internal double PressureModelTop = 0.0f;
-        internal bool HasPressure => PressureData != null && !double.IsNaN(PressureTimeStep) && !float.IsNaN(PressureScaleFactor);
-
-        internal List<FlowMap> Flowmaps;
-        internal bool HasFlowmaps => Flowmaps != null && Flowmaps.Count > 0;
-
-        internal BodyData(string body)
-        {
-            Flowmaps = new List<FlowMap>();
-            this.body = body;
-        }
-
-        internal void AddWindData(float[][,,] WindX, float[][,,] WindY, float[][,,] WindZ, float scalefactor, double timestep, double modeltop)
-        {
-            if (HasWind)
-            {
-                Utils.LogWarning(string.Format("Wind data already exists for {0}.", body));
-            }
-            else
-            {
-                WindDataX = WindX;
-                WindDataY = WindY;
-                WindDataZ = WindZ;
-                WindScaleFactor = scalefactor;
-                WindTimeStep = timestep;
-                WindModelTop = modeltop;
-                Utils.LogInfo(string.Format("Successfully added Wind Data to {0}.", body));
-            }
-        }
-
-        internal void AddTemperatureData(float[][,,] Temp, float scalefactor, double timestep, double modeltop)
-        {
-            if (HasTemperature)
-            {
-                Utils.LogWarning(string.Format("Temperature data already exists for {0}.", body));
-            }
-            else
-            {
-                TemperatureData = Temp;
-                TemperatureScaleFactor = scalefactor;
-                TemperatureTimeStep = timestep;
-                TemperatureModelTop = modeltop;
-                Utils.LogInfo(string.Format("Successfully added Temperature Data to {0}.", body));
-            }
-        }
-
-        internal void AddPressureData(float[][,,] Press, float scalefactor, double timestep, double modeltop)
-        {
-            if (HasPressure)
-            {
-                Utils.LogWarning(string.Format("Pressure data already exists for {0}.", body));
-            }
-            else
-            {
-                PressureData = Press;
-                PressureScaleFactor = scalefactor;
-                PressureTimeStep = timestep;
-                PressureModelTop = modeltop;
-                Utils.LogInfo(string.Format("Successfully added Pressure Data to {0}.", body));
-            }
-        }
-
-        internal void AddFlowMap(FlowMap flowmap) => Flowmaps.Add(flowmap);
-
-        internal float[,,] GetWindX(double time) => HasWind ? WindDataX[(int)Math.Floor(time / WindTimeStep) % WindDataX.Length] : null;
-        internal float[,,] GetWindY(double time) => HasWind ? WindDataY[(int)Math.Floor(time / WindTimeStep) % WindDataY.Length] : null;
-        internal float[,,] GetWindZ(double time) => HasWind ? WindDataZ[(int)Math.Floor(time / WindTimeStep) % WindDataZ.Length] : null;
-        internal float[,,] GetTemperature(double time) => HasTemperature ? TemperatureData[(int)Math.Floor(time / TemperatureTimeStep) % TemperatureData.Length] : null;
-        internal float[,,] GetPressure(double time) => HasPressure ? PressureData[(int)Math.Floor(time / PressureTimeStep) % PressureData.Length] : null;
-
-        internal Vector3 GetFlowmapWind(double lon, double lat, double alt, double time)
-        {
-            Vector3 windvec = Vector3.zero;
-            foreach (FlowMap map in Flowmaps)
-            {
-                windvec += map.GetWindVec(lon, lat, alt, time);
-            }
-            return windvec;
-        }
-    }
-
-    internal class FlowMap
-    {
-        internal Texture2D flowmap;
-        internal bool useThirdChannel; //whether or not to use the Blue channel to add a vertical component to the winds.
-        internal FloatCurve AltitudeSpeedMultCurve;
-        internal FloatCurve EW_AltitudeSpeedMultCurve;
-        internal FloatCurve NS_AltitudeSpeedMultCurve;
-        internal FloatCurve V_AltitudeSpeedMultCurve;
-        internal FloatCurve WindSpeedMultiplierTimeCurve;
-        internal float EWwind;
-        internal float NSwind;
-        internal float vWind;
-
-        internal float timeoffset;
-
-        internal int x;
-        internal int y;
-
-        internal FlowMap(Texture2D path, bool use3rdChannel, FloatCurve altmult, FloatCurve ewaltmultcurve, FloatCurve nsaltmultcurve, FloatCurve valtmultcurve, float EWwind, float NSwind, float vWind, FloatCurve speedtimecurve, float offset)
-        {
-            flowmap = path;
-            useThirdChannel = use3rdChannel;
-            AltitudeSpeedMultCurve = altmult;
-            EW_AltitudeSpeedMultCurve = ewaltmultcurve;
-            NS_AltitudeSpeedMultCurve = nsaltmultcurve;
-            V_AltitudeSpeedMultCurve = valtmultcurve;
-            WindSpeedMultiplierTimeCurve = speedtimecurve;
-            this.EWwind = EWwind;
-            this.NSwind = NSwind;
-            this.vWind = vWind;
-            timeoffset = WindSpeedMultiplierTimeCurve.maxTime != 0.0f ? offset % WindSpeedMultiplierTimeCurve.maxTime : 0.0f;
-
-            x = flowmap.width;
-            y = flowmap.height;
-        }
-
-        internal Vector3 GetWindVec(double lon, double lat, double alt, double time)
-        {
-            //AltitudeSpeedMultiplierCurve cannot go below 0.
-            float speedmult = Math.Max(AltitudeSpeedMultCurve.Evaluate((float)alt), 0.0f) * WindSpeedMultiplierTimeCurve.Evaluate((float)(time - timeoffset + WindSpeedMultiplierTimeCurve.maxTime) % WindSpeedMultiplierTimeCurve.maxTime);
-            if (speedmult > 0.0f)
-            {
-                //adjust longitude so the center of the map is the prime meridian for the purposes of these calculations
-                double mapx = (((lon + 270.0) / 360.0) * x) - 0.5;
-                double mapy = (((lat + 90.0) / 180.0) * y) - 0.5;
-                double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
-                double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
-
-                //locate the four nearby points, but don't go over the poles.
-                int leftx = UtilMath.WrapAround((int)Math.Truncate(mapx), 0, x);
-                int topy = Utils.Clamp((int)Math.Truncate(mapy), 0, y - 1);
-                int rightx = UtilMath.WrapAround(leftx + 1, 0, x);
-                int bottomy = Utils.Clamp(topy + 1, 0, y - 1);
-
-                Color[] colors = new Color[4];
-                Vector3[] vectors = new Vector3[4];
-                colors[0] = flowmap.GetPixel(leftx, topy);
-                colors[1] = flowmap.GetPixel(rightx, topy);
-                colors[2] = flowmap.GetPixel(leftx, bottomy);
-                colors[3] = flowmap.GetPixel(rightx, bottomy);
-
-                for (int i = 0; i < 4; i++)
-                {
-                    Vector3 windvec = Vector3.zero;
-
-                    windvec.z = (colors[i].r * 2.0f) - 1.0f;
-                    windvec.x = (colors[i].g * 2.0f) - 1.0f;
-                    windvec.y = useThirdChannel ? (colors[i].b * 2.0f) - 1.0f : 0.0f;
-                    vectors[i] = windvec;
-                }
-                Vector3 wind = Vector3.Lerp(Vector3.Lerp(vectors[0], vectors[1], (float)lerpx), Vector3.Lerp(vectors[2], vectors[3], (float)lerpx), (float)lerpy);
-                wind.x = wind.x * NSwind * NS_AltitudeSpeedMultCurve.Evaluate((float)alt);
-                wind.y = wind.y * vWind * V_AltitudeSpeedMultCurve.Evaluate((float)alt);
-                wind.z = wind.z * EWwind * EW_AltitudeSpeedMultCurve.Evaluate((float)alt);
-                return wind * speedmult;
-            }
-            return Vector3.zero;
-        }
     }
 }

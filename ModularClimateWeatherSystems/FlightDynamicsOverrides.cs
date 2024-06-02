@@ -23,7 +23,7 @@ namespace ModularClimateWeatherSystems
             else
             {
                 Utils.LogWarning("Destroying duplicate Flight Dynamics Overrides. Check your install for duplicate mod folders.");
-                Destroy(this);
+                DestroyImmediate(this);
             }
         }
 
@@ -121,8 +121,29 @@ namespace ModularClimateWeatherSystems
                     part.DragCubes.SetDrag(part.dragVectorDirLocal, (float)fi.mach);
                 }
             }
-            //let CalculateAerodynamicArea() do its thing
-            return fi.BaseFICalculateAerodynamicArea(part);
+
+            //inline the rest of CaclulateAerodynamicArea() to avoid passing an object reference again
+            if (!part.DragCubes.None)
+            {
+                return part.DragCubes.Area;
+            }
+            else
+            {
+                switch (part.dragModel)
+                {
+                    case Part.DragModel.DEFAULT:
+                    case Part.DragModel.CUBE:
+                        return (!PhysicsGlobals.DragCubesUseSpherical && !part.DragCubes.None) ? part.DragCubes.Area : part.maximum_drag;
+                    case Part.DragModel.CONIC:
+                        return part.maximum_drag;
+                    case Part.DragModel.CYLINDRICAL: 
+                        return part.maximum_drag;
+                    case Part.DragModel.SPHERICAL: 
+                        return part.maximum_drag;
+                    default: 
+                        return part.maximum_drag;
+                }
+            }
         }
 
         void CalculateConstantsAtmosphereOverride(ModularFlightIntegrator fi)
@@ -155,34 +176,36 @@ namespace ModularClimateWeatherSystems
         double CalculateConvectiveCoeff(ModularFlightIntegrator fi) //I would love to clean this up, but it works and I dont wanna touch it.
         {
             double coeff;
+            double density = fi.density;
+            double spd = fi.spd;
             if (fi.Vessel.situation == Vessel.Situations.SPLASHED)
             {
-                coeff = (PhysicsGlobals.ConvectionFactorSplashed * PhysicsGlobals.NewtonianConvectionFactorBase + Math.Pow(fi.spd, PhysicsGlobals.NewtonianVelocityExponent) * 10.0) * PhysicsGlobals.NewtonianConvectionFactorTotal;
+                coeff = (PhysicsGlobals.ConvectionFactorSplashed * PhysicsGlobals.NewtonianConvectionFactorBase + Math.Pow(spd, PhysicsGlobals.NewtonianVelocityExponent) * 10.0) * PhysicsGlobals.NewtonianConvectionFactorTotal;
             }
             else if (fi.convectiveMachLerp == 0.0)
             {
-                coeff = CalculateConvecCoeffNewtonian(fi);
+                coeff = CalculateConvecCoeffNewtonian(density, spd); 
             }
             else if (fi.convectiveMachLerp == 1.0)
             {
-                coeff = CalculateConvecCoeffMach(fi);
+                coeff = CalculateConvecCoeffMach(density, spd);
             }
             else
             {
-                coeff = UtilMath.LerpUnclamped(CalculateConvecCoeffNewtonian(fi), CalculateConvecCoeffMach(fi), fi.convectiveMachLerp);
+                coeff = UtilMath.LerpUnclamped(CalculateConvecCoeffNewtonian(density, spd), CalculateConvecCoeffMach(density, spd), fi.convectiveMachLerp);
             }
             return coeff * fi.CurrentMainBody.convectionMultiplier;
         }
-        double CalculateConvecCoeffNewtonian(ModularFlightIntegrator fi)
+        double CalculateConvecCoeffNewtonian(double density, double spd)
         {
-            double coeff = fi.density <= 1.0 ? Math.Pow(fi.density, PhysicsGlobals.NewtonianDensityExponent) : fi.density;
-            double multiplier = PhysicsGlobals.NewtonianConvectionFactorBase + Math.Pow(fi.spd, PhysicsGlobals.NewtonianVelocityExponent);
+            double coeff = density <= 1.0 ? Math.Pow(density, PhysicsGlobals.NewtonianDensityExponent) : density;
+            double multiplier = PhysicsGlobals.NewtonianConvectionFactorBase + Math.Pow(spd, PhysicsGlobals.NewtonianVelocityExponent);
             return coeff * multiplier * PhysicsGlobals.NewtonianConvectionFactorTotal;
         }
-        double CalculateConvecCoeffMach(ModularFlightIntegrator fi)
+        double CalculateConvecCoeffMach(double density, double spd) //used to take in fi. now passes variables to prevent object references from being tossed around like hot potatoes
         {
-            double coeff = fi.density <= 1.0 ? Math.Pow(fi.density, PhysicsGlobals.MachConvectionDensityExponent) : fi.density;
-            return coeff * 1E-07 * PhysicsGlobals.MachConvectionFactor * Math.Pow(fi.spd, PhysicsGlobals.MachConvectionVelocityExponent);
+            double coeff = density <= 1.0 ? Math.Pow(density, PhysicsGlobals.MachConvectionDensityExponent) : density;
+            return coeff * 1E-07 * PhysicsGlobals.MachConvectionFactor * Math.Pow(spd, PhysicsGlobals.MachConvectionVelocityExponent);
         }
 
         void CalcPressureOverride(ModularFlightIntegrator fi)
@@ -255,7 +278,7 @@ namespace ModularClimateWeatherSystems
                         bool inocean = __instance.vessel.mainBody.ocean && FlightGlobals.getAltitudeAtPos(__instance.intakeTransform.position, __instance.vessel.mainBody) < 0.0;
 
                         //Get intake resource if one of the following is true:
-                        //-disableunderwater & underwateronly are false
+                        //-both disableunderwater & underwateronly are false
                         //-disableunderwater is true and we're not in ocean
                         //-disableunderwater is false, underwateronly is true, and we're in ocean
                         if ((!__instance.disableUnderwater && !__instance.underwaterOnly) || (__instance.disableUnderwater && !inocean) || (!__instance.disableUnderwater && __instance.underwaterOnly && inocean))

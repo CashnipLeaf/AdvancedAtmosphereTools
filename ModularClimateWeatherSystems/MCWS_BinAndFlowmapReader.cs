@@ -11,7 +11,7 @@ namespace ModularClimateWeatherSystems
         {
             Utils.LogInfo("Loading configs.");
 
-            bodydata = new Dictionary<string, BodyData>();
+            bodydata = new Dictionary<string, MCWS_BodyData>();
             ConfigNode[] DataNodes = GameDatabase.Instance.GetConfigNodes("MCWS_DATA");
             foreach (ConfigNode node in DataNodes)
             {
@@ -31,7 +31,7 @@ namespace ModularClimateWeatherSystems
                 Utils.LogInfo(string.Format("Loading config for {0}.", body));
                 if (!bodydata.ContainsKey(body))
                 {
-                    bodydata.Add(body, new BodyData(body));
+                    bodydata.Add(body, new MCWS_BodyData(body));
                 }
 
                 ConfigNode data = new ConfigNode();
@@ -42,11 +42,11 @@ namespace ModularClimateWeatherSystems
                         Utils.LogInfo(string.Format("Loading Combined Data node for {0}.", body));
                         string path = "";
                         string[] readorder = new string[1];
-                        bool hascommons = ReadCommons(data, out int lon, out int lat, out int alt, out int steps, out float timestep);
+                        bool hascommons = ReadCommons(data, out int lon, out int lat, out int alt, out int steps, out double timestep);
 
                         if (hascommons && data.TryGetValue("path", ref path) && !string.IsNullOrEmpty(path) && data.TryGetValue("readOrder", ref readorder))
                         {
-                            ReadOptionals(data, out int offset, out float scaleFactor, out bool invertalt, out double modelTop);
+                            ReadOptionals(data, out int offset, out double scaleFactor, out bool invertalt, out double modelTop, out double lonoffset);
 
                             if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && readorder.Length > 1 && offset >= 0)
                             {
@@ -76,10 +76,10 @@ namespace ModularClimateWeatherSystems
                                             windz = true;
                                             break;
                                         case "temperature":
-                                            bodydata[body].AddTemperatureData(dataarray[v], scaleFactor, timestep, modelTop);
+                                            bodydata[body].AddTemperatureData(dataarray[v], scaleFactor, timestep, modelTop, lonoffset);
                                             break;
                                         case "pressure":
-                                            bodydata[body].AddPressureData(dataarray[v], scaleFactor, timestep, modelTop);
+                                            bodydata[body].AddPressureData(dataarray[v], scaleFactor, timestep, modelTop, lonoffset);
                                             break;
                                         default:
                                             break; //skip over something that isnt data
@@ -89,7 +89,7 @@ namespace ModularClimateWeatherSystems
                                 {
                                     if (windx && windy && windz) //only add wind data if all three components are present.
                                     {
-                                        bodydata[body].AddWindData(windarrayx, windarrayy, windarrayz, scaleFactor, timestep, modelTop);
+                                        bodydata[body].AddWindData(windarrayx, windarrayy, windarrayz, scaleFactor, timestep, modelTop, lonoffset);
                                     }
                                     else
                                     {
@@ -119,11 +119,11 @@ namespace ModularClimateWeatherSystems
                         Utils.LogInfo(string.Format("Loading Wind Data node for {0}.", body));
                         bool combined = false;
                         data.TryGetValue("combined", ref combined);
-                        bool hascommons = ReadCommons(data, out int lon, out int lat, out int alt, out int steps, out float timestep);
+                        bool hascommons = ReadCommons(data, out int lon, out int lat, out int alt, out int steps, out double timestep);
 
                         if (hascommons)
                         {
-                            ReadOptionals(data, out int offset, out float scaleFactor, out bool invertalt, out double modelTop);
+                            ReadOptionals(data, out int offset, out double scaleFactor, out bool invertalt, out double modelTop, out double lonoffset);
 
                             if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && offset >= 0)
                             {
@@ -190,7 +190,7 @@ namespace ModularClimateWeatherSystems
                                 }
                                 if (windx && windy && windz)
                                 {
-                                    bodydata[body].AddWindData(windarrayx, windarrayy, windarrayz, scaleFactor, timestep, modelTop);
+                                    bodydata[body].AddWindData(windarrayx, windarrayy, windarrayz, scaleFactor, timestep, modelTop, lonoffset);
                                 }
                                 else
                                 {
@@ -218,16 +218,16 @@ namespace ModularClimateWeatherSystems
                     {
                         Utils.LogInfo(string.Format("Loading Temperature Data node for {0}.", body));
                         string path = "";
-                        bool hascommons = ReadCommons(data, out int lon, out int lat, out int alt, out int steps, out float timestep);
+                        bool hascommons = ReadCommons(data, out int lon, out int lat, out int alt, out int steps, out double timestep);
 
                         if (hascommons && data.TryGetValue("path", ref path) && !string.IsNullOrEmpty(path))
                         {
-                            ReadOptionals(data, out int offset, out float scaleFactor, out bool invertalt, out double modelTop);
+                            ReadOptionals(data, out int offset, out double scaleFactor, out bool invertalt, out double modelTop, out double lonoffset);
 
                             if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && offset >= 0)
                             {
                                 float[][,,] temparray = ReadBinaryFile(path, lon, lat, alt, steps, offset, invertalt);
-                                bodydata[body].AddTemperatureData(temparray, scaleFactor, timestep, modelTop);
+                                bodydata[body].AddTemperatureData(temparray, scaleFactor, timestep, modelTop, lonoffset);
                             }
                             else
                             {
@@ -251,15 +251,15 @@ namespace ModularClimateWeatherSystems
                         Utils.LogInfo(string.Format("Loading Pressure Data node for {0}.", body));
                         string path = "";
 
-                        bool hascommons = ReadCommons(data, out int lon, out int lat, out int alt, out int steps, out float timestep);
+                        bool hascommons = ReadCommons(data, out int lon, out int lat, out int alt, out int steps, out double timestep);
                         if (hascommons && data.TryGetValue("path", ref path) && !string.IsNullOrEmpty(path))
                         {
-                            ReadOptionals(data, out int offset, out float scaleFactor, out bool invertalt, out double modelTop);
+                            ReadOptionals(data, out int offset, out double scaleFactor, out bool invertalt, out double modelTop, out double lonoffset);
 
                             if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && offset >= 0)
                             {
                                 float[][,,] pressarray = ReadBinaryFile(path, lon, lat, alt, steps, offset, invertalt);
-                                bodydata[body].AddPressureData(pressarray, scaleFactor, timestep, modelTop);
+                                bodydata[body].AddPressureData(pressarray, scaleFactor, timestep, modelTop, lonoffset);
                             }
                             else
                             {
@@ -298,7 +298,7 @@ namespace ModularClimateWeatherSystems
 
             //clean up BodyData objects with no data in them.
             List<string> todelete = new List<string>();
-            foreach (KeyValuePair<string, BodyData> pair in bodydata)
+            foreach (KeyValuePair<string, MCWS_BodyData> pair in bodydata)
             {
                 if (!pair.Value.HasWind && !pair.Value.HasTemperature && !pair.Value.HasPressure && !pair.Value.HasFlowmaps)
                 {
@@ -371,23 +371,25 @@ namespace ModularClimateWeatherSystems
         }
 
         //get the optional variables easily.
-        internal void ReadOptionals(ConfigNode cn, out int offset, out float scaleFactor, out bool invertalt, out double modelTop) 
+        internal void ReadOptionals(ConfigNode cn, out int offset, out double scaleFactor, out bool invertalt, out double modelTop, out double lonoffset) 
         {
             offset = 0;
-            scaleFactor = 1.0f;
+            scaleFactor = 1.0;
             invertalt = false;
             modelTop = 0.0;
+            lonoffset = 0.0;
 
             cn.TryGetValue("initialOffset", ref offset);
             cn.TryGetValue("scaleFactor", ref scaleFactor);
             cn.TryGetValue("invertAltitude", ref invertalt);
             cn.TryGetValue("modelTop", ref modelTop);
+            cn.TryGetValue("longitudeOffset", ref lonoffset);
         }
 
-        internal bool ReadCommons(ConfigNode cn, out int lon, out int lat, out int alt, out int steps, out float timestep)
+        internal bool ReadCommons(ConfigNode cn, out int lon, out int lat, out int alt, out int steps, out double timestep)
         {
             lon = lat = alt = steps = 0; 
-            timestep = 0.0f; 
+            timestep = 0.0; 
             return cn.TryGetValue("sizeLon", ref lon) && cn.TryGetValue("sizeLat", ref lat) && cn.TryGetValue("sizeAlt", ref alt) && cn.TryGetValue("timesteps", ref steps) && cn.TryGetValue("timestepLength", ref timestep);
         }
 

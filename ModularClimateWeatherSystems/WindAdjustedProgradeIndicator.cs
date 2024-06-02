@@ -19,7 +19,7 @@ namespace ModularClimateWeatherSystems
 
         public WindAdjustedProgradeIndicator()
         {
-            if(Instance == null)
+            if (Instance == null)
             {
                 Instance = this;
             }
