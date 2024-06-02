@@ -10,7 +10,7 @@ namespace ModularClimateWeatherSystems
     //API for interfacing with this mod.
     public static class MCWS_API
     {
-        private static Dictionary<string, BodyData> externalbodydata;
+        private static Dictionary<string, ExternalBodyData> externalbodydata;
 
         //--------------------------REGISTER EXTERNAL DATA--------------------------
         public static bool RegisterWindData(string body, GlobalWindDelegate dlg, string name)
@@ -73,7 +73,14 @@ namespace ModularClimateWeatherSystems
             windvec = Vector3.zero;
             if (BodyExists(body) && externalbodydata[body].HasWind)
             {
-                return externalbodydata[body].GetWind(lon, lat, alt, time, out windvec);
+                try
+                {
+                    return externalbodydata[body].GetWind(lon, lat, alt, time, out windvec);
+                }
+                catch
+                {
+                    return -2;
+                }
             }
             return -1;
         }
@@ -83,7 +90,14 @@ namespace ModularClimateWeatherSystems
             temp = 0.0;
             if (BodyExists(body) && externalbodydata[body].HasTemperature)
             {
-                return externalbodydata[body].GetTemperature(lon, lat, alt, time, out temp);
+                try
+                {
+                    return externalbodydata[body].GetTemperature(lon, lat, alt, time, out temp);
+                }
+                catch
+                {
+                    return -2;
+                }
             }
             return -1;
         }
@@ -93,14 +107,21 @@ namespace ModularClimateWeatherSystems
             press = 0.0;
             if (BodyExists(body) && externalbodydata[body].HasPressure)
             {
-                return externalbodydata[body].GetPressure(lon, lat, alt, time, out press);
+                try
+                {
+                    return externalbodydata[body].GetPressure(lon, lat, alt, time, out press);
+                }
+                catch 
+                { 
+                    return -2; 
+                }
             }
             return -1;
         }
 
 
         //-------------BODY DATA CLASS------------------
-        internal class BodyData
+        internal class ExternalBodyData
         {
             internal string Body;
 
@@ -116,7 +137,7 @@ namespace ModularClimateWeatherSystems
             internal string PressureSource => string.IsNullOrEmpty(presssource) ? "None" : presssource;
             private GlobalPropertyDelegate pressure;
 
-            internal BodyData(string bodyname) => Body = bodyname;
+            internal ExternalBodyData(string bodyname) => Body = bodyname;
 
             internal void SetWindFunc(string name, GlobalWindDelegate dlg)
             {
@@ -141,7 +162,7 @@ namespace ModularClimateWeatherSystems
                 if (HasWind)
                 {
                     windvec = windfunc.Invoke(Body, lon, lat, alt, time);
-                    return Utils.IsVectorFinite(windvec) ? 0 : -2;
+                    return windvec.IsFinite() ? 0 : -2;
                 }
                 return -1;
             }
@@ -343,11 +364,11 @@ namespace ModularClimateWeatherSystems
             }
             if (externalbodydata == null)
             {
-                externalbodydata = new Dictionary<string, BodyData>();
+                externalbodydata = new Dictionary<string, ExternalBodyData>();
             }
             if (!externalbodydata.ContainsKey(body))
             {
-                externalbodydata.Add(body, new BodyData(body));
+                externalbodydata.Add(body, new ExternalBodyData(body));
             }
         }
         private static void CheckInputs(string body, double time)

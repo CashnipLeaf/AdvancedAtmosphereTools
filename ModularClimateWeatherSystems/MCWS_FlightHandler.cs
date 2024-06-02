@@ -87,6 +87,11 @@ namespace ModularClimateWeatherSystems
         void FixedUpdate()
         {
             Settings.CheckGameSettings();
+            normalwind.Zero();
+            transformedwind.Zero();
+            RawWind.Zero();
+            AppliedWind.Zero();
+
             if (!FlightGlobals.ready || FlightGlobals.ActiveVessel == null)
             {
                 activevessel = null;
@@ -114,7 +119,6 @@ namespace ModularClimateWeatherSystems
             float VaryFactor = (float)(1.0 + UtilMath.Lerp(-Settings.WindSpeedVariability, Settings.WindSpeedVariability, UtilMath.Lerp(vary1, vary2, (CurrentTime - timeofnextvary) / varyinterval)));
             DisableMultiplier = activevessel != null && activevessel.LandedOrSplashed && Settings.DisableWindWhenStationary ? (float)UtilMath.Lerp(0.0, 1.0, (activevessel.srfSpeed - 5.0) * 0.2) : 1.0f;
 
-            normalwind = transformedwind = AppliedWind = RawWind = Vector3.zero;
             if (mainbody.atmosphere && alt <= mainbody.atmosphereDepth)
             {
                 //set fallback data
@@ -126,16 +130,17 @@ namespace ModularClimateWeatherSystems
                 int extwindcode = MCWS_API.GetExternalWind(mainbody.name, lon, lat, alt, CurrentTime, out Vector3 extwind);
                 if (extwindcode == 0)
                 {
-                    normalwind = extwind * VaryFactor;
+                    normalwind.Set(extwind);
+                    normalwind.MultiplyByConstant(VaryFactor);
                     transformedwind = Vesselframe * normalwind;
 
-                    RawWind = normalwind * Settings.GlobalWindSpeedMultiplier;
+                    RawWind.Set(normalwind);
+                    RawWind.MultiplyByConstant(Settings.GlobalWindSpeedMultiplier);
                     AppliedWind = Vesselframe * RawWind;
 
                     HasWind = true;
-                    goto SkipToTemp;
                 }
-                if (Data.HasWind(mainbody.name))
+                else if (Data.HasWind(mainbody.name))
                 {
                     try
                     {
@@ -170,15 +175,13 @@ namespace ModularClimateWeatherSystems
                     HasWind = false;
                 }
 
-            SkipToTemp:
                 int exttempcode = MCWS_API.GetExternalTemperature(mainbody.name, lon, lat, alt, CurrentTime, out double exttemp);
                 if (exttempcode == 0) 
                 {
                     Temperature = exttemp;
                     HasTemp = true;
-                    goto SkipToPress;
                 }
-                if (Data.HasTemperature(mainbody.name))
+                else if (Data.HasTemperature(mainbody.name))
                 {
                     try
                     {
@@ -193,7 +196,7 @@ namespace ModularClimateWeatherSystems
                                 HasTemp = true;
                                 break;
                             case 1:
-                                double TempModelTop = Data.TemperatureModelTop(mainbody.name);
+                                double TempModelTop = Math.Min(Data.TemperatureModelTop(mainbody.name), mainbody.atmosphereDepth);
                                 double extralerp = (alt - TempModelTop) / (mainbody.atmosphereDepth - TempModelTop);
                                 double realtemp = FI != null ? mainbody.GetFullTemperature(alt, FI.atmosphereTemperatureOffset) : mainbody.GetTemperature(alt);
                                 double temp = UtilMath.Lerp(Final, realtemp, Math.Pow(extralerp, 0.25));
@@ -216,15 +219,13 @@ namespace ModularClimateWeatherSystems
                     HasTemp = false;
                 }
 
-            SkipToPress:
                 int extpresscode = MCWS_API.GetExternalPressure(mainbody.name, lon, lat, alt, CurrentTime, out double extpress);
                 if (extpresscode == 0)
                 {
                     Pressure = extpress;
                     HasPress = true;
-                    return;
                 }
-                if (Data.HasPressure(mainbody.name))
+                else if (Data.HasPressure(mainbody.name))
                 {
                     try
                     {
@@ -239,7 +240,7 @@ namespace ModularClimateWeatherSystems
                                 HasPress= true;
                                 break;
                             case 1:
-                                double PressModelTop = Data.PressureModelTop(mainbody.name);
+                                double PressModelTop = Math.Min(Data.PressureModelTop(mainbody.name), mainbody.atmosphereDepth);
                                 double extralerp = (alt - PressModelTop) / (mainbody.atmosphereDepth - PressModelTop);
                                 double press0 = mainbody.GetPressure(0);
                                 double press1 = mainbody.GetPressure(PressModelTop);

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using UnityEngine;
 
 namespace ModularClimateWeatherSystems
@@ -12,45 +13,66 @@ namespace ModularClimateWeatherSystems
     internal class MCWS_BodyData
     {
         private readonly string body;
+        private CelestialBody bod;
 
         private float[][,,] WindDataX;
         private float[][,,] WindDataY;
         private float[][,,] WindDataZ;
         private double WindScaleFactor = double.NaN;
         private double WindTimeStep = double.NaN;
-        internal double WindModelTop = 0.0;
+        private double windmodeltop = 0.0;
+        internal double WindModelTop
+        {
+            get => windmodeltop;
+            set => windmodeltop = (bod.atmosphere && (value <= 0.0 || value >= bod.atmosphereDepth)) ? bod.atmosphereDepth : value;
+        }
         private double WindLonOffset = 0.0;
-        internal bool HasWind => HasWindData || HasFlowmaps;
+        private double VerticalWindMultiplier = 1.0;
+        
         internal bool HasWindData => (WindDataX != null && WindDataY != null && WindDataZ != null);
+
+        internal List<FlowMap> Flowmaps;
+        internal bool HasFlowmaps => Flowmaps != null && Flowmaps.Count > 0;
+
+        internal bool HasWind => HasWindData || HasFlowmaps;
 
         private float[][,,] TempData;
         private double TempScaleFactor = double.NaN;
         private double TempTimeStep = double.NaN;
-        internal double TempModelTop = 0.0;
+        private double tempmodeltop = 0.0;
+        internal double TempModelTop
+        {
+            get => tempmodeltop;
+            set => tempmodeltop = (bod.atmosphere && (value <= 0.0 || value >= bod.atmosphereDepth)) ? bod.atmosphereDepth : value;
+        }
         private double TempLonOffset = 0.0;
         internal bool HasTemperature => TempData != null;
 
         private float[][,,] PressData;
         private double PressScaleFactor = double.NaN;
         private double PressTimeStep = double.NaN;
-        internal double PressModelTop = 0.0;
+        private double pressmodeltop = 0.0;
+        internal double PressModelTop
+        {
+            get => pressmodeltop;
+            set => pressmodeltop = (bod.atmosphere && (value <= 0.0 || value >= bod.atmosphereDepth)) ? bod.atmosphereDepth : value;
+        }
         private double PressLonOffset = 0.0;
         internal bool HasPressure => PressData != null;
 
-        internal List<FlowMap> Flowmaps;
-        internal bool HasFlowmaps => Flowmaps != null && Flowmaps.Count > 0;
-
-        internal MCWS_BodyData(string body)
+        internal MCWS_BodyData(string body, CelestialBody bod)
         {
             Flowmaps = new List<FlowMap>();
             this.body = body;
+            this.bod = bod;
         }
 
-        internal void AddWindData(float[][,,] WindX, float[][,,] WindY, float[][,,] WindZ, double scalefactor, double timestep, double modeltop, double lonoffset)
+        internal int AddWindData(float[][,,] WindX, float[][,,] WindY, float[][,,] WindZ, double scalefactor, double timestep, double modeltop, double lonoffset, double vertmult)
         {
             if (HasWindData)
             {
                 Utils.LogWarning(string.Format("Wind data already exists for {0}.", body));
+                return -1;
             }
             else
             {
@@ -61,15 +83,18 @@ namespace ModularClimateWeatherSystems
                 WindTimeStep = timestep;
                 WindModelTop = modeltop;
                 WindLonOffset = lonoffset;
+                VerticalWindMultiplier = vertmult;
                 Utils.LogInfo(string.Format("Successfully added Wind Data to {0}.", body));
+                return 0;
             }
         }
 
-        internal void AddTemperatureData(float[][,,] Temp, double scalefactor, double timestep, double modeltop, double lonoffset)
+        internal int AddTemperatureData(float[][,,] Temp, double scalefactor, double timestep, double modeltop, double lonoffset)
         {
             if (HasTemperature)
             {
                 Utils.LogWarning(string.Format("Temperature data already exists for {0}.", body));
+                return -1;
             }
             else
             {
@@ -79,14 +104,16 @@ namespace ModularClimateWeatherSystems
                 TempModelTop = modeltop;
                 TempLonOffset = lonoffset;
                 Utils.LogInfo(string.Format("Successfully added Temperature Data to {0}.", body));
+                return 0;
             }
         }
 
-        internal void AddPressureData(float[][,,] Press, double scalefactor, double timestep, double modeltop, double lonoffset)
+        internal int AddPressureData(float[][,,] Press, double scalefactor, double timestep, double modeltop, double lonoffset)
         {
             if (HasPressure)
             {
                 Utils.LogWarning(string.Format("Pressure data already exists for {0}.", body));
+                return -1;
             }
             else
             {
@@ -96,101 +123,118 @@ namespace ModularClimateWeatherSystems
                 PressModelTop = modeltop;
                 PressLonOffset = lonoffset;
                 Utils.LogInfo(string.Format("Successfully added Pressure Data to {0}.", body));
+                return 0;
             }
         }
 
-        internal void AddFlowMap(FlowMap flowmap) => Flowmaps.Add(flowmap);
+        internal int AddFlowMap(FlowMap flowmap)
+        {
+            Flowmaps?.Add(flowmap);
+            return 0;
+        }
 
         internal int GetWind(double lon, double lat, double alt, double time, out Vector3 windvec)
         {
-            windvec = Vector3.zero;
-            if (WindDataX != null && WindDataY != null && WindDataZ != null)
+            Vector3 winddatavector = Vector3.zero;
+            Vector3 flowmapvector = Vector3.zero;
+            bool winddatagood = false;
+            bool flowmapgood = false;
+            if (HasWindData)
             {
-                switch (1)
+                try
                 {
-                    default:
-                        try
-                        {
-                            double normalizedlon = UtilMath.WrapAround(lon + 180.0 - WindLonOffset, 0.0, 360.0) / 360.0;
-                            double normalizedlat = (180.0 - (lat + 90.0)) / 180.0;
-                            double normalizedalt = UtilMath.Clamp01(alt / WindModelTop);
-                            int timeindex = (int)Math.Floor(time / WindTimeStep) % WindDataX.GetLength(0);
-                            int timeindex2 = (timeindex + 1) % WindDataX.GetLength(0);
-                            //derive the locations of the data in the arrays
+                    double normalizedlon = UtilMath.WrapAround(lon + 180.0 - WindLonOffset, 0.0, 360.0) / 360.0;
+                    double normalizedlat = (180.0 - (lat + 90.0)) / 180.0;
+                    double normalizedalt = UtilMath.Clamp01(alt / WindModelTop);
+                    int timeindex = (int)Math.Floor(time / WindTimeStep) % WindDataX.GetLength(0);
+                    int timeindex2 = (timeindex + 1) % WindDataX.GetLength(0);
+                    //derive the locations of the data in the arrays
 
-                            double mapx = UtilMath.WrapAround((normalizedlon * WindDataX[timeindex].GetLength(2)), 0, WindDataX[timeindex].GetLength(2));
-                            double mapy = normalizedlat * WindDataX[timeindex].GetUpperBound(1);
+                    double mapx = UtilMath.WrapAround(normalizedlon * WindDataX[timeindex].GetLength(2), 0, WindDataX[timeindex].GetLength(2));
+                    double mapy = normalizedlat * WindDataX[timeindex].GetUpperBound(1);
 
-                            int x1 = (int)UtilMath.Clamp(Math.Truncate(mapx), 0, WindDataX[timeindex].GetUpperBound(2));
-                            int x2 = UtilMath.WrapAround(x1 + 1, 0, WindDataX[timeindex].GetLength(2));
+                    int x1 = (int)UtilMath.Clamp(Math.Truncate(mapx), 0, WindDataX[timeindex].GetUpperBound(2));
+                    int x2 = UtilMath.WrapAround(x1 + 1, 0, WindDataX[timeindex].GetLength(2));
 
-                            int y1 = Utils.Clamp((int)Math.Floor(mapy), 0, WindDataX[timeindex].GetUpperBound(1));
-                            int y2 = Utils.Clamp(y1 + 1, 0, WindDataX[timeindex].GetUpperBound(1));
+                    int y1 = Utils.Clamp((int)Math.Floor(mapy), 0, WindDataX[timeindex].GetUpperBound(1));
+                    int y2 = Utils.Clamp(y1 + 1, 0, WindDataX[timeindex].GetUpperBound(1));
 
-                            double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
-                            double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
-                            double lerpz = Utils.ScaleAltitude(normalizedalt, WindScaleFactor, WindDataX[timeindex].GetUpperBound(0), out int z1, out int z2);
-                            double lerpt = UtilMath.Clamp01((time % WindTimeStep) / WindTimeStep);
+                    double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
+                    double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
+                    double lerpz = Utils.ScaleAltitude(normalizedalt, WindScaleFactor, WindDataX[timeindex].GetUpperBound(0), out int z1, out int z2);
+                    double lerpt = UtilMath.Clamp01((time % WindTimeStep) / WindTimeStep);
 
-                            //Bilinearly interpolate on the longitude and latitude axes 
-                            float BottomPlaneX1 = Utils.BiLerp(WindDataX[timeindex][z1, y1, x1], WindDataX[timeindex][z1, y1, x2], WindDataX[timeindex][z1, y2, x1], WindDataX[timeindex][z1, y2, x2], (float)lerpx, (float)lerpy);
-                            float TopPlaneX1 = Utils.BiLerp(WindDataX[timeindex][z2, y1, x1], WindDataX[timeindex][z2, y1, x2], WindDataX[timeindex][z2, y2, x1], WindDataX[timeindex][z2, y2, x2], (float)lerpx, (float)lerpy);
+                    //Bilinearly interpolate on the longitude and latitude axes 
+                    float BottomPlaneX1 = Utils.BiLerp(WindDataX[timeindex][z1, y1, x1], WindDataX[timeindex][z1, y1, x2], WindDataX[timeindex][z1, y2, x1], WindDataX[timeindex][z1, y2, x2], (float)lerpx, (float)lerpy);
+                    float TopPlaneX1 = Utils.BiLerp(WindDataX[timeindex][z2, y1, x1], WindDataX[timeindex][z2, y1, x2], WindDataX[timeindex][z2, y2, x1], WindDataX[timeindex][z2, y2, x2], (float)lerpx, (float)lerpy);
 
-                            float BottomPlaneX2 = Utils.BiLerp(WindDataX[timeindex2][z1, y1, x1], WindDataX[timeindex2][z1, y1, x2], WindDataX[timeindex2][z1, y2, x1], WindDataX[timeindex2][z1, y2, x2], (float)lerpx, (float)lerpy);
-                            float TopPlaneX2 = Utils.BiLerp(WindDataX[timeindex2][z2, y1, x1], WindDataX[timeindex2][z2, y1, x2], WindDataX[timeindex2][z2, y2, x1], WindDataX[timeindex2][z2, y2, x2], (float)lerpx, (float)lerpy);
+                    float BottomPlaneX2 = Utils.BiLerp(WindDataX[timeindex2][z1, y1, x1], WindDataX[timeindex2][z1, y1, x2], WindDataX[timeindex2][z1, y2, x1], WindDataX[timeindex2][z1, y2, x2], (float)lerpx, (float)lerpy);
+                    float TopPlaneX2 = Utils.BiLerp(WindDataX[timeindex2][z2, y1, x1], WindDataX[timeindex2][z2, y1, x2], WindDataX[timeindex2][z2, y2, x1], WindDataX[timeindex2][z2, y2, x2], (float)lerpx, (float)lerpy);
 
-                            float BottomPlaneY1 = Utils.BiLerp(WindDataY[timeindex][z1, y1, x1], WindDataY[timeindex][z1, y1, x2], WindDataY[timeindex][z1, y2, x1], WindDataY[timeindex][z1, y2, x2], (float)lerpx, (float)lerpy);
-                            float TopPlaneY1 = Utils.BiLerp(WindDataY[timeindex][z2, y1, x1], WindDataY[timeindex][z2, y1, x2], WindDataY[timeindex][z2, y2, x1], WindDataY[timeindex][z2, y2, x2], (float)lerpx, (float)lerpy);
+                    float BottomPlaneY1 = Utils.BiLerp(WindDataY[timeindex][z1, y1, x1], WindDataY[timeindex][z1, y1, x2], WindDataY[timeindex][z1, y2, x1], WindDataY[timeindex][z1, y2, x2], (float)lerpx, (float)lerpy);
+                    float TopPlaneY1 = Utils.BiLerp(WindDataY[timeindex][z2, y1, x1], WindDataY[timeindex][z2, y1, x2], WindDataY[timeindex][z2, y2, x1], WindDataY[timeindex][z2, y2, x2], (float)lerpx, (float)lerpy);
 
-                            float BottomPlaneY2 = Utils.BiLerp(WindDataY[timeindex2][z1, y1, x1], WindDataY[timeindex2][z1, y1, x2], WindDataY[timeindex2][z1, y2, x1], WindDataY[timeindex2][z1, y2, x2], (float)lerpx, (float)lerpy);
-                            float TopPlaneY2 = Utils.BiLerp(WindDataY[timeindex2][z2, y1, x1], WindDataY[timeindex2][z2, y1, x2], WindDataY[timeindex2][z2, y2, x1], WindDataY[timeindex2][z2, y2, x2], (float)lerpx, (float)lerpy);
+                    float BottomPlaneY2 = Utils.BiLerp(WindDataY[timeindex2][z1, y1, x1], WindDataY[timeindex2][z1, y1, x2], WindDataY[timeindex2][z1, y2, x1], WindDataY[timeindex2][z1, y2, x2], (float)lerpx, (float)lerpy);
+                    float TopPlaneY2 = Utils.BiLerp(WindDataY[timeindex2][z2, y1, x1], WindDataY[timeindex2][z2, y1, x2], WindDataY[timeindex2][z2, y2, x1], WindDataY[timeindex2][z2, y2, x2], (float)lerpx, (float)lerpy);
 
-                            float BottomPlaneZ1 = Utils.BiLerp(WindDataZ[timeindex][z1, y1, x1], WindDataZ[timeindex][z1, y1, x2], WindDataZ[timeindex][z1, y2, x1], WindDataZ[timeindex][z1, y2, x2], (float)lerpx, (float)lerpy);
-                            float TopPlaneZ1 = Utils.BiLerp(WindDataZ[timeindex][z2, y1, x1], WindDataZ[timeindex][z2, y1, x2], WindDataZ[timeindex][z2, y2, x1], WindDataZ[timeindex][z2, y2, x2], (float)lerpx, (float)lerpy);
+                    float BottomPlaneZ1 = Utils.BiLerp(WindDataZ[timeindex][z1, y1, x1], WindDataZ[timeindex][z1, y1, x2], WindDataZ[timeindex][z1, y2, x1], WindDataZ[timeindex][z1, y2, x2], (float)lerpx, (float)lerpy);
+                    float TopPlaneZ1 = Utils.BiLerp(WindDataZ[timeindex][z2, y1, x1], WindDataZ[timeindex][z2, y1, x2], WindDataZ[timeindex][z2, y2, x1], WindDataZ[timeindex][z2, y2, x2], (float)lerpx, (float)lerpy);
 
-                            float BottomPlaneZ2 = Utils.BiLerp(WindDataZ[timeindex2][z1, y1, x1], WindDataZ[timeindex2][z1, y1, x2], WindDataZ[timeindex2][z1, y2, x1], WindDataZ[timeindex2][z1, y2, x2], (float)lerpx, (float)lerpy);
-                            float TopPlaneZ2 = Utils.BiLerp(WindDataZ[timeindex2][z2, y1, x1], WindDataZ[timeindex2][z2, y1, x2], WindDataZ[timeindex2][z2, y2, x1], WindDataZ[timeindex2][z2, y2, x2], (float)lerpx, (float)lerpy);
+                    float BottomPlaneZ2 = Utils.BiLerp(WindDataZ[timeindex2][z1, y1, x1], WindDataZ[timeindex2][z1, y1, x2], WindDataZ[timeindex2][z1, y2, x1], WindDataZ[timeindex2][z1, y2, x2], (float)lerpx, (float)lerpy);
+                    float TopPlaneZ2 = Utils.BiLerp(WindDataZ[timeindex2][z2, y1, x1], WindDataZ[timeindex2][z2, y1, x2], WindDataZ[timeindex2][z2, y2, x1], WindDataZ[timeindex2][z2, y2, x2], (float)lerpx, (float)lerpy);
 
-                            //Bilinearly interpolate on the altitude and time axes
-                            double FinalX = UtilMath.Lerp(UtilMath.Lerp(BottomPlaneX1, TopPlaneX1, lerpz), UtilMath.Lerp(BottomPlaneX2, TopPlaneX2, lerpz), lerpt);
-                            double FinalY = UtilMath.Lerp(UtilMath.Lerp(BottomPlaneY1, TopPlaneY1, lerpz), UtilMath.Lerp(BottomPlaneY2, TopPlaneY2, lerpz), lerpt);
-                            double FinalZ = UtilMath.Lerp(UtilMath.Lerp(BottomPlaneZ1, TopPlaneZ1, lerpz), UtilMath.Lerp(BottomPlaneZ2, TopPlaneZ2, lerpz), lerpt);
+                    //Bilinearly interpolate on the altitude and time axes
+                    float FinalX = Mathf.Lerp(Mathf.Lerp(BottomPlaneX1, TopPlaneX1, (float)lerpz), Mathf.Lerp(BottomPlaneX2, TopPlaneX2, (float)lerpz), (float)lerpt);
+                    float FinalY = Mathf.Lerp(Mathf.Lerp(BottomPlaneY1, TopPlaneY1, (float)lerpz), Mathf.Lerp(BottomPlaneY2, TopPlaneY2, (float)lerpz), (float)lerpt) * (float)VerticalWindMultiplier;
+                    float FinalZ = Mathf.Lerp(Mathf.Lerp(BottomPlaneZ1, TopPlaneZ1, (float)lerpz), Mathf.Lerp(BottomPlaneZ2, TopPlaneZ2, (float)lerpz), (float)lerpt);
 
-                            //Create the wind vector
-                            windvec = new Vector3((float)FinalX, (float)FinalY, (float)FinalZ);
-                            if (!Utils.IsVectorFinite(windvec))
-                            {
-                                break;
-                            }
-                            else
-                            {
-                                return 0;
-                            }
-                        }
-                        catch
-                        {
-                            break;
-                        }
+                    //Create the wind vector
+                    winddatavector = new Vector3(FinalX, FinalY, FinalZ);
+                    winddatagood = winddatavector.IsFinite();
+                }
+                catch
+                {
+                    winddatagood = false;
                 }
             }
             
             if (HasFlowmaps)
             {
-                windvec = Vector3.zero;
                 try
                 {
                     foreach (FlowMap map in Flowmaps)
                     {
-                        windvec += map.GetWindVec(lon, lat, alt, time);
+                        flowmapvector.Add(map.GetWindVec(lon, lat, alt, time));
                     }
-                    return Utils.IsVectorFinite(windvec) ? 0 : -2;
+                    flowmapgood = flowmapvector.IsFinite();
                 }
                 catch
                 {
-                    return -2;
+                    flowmapgood = false;
                 }
             }
-            return -1;
+
+            //if both winddata and flowmaps are present, blend between the two. otherwise, return whichever one is applicable.
+            if (winddatagood && flowmapgood)
+            {
+                windvec = winddatavector + flowmapvector;
+                return 0;
+            }
+            else if (!winddatagood && flowmapgood)
+            {
+                windvec = flowmapvector;
+                return 0;
+            }
+            else if (winddatagood && !flowmapgood)
+            {
+                windvec = winddatavector;
+                return 0;
+            }
+            else
+            {
+                windvec = Vector3.zero;
+                return -1;
+            }
         }
         internal int GetTemperature(double lon, double lat, double alt, double time, out double temp)
         {
@@ -206,7 +250,7 @@ namespace ModularClimateWeatherSystems
                     int timeindex2 = (timeindex + 1) % TempData.GetLength(0);
 
                     //derive the locations of the data in the arrays
-                    double mapx = UtilMath.WrapAround((normalizedlon * TempData[timeindex].GetLength(2)), 0, TempData[timeindex].GetLength(2));
+                    double mapx = UtilMath.WrapAround(normalizedlon * TempData[timeindex].GetLength(2), 0, TempData[timeindex].GetLength(2));
                     double mapy = normalizedlat * TempData[timeindex].GetUpperBound(1);
 
                     int x1 = (int)UtilMath.Clamp(Math.Truncate(mapx), 0, TempData[timeindex].GetUpperBound(2));
@@ -240,10 +284,7 @@ namespace ModularClimateWeatherSystems
                     return -2;
                 }
             }
-            else
-            {
-                return -1;
-            }
+            return -1;
         }
         internal int GetPressure(double lon, double lat, double alt, double time, out double press)
         {
@@ -259,7 +300,7 @@ namespace ModularClimateWeatherSystems
                     int timeindex2 = (timeindex + 1) % PressData.GetLength(0);
 
                     //derive the locations of the data in the arrays
-                    double mapx = UtilMath.WrapAround((normalizedlon * PressData[timeindex].GetLength(2)), 0.0, PressData[timeindex].GetLength(2));
+                    double mapx = UtilMath.WrapAround(normalizedlon * PressData[timeindex].GetLength(2), 0.0, PressData[timeindex].GetLength(2));
                     double mapy = normalizedlat * PressData[timeindex].GetUpperBound(1);
 
                     int x1 = (int)UtilMath.Clamp(Math.Truncate(mapx), 0, PressData[timeindex].GetUpperBound(2));
@@ -296,10 +337,7 @@ namespace ModularClimateWeatherSystems
                     return -2;
                 }
             }
-            else
-            {
-                return -1;
-            }
+            return -1;
         }
 
         internal int GetWindData(double time, out float[][,,] dataarray)
@@ -320,10 +358,7 @@ namespace ModularClimateWeatherSystems
                     return -2;
                 }
             }
-            else
-            {
-                return -1;
-            }
+            return -1;
         }
         internal int GetTemperatureData(double time, out float[,,] dataarray)
         {
@@ -341,10 +376,7 @@ namespace ModularClimateWeatherSystems
                     return -2;
                 }
             }
-            else
-            {
-                return -1;
-            }
+            return -1;
         }
         internal int GetPressureData(double time, out float[,,] dataarray)
         {
@@ -362,10 +394,7 @@ namespace ModularClimateWeatherSystems
                     return -2;
                 }
             }
-            else
-            {
-                return -1;
-            }
+            return -1;
         }
     }
 
@@ -424,7 +453,9 @@ namespace ModularClimateWeatherSystems
                 int bottomy = Utils.Clamp(topy + 1, 0, y - 1);
 
                 Color[] colors = new Color[4];
-                Vector3[] vectors = new Vector3[4];
+                double[] windx = new double[4];
+                double[] windy = new double[4];
+                double[] windz = new double[4];
                 colors[0] = flowmap.GetPixel(leftx, topy);
                 colors[1] = flowmap.GetPixel(rightx, topy);
                 colors[2] = flowmap.GetPixel(leftx, bottomy);
@@ -432,18 +463,15 @@ namespace ModularClimateWeatherSystems
 
                 for (int i = 0; i < 4; i++)
                 {
-                    Vector3 windvec = Vector3.zero;
-
-                    windvec.z = (colors[i].r * 2.0f) - 1.0f;
-                    windvec.x = (colors[i].g * 2.0f) - 1.0f;
-                    windvec.y = useThirdChannel ? (colors[i].b * 2.0f) - 1.0f : 0.0f;
-                    vectors[i] = windvec;
+                    windx[i] = (colors[i].r * 2.0f) - 1.0f;
+                    windz[i] = (colors[i].g * 2.0f) - 1.0f;
+                    windy[i] = useThirdChannel ? (colors[i].b * 2.0f) - 1.0f : 0.0f;
                 }
-                Vector3 wind = Vector3.Lerp(Vector3.Lerp(vectors[0], vectors[1], (float)lerpx), Vector3.Lerp(vectors[2], vectors[3], (float)lerpx), (float)lerpy);
-                wind.x = wind.x * NSwind * NS_AltitudeSpeedMultCurve.Evaluate((float)alt);
-                wind.y = wind.y * vWind * V_AltitudeSpeedMultCurve.Evaluate((float)alt);
-                wind.z = wind.z * EWwind * EW_AltitudeSpeedMultCurve.Evaluate((float)alt);
-                return wind * speedmult;
+                double windvecx = UtilMath.Lerp(UtilMath.Lerp(windx[0], windx[1], lerpx), UtilMath.Lerp(windx[2], windx[3], lerpx), lerpy) * NSwind * NS_AltitudeSpeedMultCurve.Evaluate((float)alt) * speedmult;
+                double windvecy = UtilMath.Lerp(UtilMath.Lerp(windy[0], windy[1], lerpx), UtilMath.Lerp(windy[2], windy[3], lerpx), lerpy) * vWind * V_AltitudeSpeedMultCurve.Evaluate((float)alt) * speedmult;
+                double windvecz = UtilMath.Lerp(UtilMath.Lerp(windz[0], windz[1], lerpx), UtilMath.Lerp(windz[2], windz[3], lerpx), lerpy) * EWwind * EW_AltitudeSpeedMultCurve.Evaluate((float)alt) * speedmult;
+
+                return new Vector3((float)windvecx, (float)windvecy, (float)windvecz);
             }
             return Vector3.zero;
         }

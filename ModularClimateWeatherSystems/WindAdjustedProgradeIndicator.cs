@@ -46,7 +46,7 @@ namespace ModularClimateWeatherSystems
             {
                 Vessel activevessel = FlightGlobals.ActiveVessel;
                 Vector3 windvec = FH.InternalAppliedWind;
-                if (activevessel.mainBody.atmosphere && activevessel.altitude <= activevessel.mainBody.atmosphereDepth && Utils.IsVectorFinite(windvec) && windvec.magnitude >= 0.5f)
+                if (activevessel.mainBody.atmosphere && activevessel.altitude <= activevessel.mainBody.atmosphereDepth && windvec.IsFinite() && windvec.magnitude >= 0.5f)
                 {
                     if (navBall == null || progradewind == null || retrogradewind == null)
                     {
