@@ -33,7 +33,7 @@ namespace ModularClimateWeatherSystems
         internal Vector3 transformedwind = Vector3.zero;
 
         //for the "disable wind while splashed or landed and craft is stationary" setting. for flight dynamics use only.
-        internal Vector3 InternalAppliedWind => AppliedWind * DisableMultiplier; 
+        internal Vector3 InternalAppliedWind = Vector3.zero; 
         private float DisableMultiplier = 1.0f;
 
         private double temperature = PhysicsGlobals.SpaceTemperature;
@@ -91,6 +91,7 @@ namespace ModularClimateWeatherSystems
             transformedwind.Zero();
             RawWind.Zero();
             AppliedWind.Zero();
+            InternalAppliedWind.Zero();
 
             if (!FlightGlobals.ready || FlightGlobals.ActiveVessel == null)
             {
@@ -138,6 +139,16 @@ namespace ModularClimateWeatherSystems
                     RawWind.MultiplyByConstant(Settings.GlobalWindSpeedMultiplier);
                     AppliedWind = Vesselframe * RawWind;
 
+                    if (activevessel.easingInToSurface)
+                    {
+                        InternalAppliedWind.Zero();
+                    }
+                    else
+                    {
+                        InternalAppliedWind.Set(AppliedWind);
+                        InternalAppliedWind.MultiplyByConstant(DisableMultiplier);
+                    }
+
                     HasWind = true;
                 }
                 else if (Data.HasWind(mainbody.name))
@@ -152,13 +163,23 @@ namespace ModularClimateWeatherSystems
                                 break;
                             case 0:
                                 //add the variability factor to the wind vector, then transform it to the global coordinate frame
-                                normalwind = Final * VaryFactor;
+                                normalwind.Set(Final);
+                                normalwind.MultiplyByConstant(VaryFactor);
                                 transformedwind = Vesselframe * normalwind;
 
-                                //add wind speed multiplier
-                                RawWind = normalwind * Settings.GlobalWindSpeedMultiplier;
+                                RawWind.Set(normalwind);
+                                RawWind.MultiplyByConstant(Settings.GlobalWindSpeedMultiplier);
                                 AppliedWind = Vesselframe * RawWind;
-                                HasWind = true;
+
+                                if (activevessel.easingInToSurface)
+                                {
+                                    InternalAppliedWind.Zero();
+                                }
+                                else
+                                {
+                                    InternalAppliedWind.Set(AppliedWind);
+                                    InternalAppliedWind.MultiplyByConstant(DisableMultiplier);
+                                }
                                 break;
                             default:
                                 break;
@@ -167,7 +188,11 @@ namespace ModularClimateWeatherSystems
                     catch (Exception ex) //fallback data
                     {
                         Utils.LogError("Exception thrown when deriving point Wind data for " + mainbody.name + ": " + ex.ToString());
-                        normalwind = transformedwind = AppliedWind = RawWind = Vector3.zero;
+                        normalwind.Zero();
+                        transformedwind.Zero();
+                        RawWind.Zero();
+                        AppliedWind.Zero();
+                        InternalAppliedWind.Zero();
                     }
                 }
                 else

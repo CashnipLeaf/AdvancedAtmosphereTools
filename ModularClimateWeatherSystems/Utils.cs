@@ -57,8 +57,8 @@ namespace ModularClimateWeatherSystems
         internal static int Clamp(int value, int min, int max) => Math.Min(Math.Max(value, min), max); //Apparently no such function exists for integers. Why?
     }
 
-    //extension methods
-    internal static class Vector3Extensions
+    //faster extension methods for vector3 structs
+    internal static class VectorExtensions
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static void Add(ref this Vector3 v, Vector3 other)
@@ -66,6 +66,13 @@ namespace ModularClimateWeatherSystems
             v.x += other.x;
             v.y += other.y;
             v.z += other.z;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static void Subtract(ref this Vector3 v, Vector3 other)
+        {
+            v.x -= other.x;
+            v.y -= other.y;
+            v.z -= other.z;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static void Set(ref this Vector3 v, Vector3 other)
@@ -80,6 +87,14 @@ namespace ModularClimateWeatherSystems
             v.x *= other;
             v.y *= other;
             v.z *= other;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static void LerpWith(ref this Vector3 v, Vector3 other, float by)
+        {
+            by = Mathf.Clamp01(by);
+            v.x = (v.x * (1.0f - by)) + (other.x * by);
+            v.y = (v.x * (1.0f - by)) + (other.y * by);
+            v.z = (v.y * (1.0f - by)) + (other.z * by);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

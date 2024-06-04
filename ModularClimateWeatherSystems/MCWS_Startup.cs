@@ -114,17 +114,17 @@ namespace ModularClimateWeatherSystems
         internal int GetWind(string body, double lon, double lat, double alt, double time, out Vector3 windvec)
         {
             windvec = Vector3.zero;
-            return HasWind(body) ? bodydata[body].GetWind(lon, lat, alt, time, out windvec) : 1;
+            return HasWind(body) ? bodydata[body].GetWind(lon, lat, alt, time, out windvec) : -1;
         }
         internal int GetTemperature(string body, double lon, double lat, double alt, double time, out double temp)
         {
             temp = 0.0;
-            return HasTemperature(body) ? bodydata[body].GetTemperature(lon, lat, alt, time, out temp) : 1;
+            return HasTemperature(body) ? bodydata[body].GetTemperature(lon, lat, alt, time, out temp) : -1;
         }
         internal int GetPressure(string body, double lon, double lat, double alt, double time, out double press)
         {
             press = 0.0;
-            return HasPressure(body) ? bodydata[body].GetPressure(lon, lat, alt, time, out press) : 1;
+            return HasPressure(body) ? bodydata[body].GetPressure(lon, lat, alt, time, out press) : -1;
         }
 
         internal double WindModelTop(string body) => HasWind(body) ? bodydata[body].WindModelTop : double.MaxValue;

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using UnityEngine;
 
 namespace ModularClimateWeatherSystems
@@ -214,7 +213,7 @@ namespace ModularClimateWeatherSystems
                 }
             }
 
-            //if both winddata and flowmaps are present, blend between the two. otherwise, return whichever one is applicable.
+            //if both winddata and flowmaps are present and the value is usable, add them together. otherwise, return whichever one is applicable.
             if (winddatagood && flowmapgood)
             {
                 windvec = winddatavector + flowmapvector;

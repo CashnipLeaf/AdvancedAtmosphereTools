@@ -96,12 +96,12 @@ namespace ModularClimateWeatherSystems
         {
             Vector3 windvec = (FH != null && FH.HasWind) ? FH.InternalAppliedWind : Vector3.zero;
             float submerged = (float)part.submergedPortion;
-            windvec = Vector3.Lerp(windvec, Vector3.zero, submerged * submerged);
+            windvec.LerpWith(Vector3.zero, submerged * submerged);
 
             //add an offset to the velocity vector used for body drag/lift calcs and update the related fields.
             if (part.Rigidbody != null && windvec.IsFinite() && !Mathf.Approximately(windvec.magnitude, 0.0f))
             {
-                part.dragVector = part.Rigidbody.velocity + Krakensbane.GetFrameVelocity() - windvec;
+                part.dragVector.Subtract(windvec);
                 part.dragVectorSqrMag = part.dragVector.sqrMagnitude;
                 if (part.dragVectorSqrMag != 0.0)
                 {
@@ -247,7 +247,8 @@ namespace ModularClimateWeatherSystems
                 return;
             }
             float submerged = (float)__instance.part.submergedPortion;
-            pointVelocity -= Vector3.Lerp(windvec, Vector3.zero, submerged * submerged);
+            windvec.LerpWith(Vector3.zero, submerged * submerged);
+            pointVelocity.Subtract(windvec);
         }
     }
 
@@ -268,6 +269,8 @@ namespace ModularClimateWeatherSystems
             {
                 return true;
             }
+            float submerged = (float)__instance.part.submergedPortion;
+            windvec.LerpWith(Vector3.zero, submerged * submerged);
 
             if (__instance.intakeEnabled && __instance.moduleIsEnabled && __instance.vessel != null && __instance.intakeTransform != null)
             {
