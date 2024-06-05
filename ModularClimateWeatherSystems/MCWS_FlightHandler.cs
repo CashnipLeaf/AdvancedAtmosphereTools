@@ -180,6 +180,8 @@ namespace ModularClimateWeatherSystems
                                     InternalAppliedWind.Set(AppliedWind);
                                     InternalAppliedWind.MultiplyByConstant(DisableMultiplier);
                                 }
+
+                                HasWind = true;
                                 break;
                             default:
                                 break;
