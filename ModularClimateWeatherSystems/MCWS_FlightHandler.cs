@@ -195,6 +195,7 @@ namespace ModularClimateWeatherSystems
                         RawWind.Zero();
                         AppliedWind.Zero();
                         InternalAppliedWind.Zero();
+                        HasWind = false;
                     }
                 }
                 else
