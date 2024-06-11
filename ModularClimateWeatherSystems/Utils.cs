@@ -7,7 +7,7 @@ namespace ModularClimateWeatherSystems
 {
     internal static class Utils
     {
-        internal const string version = "0.9.4";
+        internal const string version = "0.9.5";
         internal static string GameDataPath => KSPUtil.ApplicationRootPath + "GameData/";
         internal static Dictionary<string, string> LOCCache; //localization cache
 
@@ -58,7 +58,7 @@ namespace ModularClimateWeatherSystems
     }
 
     //faster extension methods for vector3 structs
-    internal static class VectorExtensions
+    internal static class Extensions
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static void Add(ref this Vector3 v, Vector3 other)

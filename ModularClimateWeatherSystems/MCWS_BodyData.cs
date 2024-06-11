@@ -26,6 +26,7 @@ namespace ModularClimateWeatherSystems
             set => windmodeltop = (bod.atmosphere && (value <= 0.0 || value >= bod.atmosphereDepth)) ? bod.atmosphereDepth : value;
         }
         private double WindLonOffset = 0.0;
+        private double WindTimeOffset = 0.0;
         private double VerticalWindMultiplier = 1.0;
         
         internal bool HasWindData => (WindDataX != null && WindDataY != null && WindDataZ != null);
@@ -45,6 +46,7 @@ namespace ModularClimateWeatherSystems
             set => tempmodeltop = (bod.atmosphere && (value <= 0.0 || value >= bod.atmosphereDepth)) ? bod.atmosphereDepth : value;
         }
         private double TempLonOffset = 0.0;
+        private double TempTimeOffset = 0.0;
         internal bool HasTemperature => TempData != null;
 
         private float[][,,] PressData;
@@ -57,6 +59,7 @@ namespace ModularClimateWeatherSystems
             set => pressmodeltop = (bod.atmosphere && (value <= 0.0 || value >= bod.atmosphereDepth)) ? bod.atmosphereDepth : value;
         }
         private double PressLonOffset = 0.0;
+        private double PressTimeOffset = 0.0;
         internal bool HasPressure => PressData != null;
 
         internal MCWS_BodyData(string body, CelestialBody bod)
@@ -66,7 +69,7 @@ namespace ModularClimateWeatherSystems
             this.bod = bod;
         }
 
-        internal int AddWindData(float[][,,] WindX, float[][,,] WindY, float[][,,] WindZ, double scalefactor, double timestep, double modeltop, double lonoffset, double vertmult)
+        internal int AddWindData(float[][,,] WindX, float[][,,] WindY, float[][,,] WindZ, double scalefactor, double timestep, double modeltop, double lonoffset, double vertmult, double timeoffset)
         {
             if (HasWindData)
             {
@@ -83,12 +86,13 @@ namespace ModularClimateWeatherSystems
                 WindModelTop = modeltop;
                 WindLonOffset = lonoffset;
                 VerticalWindMultiplier = vertmult;
+                WindTimeOffset = timeoffset;
                 Utils.LogInfo(string.Format("Successfully added Wind Data to {0}.", body));
                 return 0;
             }
         }
 
-        internal int AddTemperatureData(float[][,,] Temp, double scalefactor, double timestep, double modeltop, double lonoffset)
+        internal int AddTemperatureData(float[][,,] Temp, double scalefactor, double timestep, double modeltop, double lonoffset, double timeoffset)
         {
             if (HasTemperature)
             {
@@ -102,12 +106,13 @@ namespace ModularClimateWeatherSystems
                 TempTimeStep = timestep;
                 TempModelTop = modeltop;
                 TempLonOffset = lonoffset;
+                TempTimeOffset = timeoffset;
                 Utils.LogInfo(string.Format("Successfully added Temperature Data to {0}.", body));
                 return 0;
             }
         }
 
-        internal int AddPressureData(float[][,,] Press, double scalefactor, double timestep, double modeltop, double lonoffset)
+        internal int AddPressureData(float[][,,] Press, double scalefactor, double timestep, double modeltop, double lonoffset, double timeoffset)
         {
             if (HasPressure)
             {
@@ -121,6 +126,7 @@ namespace ModularClimateWeatherSystems
                 PressTimeStep = timestep;
                 PressModelTop = modeltop;
                 PressLonOffset = lonoffset;
+                PressTimeOffset = timeoffset;
                 Utils.LogInfo(string.Format("Successfully added Pressure Data to {0}.", body));
                 return 0;
             }
@@ -129,7 +135,7 @@ namespace ModularClimateWeatherSystems
         internal int AddFlowMap(FlowMap flowmap)
         {
             Flowmaps?.Add(flowmap);
-            return 0;
+            return Flowmaps == null ? -1 : 0;
         }
 
         internal int GetWind(double lon, double lat, double alt, double time, out Vector3 windvec)
@@ -142,10 +148,10 @@ namespace ModularClimateWeatherSystems
             {
                 try
                 {
-                    double normalizedlon = UtilMath.WrapAround(lon + 180.0 - WindLonOffset, 0.0, 360.0) / 360.0;
+                    double normalizedlon = UtilMath.WrapAround(lon + 360.0 - WindLonOffset, 0.0, 360.0) / 360.0;
                     double normalizedlat = (180.0 - (lat + 90.0)) / 180.0;
                     double normalizedalt = UtilMath.Clamp01(alt / WindModelTop);
-                    int timeindex = (int)Math.Floor(time / WindTimeStep) % WindDataX.GetLength(0);
+                    int timeindex = UtilMath.WrapAround((int)Math.Floor((time + WindTimeOffset) / WindTimeStep), 0, WindDataX.GetLength(0));
                     int timeindex2 = (timeindex + 1) % WindDataX.GetLength(0);
                     //derive the locations of the data in the arrays
 
@@ -242,10 +248,10 @@ namespace ModularClimateWeatherSystems
             {
                 try
                 {
-                    double normalizedlon = UtilMath.WrapAround(lon + 180.0 - TempLonOffset, 0.0, 360.0) / 360.0;
+                    double normalizedlon = UtilMath.WrapAround(lon + 360.0 - TempLonOffset, 0.0, 360.0) / 360.0;
                     double normalizedlat = (180.0 - (lat + 90.0)) / 180.0;
                     double normalizedalt = UtilMath.Clamp01(alt / TempModelTop);
-                    int timeindex = (int)Math.Floor(time / TempTimeStep) % TempData.GetLength(0);
+                    int timeindex = UtilMath.WrapAround((int)Math.Floor((time + TempTimeOffset) / TempTimeStep), 0, TempData.GetLength(0));
                     int timeindex2 = (timeindex + 1) % TempData.GetLength(0);
 
                     //derive the locations of the data in the arrays
@@ -292,10 +298,10 @@ namespace ModularClimateWeatherSystems
             {
                 try
                 {
-                    double normalizedlon = UtilMath.WrapAround(lon + 180.0 - PressLonOffset, 0.0, 360.0) / 360.0;
+                    double normalizedlon = UtilMath.WrapAround(lon + 360.0 - PressLonOffset, 0.0, 360.0) / 360.0;
                     double normalizedlat = (180.0 - (lat + 90.0)) / 180.0;
                     double normalizedalt = UtilMath.Clamp01(alt / PressModelTop);
-                    int timeindex = (int)Math.Floor(time / PressTimeStep) % PressData.GetLength(0);
+                    int timeindex = UtilMath.WrapAround((int)Math.Floor((time + PressTimeOffset) / PressTimeStep), 0, PressData.GetLength(0));
                     int timeindex2 = (timeindex + 1) % PressData.GetLength(0);
 
                     //derive the locations of the data in the arrays

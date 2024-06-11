@@ -196,13 +196,13 @@ namespace ModularClimateWeatherSystems
             }
             return coeff * fi.CurrentMainBody.convectionMultiplier;
         }
-        double CalculateConvecCoeffNewtonian(double density, double spd)
+        double CalculateConvecCoeffNewtonian(double density, double spd) //used to take in fi. now passes variables to prevent object references from being tossed around like hot potatoes
         {
             double coeff = density <= 1.0 ? Math.Pow(density, PhysicsGlobals.NewtonianDensityExponent) : density;
             double multiplier = PhysicsGlobals.NewtonianConvectionFactorBase + Math.Pow(spd, PhysicsGlobals.NewtonianVelocityExponent);
             return coeff * multiplier * PhysicsGlobals.NewtonianConvectionFactorTotal;
         }
-        double CalculateConvecCoeffMach(double density, double spd) //used to take in fi. now passes variables to prevent object references from being tossed around like hot potatoes
+        double CalculateConvecCoeffMach(double density, double spd) 
         {
             double coeff = density <= 1.0 ? Math.Pow(density, PhysicsGlobals.MachConvectionDensityExponent) : density;
             return coeff * 1E-07 * PhysicsGlobals.MachConvectionFactor * Math.Pow(spd, PhysicsGlobals.MachConvectionVelocityExponent);
