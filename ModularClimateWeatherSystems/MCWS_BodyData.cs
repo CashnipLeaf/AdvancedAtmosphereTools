@@ -12,7 +12,9 @@ namespace ModularClimateWeatherSystems
     internal class MCWS_BodyData
     {
         private readonly string body;
-        private CelestialBody bod;
+        private readonly bool hasatmo = false;
+        internal bool HasAtmo => hasatmo;
+        private readonly double atmodepth = 0.0;
 
         private float[][,,] WindDataX;
         private float[][,,] WindDataY;
@@ -23,7 +25,7 @@ namespace ModularClimateWeatherSystems
         internal double WindModelTop
         {
             get => windmodeltop;
-            set => windmodeltop = (bod.atmosphere && (value <= 0.0 || value >= bod.atmosphereDepth)) ? bod.atmosphereDepth : value;
+            set => windmodeltop = (hasatmo && (value <= 0.0 || value >= atmodepth)) ? atmodepth : value;
         }
         private double WindLonOffset = 0.0;
         private double WindTimeOffset = 0.0;
@@ -43,7 +45,7 @@ namespace ModularClimateWeatherSystems
         internal double TempModelTop
         {
             get => tempmodeltop;
-            set => tempmodeltop = (bod.atmosphere && (value <= 0.0 || value >= bod.atmosphereDepth)) ? bod.atmosphereDepth : value;
+            set => tempmodeltop = (hasatmo && (value <= 0.0 || value >= atmodepth)) ? atmodepth : value;
         }
         private double TempLonOffset = 0.0;
         private double TempTimeOffset = 0.0;
@@ -56,7 +58,7 @@ namespace ModularClimateWeatherSystems
         internal double PressModelTop
         {
             get => pressmodeltop;
-            set => pressmodeltop = (bod.atmosphere && (value <= 0.0 || value >= bod.atmosphereDepth)) ? bod.atmosphereDepth : value;
+            set => pressmodeltop = (hasatmo && (value <= 0.0 || value >= atmodepth)) ? atmodepth : value;
         }
         private double PressLonOffset = 0.0;
         private double PressTimeOffset = 0.0;
@@ -66,7 +68,11 @@ namespace ModularClimateWeatherSystems
         {
             Flowmaps = new List<FlowMap>();
             this.body = body;
-            this.bod = bod;
+            hasatmo = bod.atmosphere;
+            if (hasatmo)
+            {
+                atmodepth = bod.atmosphereDepth;
+            }
         }
 
         internal int AddWindData(float[][,,] WindX, float[][,,] WindY, float[][,,] WindZ, double scalefactor, double timestep, double modeltop, double lonoffset, double vertmult, double timeoffset)
@@ -207,11 +213,16 @@ namespace ModularClimateWeatherSystems
             {
                 try
                 {
-                    foreach (FlowMap map in Flowmaps)
+                    int count = Flowmaps.Count;
+                    if (count > 0)
                     {
-                        flowmapvector.Add(map.GetWindVec(lon, lat, alt, time));
+                        for (int i = 0; i < count; i++)
+                        {
+                            FlowMap map = Flowmaps[i];
+                            flowmapvector.Add(map.GetWindVec(lon, lat, alt, time));
+                        }
+                        flowmapgood = flowmapvector.IsFinite();
                     }
-                    flowmapgood = flowmapvector.IsFinite();
                 }
                 catch
                 {

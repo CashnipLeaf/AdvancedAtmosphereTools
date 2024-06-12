@@ -10,78 +10,76 @@ namespace ModularClimateWeatherSystems
     [KSPAddon(KSPAddon.Startup.SpaceCentre, true)]
     public class FlightDynamicsOverrides : MonoBehaviour
     {
-        public static FlightDynamicsOverrides Instance { get; private set; }
+        public static bool registeredoverrides = false;
         private static MCWS_FlightHandler FH => MCWS_FlightHandler.Instance;
 
-        public FlightDynamicsOverrides() //make sure that things dont get patched more than once. That would be very bad.
+        void Start()
         {
-            if (Instance == null)
+            if (!registeredoverrides) //make sure that things dont get patched more than once. That would be very bad.
             {
                 Utils.LogInfo("Initializing Flight Dynamics Overrides.");
-                Instance = this;
+
+                //If FAR is installed, do not override flight dynamics. Leave the aerodynamics calulations to FAR.
+                if (!Settings.FAR_Exists)
+                {
+                    //register overrides with ModularFI
+                    Utils.LogInfo("Registering MCWS with ModularFlightIntegrator.");
+                    try
+                    {
+                        if (ModularFlightIntegrator.RegisterUpdateAerodynamicsOverride(NewAeroUpdate))
+                        {
+                            ModularFlightIntegrator.RegisterCalculateAerodynamicAreaOverride(AerodynamicAreaOverride);
+                            Utils.LogInfo("Successfully registered MCWS's Aerodynamics Overrides with ModularFlightIntegrator.");
+                        }
+                        else
+                        {
+                            Utils.LogWarning("Unable to register MCWS's Aerodynamics Override with ModularFlightIntegrator.");
+                        }
+
+                        if (ModularFlightIntegrator.RegisterCalculatePressureOverride(CalcPressureOverride))
+                        {
+                            Utils.LogInfo("Successfully registered MCWS's Pressure Override with ModularFlightIntegrator.");
+                        }
+                        else
+                        {
+                            Utils.LogWarning("Unable to register MCWS's Pressure Override with ModularFlightIntegrator.");
+                        }
+
+                        if (ModularFlightIntegrator.RegistercalculateConstantsAtmosphereOverride(CalculateConstantsAtmosphereOverride))
+                        {
+                            Utils.LogInfo("Successfully registered MCWS's Atmosphere and Thermodynamics Overrides with ModularFlightIntegrator.");
+                        }
+                        else
+                        {
+                            Utils.LogWarning("Unable to register MCWS's Atmosphere and Thermodynamics Overrides with ModularFlightIntegrator.");
+                        }
+                        Utils.LogInfo("ModularFlightIntegrator Registration Complete.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Utils.LogError("ModularFlightIntegrator Registration Failed. Exception thrown: " + ex.ToString());
+                    }
+                    Utils.LogInfo("Patching Lifting Surface and Air Intake behavior.");
+                    try
+                    {
+                        Assembly assembly = Assembly.GetExecutingAssembly();
+                        Harmony harmony = new Harmony("MCWS_WingAndIntake");
+                        harmony.PatchAll(assembly);
+                        Utils.LogInfo("Patching Complete.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Utils.LogError("Patching Failed. Exception thrown:" + ex.ToString());
+                    }
+                }
+                registeredoverrides = true;
+                Destroy(this);
             }
             else
             {
                 Utils.LogWarning("Destroying duplicate Flight Dynamics Overrides. Check your install for duplicate mod folders.");
                 DestroyImmediate(this);
             }
-        }
-
-        void Start()
-        {
-            //If FAR is installed, do not override flight dynamics. Leave the aerodynamics calulations to FAR.
-            if (!Settings.FAR_Exists)
-            {
-                //register overrides with ModularFI
-                Utils.LogInfo("Registering MCWS with ModularFlightIntegrator.");
-                try
-                {
-                    if (ModularFlightIntegrator.RegisterUpdateAerodynamicsOverride(NewAeroUpdate))
-                    {
-                        ModularFlightIntegrator.RegisterCalculateAerodynamicAreaOverride(AerodynamicAreaOverride);
-                        Utils.LogInfo("Successfully registered MCWS's Aerodynamics Overrides with ModularFlightIntegrator.");
-                    }
-                    else
-                    {
-                        Utils.LogWarning("Unable to register MCWS's Aerodynamics Override with ModularFlightIntegrator.");
-                    }
-
-                    if (ModularFlightIntegrator.RegisterCalculatePressureOverride(CalcPressureOverride))
-                    {
-                        Utils.LogInfo("Successfully registered MCWS's Pressure Override with ModularFlightIntegrator.");
-                    }
-                    else
-                    {
-                        Utils.LogWarning("Unable to register MCWS's Pressure Override with ModularFlightIntegrator.");
-                    }
-
-                    if (ModularFlightIntegrator.RegistercalculateConstantsAtmosphereOverride(CalculateConstantsAtmosphereOverride))
-                    {
-                        Utils.LogInfo("Successfully registered MCWS's Atmosphere and Thermodynamics Overrides with ModularFlightIntegrator.");
-                    }
-                    else
-                    {
-                        Utils.LogWarning("Unable to register MCWS's Atmosphere and Thermodynamics Overrides with ModularFlightIntegrator.");
-                    }
-                    Utils.LogInfo("ModularFlightIntegrator Registration Complete.");
-                }
-                catch (Exception ex)
-                {
-                    Utils.LogError("ModularFlightIntegrator Registration Failed. Exception thrown: " + ex.ToString());
-                }
-                Utils.LogInfo("Patching Lifting Surface and Air Intake behavior.");
-                try
-                {
-                    Assembly assembly = Assembly.GetExecutingAssembly();
-                    Harmony harmony = new Harmony("MCWS_WingAndIntake");
-                    harmony.PatchAll(assembly);
-                    Utils.LogInfo("Patching Complete.");
-                }
-                catch (Exception ex)
-                {
-                    Utils.LogError("Patching Failed. Exception thrown:" + ex.ToString());
-                }
-            } 
         }
 
         void NewAeroUpdate(ModularFlightIntegrator fi, Part part)

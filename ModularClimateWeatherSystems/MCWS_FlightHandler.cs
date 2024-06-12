@@ -57,31 +57,28 @@ namespace ModularClimateWeatherSystems
         private const double varyinterval = 100d;
         private double timeofnextvary = 0d;
 
-        public MCWS_FlightHandler() //prevent multiple FlightHandler instances from running.
+        void Awake()
         {
-            if (Instance == null)
+            if (Instance == null) //prevent multiple FlightHandler instances from running.
             {
                 Utils.LogInfo("Initializing Flight Handler.");
                 Instance = this;
+
+                if (Settings.FAR_Exists)
+                {
+                    Utils.LogInfo("Registering MCWS with FerramAerospaceResearch.");
+                    RegisterWithFAR();
+                }
+
+                //set up wind variability. seed the variability generator based on current time.
+                varywind = new Random((DateTime.Now.Hour * 10000) + (DateTime.Now.Minute * 100) + DateTime.Now.Second);
+                vary2 = varywind.NextDouble();
             }
             else
             {
                 Utils.LogWarning("Destroying duplicate Flight Handler. Check your install for duplicate mod folders.");
                 DestroyImmediate(this);
             }
-        }
-
-        void Awake()
-        {
-            if (Settings.FAR_Exists)
-            {
-                Utils.LogInfo("Registering MCWS with FerramAerospaceResearch.");
-                RegisterWithFAR();
-            }
-
-            //set up wind variability. seed the variability generator based on current time.
-            varywind = new Random((DateTime.Now.Hour * 10000) + (DateTime.Now.Minute * 100) + DateTime.Now.Second); 
-            vary2 = varywind.NextDouble();
         }
 
         void FixedUpdate()
@@ -302,6 +299,13 @@ namespace ModularClimateWeatherSystems
             Utils.LogInfo("Flight Scene has ended. Unloading Flight Handler.");
             RemoveToolbarButton();
             GameEvents.onGUIApplicationLauncherDestroyed.Remove(RemoveToolbarButton);
+            activevessel = null;
+            mainbody = null;
+            varywind = null;
+            if (Instance == this)
+            {
+                Instance = null;
+            }
         }        
 
         //----------------FerramAerospaceResearch Compatibility--------------

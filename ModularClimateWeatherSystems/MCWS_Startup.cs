@@ -11,15 +11,92 @@ namespace ModularClimateWeatherSystems
     [KSPAddon(KSPAddon.Startup.MainMenu, true)]
     partial class MCWS_Startup : MonoBehaviour
     {
+        public static MCWS_Startup Instance { get; private set; }
+
         internal Dictionary<string, MCWS_BodyData> bodydata;
 
-        public static MCWS_Startup Instance { get; private set; }
-        public MCWS_Startup()
+        void Awake()
         {
             if (Instance == null)
             {
                 Instance = this;
                 Utils.LogInfo("Initializing Modular Climate & Weather Systems: Version " + Utils.version);
+
+                Utils.LogInfo("Caching Localization Tags.");
+                try
+                {
+
+                    Utils.LOCCache = new Dictionary<string, string>();
+                    IEnumerator tags = Localizer.Tags.Keys.GetEnumerator();
+                    while (tags.MoveNext())
+                    {
+                        if (tags.Current != null)
+                        {
+                            string tag = tags.Current.ToString();
+                            if (tag.Contains("#LOC_MCWS_"))
+                            {
+                                Utils.LOCCache.Add(tag, Localizer.GetStringByTag(tag).Replace("\\n", "\n"));
+                            }
+                        }
+                    }
+                    Utils.LogInfo("Successfully cached Localization Tags.");
+                }
+                catch (Exception ex)
+                {
+                    Utils.LogError("Exception thrown when caching Localization Tags: " + ex.ToString());
+                }
+
+                Utils.LogInfo("Registering MCWS with the toolbar controller.");
+                try
+                {
+                    if (ToolbarControl.RegisterMod(MCWS_FlightHandler.modID, MCWS_FlightHandler.modNAME))
+                    {
+                        Utils.LogInfo("Successfully registered MCWS with the toolbar controller.");
+                    }
+                    else
+                    {
+                        Utils.LogWarning("Unable to register MCWS with the toolbar. MCWS's UI will not be available.");
+                    }
+                }
+                catch (Exception e)
+                {
+                    Utils.LogError("Exception thrown when registering MCWS with the toolbar controller: " + e.ToString());
+                }
+
+                Utils.LogInfo("Checking for an instance of FerramAerospaceResearch.");
+                try
+                {
+                    Type FARAtm = null;
+                    foreach (var assembly in AssemblyLoader.loadedAssemblies)
+                    {
+                        if (assembly.name == "FerramAerospaceResearch")
+                        {
+                            var types = assembly.assembly.GetExportedTypes();
+                            foreach (Type t in types)
+                            {
+                                if (t.FullName.Equals("FerramAerospaceResearch.FARWind"))
+                                {
+                                    FARAtm = t;
+                                }
+                                if (t.FullName.Equals("FerramAerospaceResearch.FARAtmosphere"))
+                                {
+                                    FARAtm = t;
+                                }
+                            }
+                        }
+                    }
+                    Settings.FAR_Exists = FARAtm != null;
+                    Utils.LogInfo(Settings.FAR_Exists ? "FerramAerospaceResearch detected. Flight Dynamics calculations will be deferred to FAR." : "No instances of FerramAerospaceResearch detected.");
+                }
+                catch (Exception ex)
+                {
+                    Utils.LogError("Exception thrown when checking for FerramAerospaceResearch: " + ex.ToString());
+                    Settings.FAR_Exists = false;
+                }
+                ReadConfigs();
+
+                Utils.LogInfo("MCWS Setup Complete.");
+                DontDestroyOnLoad(this);
             }
             else
             {
@@ -28,82 +105,17 @@ namespace ModularClimateWeatherSystems
             }
         }
 
-        void Awake()
+        void OnDestroy()
         {
-            Utils.LogInfo("Caching Localization Tags.");
-            try
+            if(bodydata != null)
             {
-                Utils.LOCCache = new Dictionary<string, string>();
-                IEnumerator tags = Localizer.Tags.Keys.GetEnumerator();
-                while (tags.MoveNext())
-                {
-                    if (tags.Current != null)
-                    {
-                        string tag = tags.Current.ToString();
-                        if (tag.Contains("#LOC_MCWS_"))
-                        {
-                            Utils.LOCCache.Add(tag, Localizer.GetStringByTag(tag).Replace("\\n", "\n"));
-                        }
-                    }
-                }
-                Utils.LogInfo("Successfully cached Localization Tags.");
+                bodydata?.Clear();
             }
-            catch (Exception ex)
+            bodydata = null;
+            if (Instance == this)
             {
-                Utils.LogError("Exception thrown when caching Localization Tags: " + ex.ToString());
+                Instance = null;
             }
-
-            Utils.LogInfo("Registering MCWS with the toolbar controller.");
-            try
-            {
-                if (ToolbarControl.RegisterMod(MCWS_FlightHandler.modID, MCWS_FlightHandler.modNAME))
-                {
-                    Utils.LogInfo("Successfully registered MCWS with the toolbar controller.");
-                }
-                else
-                {
-                    Utils.LogWarning("Unable to register MCWS with the toolbar. MCWS's UI will not be available.");
-                }
-            }
-            catch (Exception e)
-            {
-                Utils.LogError("Exception thrown when registering MCWS with the toolbar controller: " + e.ToString());
-            }
-
-            Utils.LogInfo("Checking for an instance of FerramAerospaceResearch.");
-            try
-            {
-                Type FARAtm = null;
-                foreach (var assembly in AssemblyLoader.loadedAssemblies)
-                {
-                    if (assembly.name == "FerramAerospaceResearch")
-                    {
-                        var types = assembly.assembly.GetExportedTypes();
-                        foreach (Type t in types)
-                        {
-                            if (t.FullName.Equals("FerramAerospaceResearch.FARWind"))
-                            {
-                                FARAtm = t;
-                            }
-                            if (t.FullName.Equals("FerramAerospaceResearch.FARAtmosphere"))
-                            {
-                                FARAtm = t;
-                            }
-                        }
-                    }
-                }
-                Settings.FAR_Exists = FARAtm != null;
-                Utils.LogInfo(Settings.FAR_Exists ? "FerramAerospaceResearch detected. Flight Dynamics calculations will be deferred to FAR." : "No instances of FerramAerospaceResearch detected.");
-            }
-            catch (Exception ex)
-            {
-                Utils.LogError("Exception thrown when checking for FerramAerospaceResearch: " + ex.ToString());
-                Settings.FAR_Exists = false;
-            }
-            ReadConfigs();
-
-            Utils.LogInfo("MCWS Setup Complete.");
-            DontDestroyOnLoad(this);
         }
 
         internal bool BodyExists(string body) => bodydata != null && bodydata.ContainsKey(body);

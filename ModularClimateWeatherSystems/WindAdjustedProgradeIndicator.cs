@@ -16,27 +16,24 @@ namespace ModularClimateWeatherSystems
         PluginConfiguration cfg;
         Color color;
         Vector3 navBallLocalScale = new Vector3(44, 44, 44);
-
-        public WindAdjustedProgradeIndicator()
+        
+        void Start()
         {
             if (Instance == null)
             {
                 Instance = this;
+
+                cfg = PluginConfiguration.CreateForType<WindAdjustedProgradeIndicator>();
+                cfg.load();
+                Vector3 tmp = cfg.GetValue("alignmentmarkercolor", new Vector3(0f, 1f, 0.2f)); // default: light green
+                color = new Color(tmp.x, tmp.y, tmp.z);
+                cfg.save();
+                GameEvents.onUIScaleChange.Add(ResizeIndicators);
             }
             else
             {
-                Destroy(this);
+                DestroyImmediate(this);
             }
-        }
-        
-        void Start()
-        {
-            cfg = PluginConfiguration.CreateForType<WindAdjustedProgradeIndicator>();
-            cfg.load();
-            Vector3 tmp = cfg.GetValue("alignmentmarkercolor", new Vector3(0f, 1f, 0.2f)); // default: light green
-            color = new Color(tmp.x, tmp.y, tmp.z);
-            cfg.save();
-            GameEvents.onUIScaleChange.Add(ResizeIndicators);
         }
 
         void LateUpdate()
@@ -103,6 +100,11 @@ namespace ModularClimateWeatherSystems
                 Destroy(retrogradewind);
             }
             GameEvents.onUIScaleChange.Remove(ResizeIndicators);
+
+            if (Instance == this)
+            {
+                Instance = null;
+            }
         }
 
         void ResizeIndicators()

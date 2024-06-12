@@ -296,11 +296,11 @@ namespace ModularClimateWeatherSystems
             }
             Utils.LogInfo("All configs loaded. Performing cleanup.");
 
-            //clean up BodyData objects with no data in them.
+            //clean up BodyData objects with no data in them, or that somehow got assigned to a body with no atmosphere.
             List<string> todelete = new List<string>();
             foreach (KeyValuePair<string, MCWS_BodyData> pair in bodydata)
             {
-                if (!pair.Value.HasWind && !pair.Value.HasTemperature && !pair.Value.HasPressure && !pair.Value.HasFlowmaps)
+                if (!pair.Value.HasAtmo || (!pair.Value.HasWind && !pair.Value.HasTemperature && !pair.Value.HasPressure && !pair.Value.HasFlowmaps))
                 {
                     todelete.Add(pair.Key);
                 }
