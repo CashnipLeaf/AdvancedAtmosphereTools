@@ -144,10 +144,10 @@ namespace ModularClimateWeatherSystems
             return Flowmaps == null ? -1 : 0;
         }
 
-        internal int GetWind(double lon, double lat, double alt, double time, out Vector3 windvec)
+        internal int GetWind(double lon, double lat, double alt, double time, ref Vector3 winddatavector, ref Vector3 flowmapvector, ref DataInfo windinfo)
         {
-            Vector3 winddatavector = Vector3.zero;
-            Vector3 flowmapvector = Vector3.zero;
+            //winddatavector = Vector3.zero;
+            //flowmapvector = Vector3.zero;
             bool winddatagood = false;
             bool flowmapgood = false;
             if (HasWindData)
@@ -200,8 +200,11 @@ namespace ModularClimateWeatherSystems
                     float FinalZ = Mathf.Lerp(Mathf.Lerp(BottomPlaneZ1, TopPlaneZ1, (float)lerpz), Mathf.Lerp(BottomPlaneZ2, TopPlaneZ2, (float)lerpz), (float)lerpt);
 
                     //Create the wind vector
-                    winddatavector = new Vector3(FinalX, FinalY, FinalZ);
+                    winddatavector.x = FinalX;
+                    winddatavector.y = FinalY;
+                    winddatavector.z = FinalZ;
                     winddatagood = winddatavector.IsFinite();
+                    windinfo.SetNew(x1, x2, lerpx, y1, y2, lerpy, z1, z2, lerpz, timeindex, timeindex2, lerpt, alt > windmodeltop);
                 }
                 catch
                 {
@@ -233,26 +236,22 @@ namespace ModularClimateWeatherSystems
             //if both winddata and flowmaps are present and the value is usable, add them together. otherwise, return whichever one is applicable.
             if (winddatagood && flowmapgood)
             {
-                windvec = winddatavector + flowmapvector;
                 return 0;
             }
             else if (!winddatagood && flowmapgood)
             {
-                windvec = flowmapvector;
-                return 0;
+                return 2;
             }
             else if (winddatagood && !flowmapgood)
             {
-                windvec = winddatavector;
-                return 0;
+                return 1;
             }
             else
             {
-                windvec = Vector3.zero;
                 return -1;
             }
         }
-        internal int GetTemperature(double lon, double lat, double alt, double time, out double temp)
+        internal int GetTemperature(double lon, double lat, double alt, double time, out double temp, ref DataInfo tempinfo)
         {
             temp = 0.0;
             if (TempData != null)
@@ -291,6 +290,7 @@ namespace ModularClimateWeatherSystems
                     temp = UtilMath.Lerp(UtilMath.Lerp((double)BottomPlane1, (double)TopPlane1, lerpz), UtilMath.Lerp((double)BottomPlane2, (double)TopPlane2, lerpz), lerpt);
                     if (double.IsFinite(temp))
                     {
+                        tempinfo.SetNew(x1, x2, lerpx, y1, y2, lerpy, z1, z2, lerpz, timeindex, timeindex2, lerpt, alt > TempModelTop);
                         return alt > TempModelTop ? 1 : 0;
                     }
                     return -2;
@@ -302,7 +302,7 @@ namespace ModularClimateWeatherSystems
             }
             return -1;
         }
-        internal int GetPressure(double lon, double lat, double alt, double time, out double press)
+        internal int GetPressure(double lon, double lat, double alt, double time, out double press, ref DataInfo pressinfo)
         {
             press = 0.0;
             if (PressData != null)
@@ -344,6 +344,7 @@ namespace ModularClimateWeatherSystems
                     press = Utils.InterpolatePressure(BottomPlaneFinal, TopPlaneFinal, lerpz);
                     if (double.IsFinite(press))
                     {
+                        pressinfo.SetNew(x1, x2, lerpx, y1, y2, lerpy, z1, z2, lerpz, timeindex, timeindex2, lerpt, alt > PressModelTop);
                         return alt > PressModelTop ? 1 : 0;
                     }
                     return -2;

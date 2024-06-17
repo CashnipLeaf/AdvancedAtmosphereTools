@@ -7,7 +7,7 @@ namespace ModularClimateWeatherSystems
 {
     internal static class Utils
     {
-        internal const string version = "0.9.5";
+        internal const string version = "0.9.6";
         internal static string GameDataPath => KSPUtil.ApplicationRootPath + "GameData/";
         internal static Dictionary<string, string> LOCCache; //localization cache
 
@@ -54,12 +54,91 @@ namespace ModularClimateWeatherSystems
             return first * Math.Pow(Math.E, -1 * UtilMath.Lerp(0.0, UtilMath.Clamp(scalefactor, float.MinValue, float.MaxValue), by));
         }
 
-        internal static int Clamp(int value, int min, int max) => Math.Min(Math.Max(value, min), max); //Apparently no such function exists for integers. Why?
+        //Apparently no such function exists for integers in either UtilMath or Mathf. Why?
+        internal static int Clamp(int value, int min, int max) => Math.Min(Math.Max(value, min), max); 
     }
 
-    //faster extension methods for vector3 structs
+    //struct to encapsulate data info nicely
+    public struct DataInfo
+    {
+        public int x1;
+        public int x2;
+        public double xlerp;
+        public int y1;
+        public int y2;
+        public double ylerp;
+        public int z1;
+        public int z2;
+        public double zlerp;
+        public int t1;
+        public int t2;
+        public double tlerp;
+        public bool abovetop;
+
+        public DataInfo(int x1, int x2, double xlerp, int y1, int y2, double ylerp, int z1, int z2, double zlerp, int t1, int t2, double tlerp, bool abovetop)
+        {
+            this.x1 = x1;
+            this.x2 = x2;
+            this.xlerp = xlerp;
+            this.y1 = y1;
+            this.y2 = y2;
+            this.ylerp = ylerp;
+            this.z1 = z1;
+            this.z2 = z2;
+            this.zlerp = zlerp;
+            this.t1 = t1;
+            this.t2 = t2;
+            this.tlerp = tlerp;
+            this.abovetop = abovetop;
+        }
+
+        public static DataInfo Zero => new DataInfo(0, 0, 0.0, 0, 0, 0.0, 0, 0, 0.0, 0, 0, 0.0, false);
+
+        public void SetNew(DataInfo data)
+        {
+            x1 = data.x1;
+            x2 = data.x2;
+            xlerp = data.xlerp;
+            y1 = data.y1;
+            y2 = data.y2;
+            ylerp = data.ylerp;
+            z1 = data.z1;
+            z2 = data.z2;
+            zlerp = data.zlerp;
+            t1 = data.t1;
+            t2 = data.t2;
+            tlerp = data.tlerp;
+            abovetop = data.abovetop;
+        }
+
+        public void SetNew(int x1, int x2, double xlerp, int y1, int y2, double ylerp, int z1, int z2, double zlerp, int t1, int t2, double tlerp, bool abovetop)
+        {
+            this.x1 = x1;
+            this.x2 = x2;
+            this.xlerp = xlerp;
+            this.y1 = y1;
+            this.y2 = y2;
+            this.ylerp = ylerp;
+            this.z1 = z1;
+            this.z2 = z2;
+            this.zlerp = zlerp;
+            this.t1 = t1;
+            this.t2 = t2;
+            this.tlerp = tlerp;
+            this.abovetop = abovetop;
+        }
+
+        public void SetZero()
+        {
+            x1 = x2 = y1 = y2 = z1 = z2 = t1 = t2 = 0;
+            xlerp = ylerp = zlerp = tlerp = 0;
+            abovetop = false;
+        }
+    }
+
     internal static class Extensions
     {
+        //faster extension methods for vector3 structs
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static void Add(ref this Vector3 v, Vector3 other)
         {

@@ -33,8 +33,14 @@ namespace ModularClimateWeatherSystems
         internal Vector3 transformedwind = Vector3.zero;
 
         //for the "disable wind while splashed or landed and craft is stationary" setting. for flight dynamics use only.
-        internal Vector3 InternalAppliedWind = Vector3.zero; 
+        internal Vector3 InternalAppliedWind = Vector3.zero;
         private float DisableMultiplier = 1.0f;
+
+        private Vector3 datawind = Vector3.zero;
+        private Vector3 flowmapwind = Vector3.zero;
+
+        private bool haswinddata = false;
+        private bool hasflowmaps = false;
 
         private double temperature = PhysicsGlobals.SpaceTemperature;
         internal double Temperature
@@ -42,6 +48,7 @@ namespace ModularClimateWeatherSystems
             get => temperature;
             private set => temperature = UtilMath.Clamp(value, PhysicsGlobals.SpaceTemperature, float.MaxValue);
         }
+        private double stocktemperature = PhysicsGlobals.SpaceTemperature;
 
         private double pressure = 0.0;
         internal double Pressure
@@ -49,6 +56,11 @@ namespace ModularClimateWeatherSystems
             get => pressure;
             private set => pressure = UtilMath.Clamp(value, 0.0, float.MaxValue);
         }
+        private double stockpressure = 0.0;
+
+        private DataInfo WindDataInfo = DataInfo.Zero;
+        private DataInfo TemperatureDataInfo = DataInfo.Zero;
+        private DataInfo PressureDataInfo = DataInfo.Zero;
 
         //stuff for wind speed variability
         private Random varywind;
@@ -89,6 +101,12 @@ namespace ModularClimateWeatherSystems
             RawWind.Zero();
             AppliedWind.Zero();
             InternalAppliedWind.Zero();
+            datawind.Zero();
+            flowmapwind.Zero();
+            WindDataInfo.SetZero();
+            TemperatureDataInfo.SetZero();
+            PressureDataInfo.SetZero();
+            HasWind = HasTemp = HasPress = hasflowmaps = haswinddata = false;
 
             if (!FlightGlobals.ready || FlightGlobals.ActiveVessel == null)
             {
@@ -106,7 +124,7 @@ namespace ModularClimateWeatherSystems
             Vesselframe.SetColumn(1, (Vector3)activevessel.upAxis);
             Vesselframe.SetColumn(2, (Vector3)activevessel.east);
 
-            if (TimeWarp.CurrentRate <= 1.0f && CurrentTime > timeofnextvary) //pause fetching of new data when timewarp is active.
+            if (TimeWarp.CurrentRate <= 1.0f && CurrentTime > timeofnextvary) //pause updating the vary shenanigans when timewarp is active
             {
                 timeofnextvary = CurrentTime + varyinterval;
                 vary1 = vary2;
@@ -121,15 +139,19 @@ namespace ModularClimateWeatherSystems
             {
                 //set fallback data
                 FlightIntegrator FI = activevessel.GetComponent<FlightIntegrator>();
-                Temperature = FI != null ? mainbody.GetFullTemperature(alt, FI.atmosphereTemperatureOffset) : mainbody.GetTemperature(alt);
-                Pressure = mainbody.GetPressure(alt);
-                HasWind = HasTemp = HasPress = false;
+                stocktemperature = FI != null ? mainbody.GetFullTemperature(alt, FI.atmosphereTemperatureOffset) : mainbody.GetTemperature(alt);
+                Temperature = stocktemperature;
+                stockpressure = mainbody.GetPressure(alt);
+                Pressure = stockpressure;
 
                 int extwindcode = MCWS_API.GetExternalWind(mainbody.name, lon, lat, alt, CurrentTime, out Vector3 extwind);
                 if (extwindcode == 0)
                 {
                     normalwind.Set(extwind);
-                    normalwind.MultiplyByConstant(VaryFactor);
+                    if (!Settings.debugmode)
+                    {
+                        normalwind.MultiplyByConstant(VaryFactor);
+                    }
                     transformedwind = Vesselframe * normalwind;
 
                     RawWind.Set(normalwind);
@@ -152,36 +174,55 @@ namespace ModularClimateWeatherSystems
                 {
                     try
                     {
-                        int retcode = Data.GetWind(mainbody.name, lon, lat, alt, CurrentTime, out Vector3 Final);
-                        switch (retcode)
+                        int retcode = Data.GetWind(mainbody.name, lon, lat, alt, CurrentTime, out Vector3 datavec, out Vector3 flowmapvec, out DataInfo winfo);
+                        if (retcode >= 0)
                         {
-                            case -2:
-                                Utils.LogError("Error when reading wind data for body " + mainbody.name);
-                                break;
-                            case 0:
-                                //add the variability factor to the wind vector, then transform it to the global coordinate frame
-                                normalwind.Set(Final);
+                            if (retcode == 2)
+                            {
+                                datawind.Zero();
+                                flowmapwind.Set(flowmapvec);
+                                normalwind.Set(flowmapwind);
+                                hasflowmaps = true;
+                            }
+                            else if (retcode == 1)
+                            {
+                                flowmapwind.Zero();
+                                datawind.Set(datavec);
+                                normalwind.Set(datawind);
+                                haswinddata = true;
+                                WindDataInfo.SetNew(winfo);
+                            }
+                            else
+                            {
+                                datawind.Set(datavec);
+                                flowmapwind.Set(flowmapvec);
+                                normalwind.Set(datawind);
+                                normalwind.Add(flowmapwind);
+                                haswinddata = hasflowmaps = true;
+                                WindDataInfo.SetNew(winfo);
+                            }
+
+                            if (!Settings.debugmode)
+                            {
                                 normalwind.MultiplyByConstant(VaryFactor);
-                                transformedwind = Vesselframe * normalwind;
+                            }
+                            transformedwind = Vesselframe * normalwind;
 
-                                RawWind.Set(normalwind);
-                                RawWind.MultiplyByConstant(Settings.GlobalWindSpeedMultiplier);
-                                AppliedWind = Vesselframe * RawWind;
+                            RawWind.Set(normalwind);
+                            RawWind.MultiplyByConstant(Settings.GlobalWindSpeedMultiplier);
+                            AppliedWind = Vesselframe * RawWind;
 
-                                if (activevessel.easingInToSurface)
-                                {
-                                    InternalAppliedWind.Zero();
-                                }
-                                else
-                                {
-                                    InternalAppliedWind.Set(AppliedWind);
-                                    InternalAppliedWind.MultiplyByConstant(DisableMultiplier);
-                                }
+                            if (activevessel.easingInToSurface)
+                            {
+                                InternalAppliedWind.Zero();
+                            }
+                            else
+                            {
+                                InternalAppliedWind.Set(AppliedWind);
+                                InternalAppliedWind.MultiplyByConstant(DisableMultiplier);
+                            }
 
-                                HasWind = true;
-                                break;
-                            default:
-                                break;
+                            HasWind = true;
                         }
                     }
                     catch (Exception ex) //fallback data
@@ -192,12 +233,15 @@ namespace ModularClimateWeatherSystems
                         RawWind.Zero();
                         AppliedWind.Zero();
                         InternalAppliedWind.Zero();
-                        HasWind = false;
+                        datawind.Zero();
+                        flowmapwind.Zero();
+                        WindDataInfo.SetZero();
+                        HasWind = haswinddata = hasflowmaps = false;
                     }
                 }
                 else
                 {
-                    HasWind = false;
+                    HasWind = hasflowmaps = haswinddata = false;
                 }
 
                 int exttempcode = MCWS_API.GetExternalTemperature(mainbody.name, lon, lat, alt, CurrentTime, out double exttemp);
@@ -210,7 +254,7 @@ namespace ModularClimateWeatherSystems
                 {
                     try
                     {
-                        int retcode = Data.GetTemperature(mainbody.name, lon, lat, alt, CurrentTime, out double Final);
+                        int retcode = Data.GetTemperature(mainbody.name, lon, lat, alt, CurrentTime, out double Final, out DataInfo tinfo);
                         switch (retcode)
                         {
                             case -2:
@@ -219,6 +263,7 @@ namespace ModularClimateWeatherSystems
                             case 0:
                                 Temperature = Final;
                                 HasTemp = true;
+                                TemperatureDataInfo.SetNew(tinfo);
                                 break;
                             case 1:
                                 double TempModelTop = Math.Min(Data.TemperatureModelTop(mainbody.name), mainbody.atmosphereDepth);
@@ -227,6 +272,7 @@ namespace ModularClimateWeatherSystems
                                 double temp = UtilMath.Lerp(Final, realtemp, Math.Pow(extralerp, 0.25));
                                 Temperature = double.IsFinite(temp) ? temp : throw new NotFiniteNumberException();
                                 HasTemp = true;
+                                TemperatureDataInfo.SetNew(tinfo);
                                 break;
                             default:
                                 break;
@@ -235,12 +281,13 @@ namespace ModularClimateWeatherSystems
                     catch (Exception ex) //fallback data
                     {
                         Utils.LogError("Exception thrown when deriving point Temperature data for " + mainbody.name + ": " + ex.ToString());
-                        Temperature = FI != null ? mainbody.GetFullTemperature(alt, FI.atmosphereTemperatureOffset) : mainbody.GetTemperature(alt);
+                        Temperature = stocktemperature;
                         HasTemp = false;
                     }
                 }
                 else
                 {
+                    Temperature = stocktemperature;
                     HasTemp = false;
                 }
 
@@ -254,7 +301,7 @@ namespace ModularClimateWeatherSystems
                 {
                     try
                     {
-                        int retcode = Data.GetPressure(mainbody.name, lon, lat, alt, CurrentTime, out double Final);
+                        int retcode = Data.GetPressure(mainbody.name, lon, lat, alt, CurrentTime, out double Final, out DataInfo pinfo);
                         switch (retcode)
                         {
                             case -2:
@@ -262,7 +309,8 @@ namespace ModularClimateWeatherSystems
                                 break;
                             case 0:
                                 Pressure = Final * 0.001;
-                                HasPress= true;
+                                HasPress = true;
+                                PressureDataInfo.SetNew(pinfo);
                                 break;
                             case 1:
                                 double PressModelTop = Math.Min(Data.PressureModelTop(mainbody.name), mainbody.atmosphereDepth);
@@ -273,6 +321,7 @@ namespace ModularClimateWeatherSystems
                                 double press = UtilMath.Lerp(Final * Math.Pow(Math.E, -((alt - PressModelTop) / scaleheight)), mainbody.GetPressure(alt) * 1000, Math.Pow(extralerp, 0.125)) * 0.001;
                                 Pressure = double.IsFinite(press) ? press : throw new NotFiniteNumberException();
                                 HasPress = true;
+                                PressureDataInfo.SetNew(pinfo);
                                 break;
                             default:
                                 break;
@@ -281,16 +330,21 @@ namespace ModularClimateWeatherSystems
                     catch (Exception ex) //fallback data
                     {
                         Utils.LogError("Exception thrown when deriving point Pressure data for " + mainbody.name + ": " + ex.ToString());
-                        Pressure = mainbody.GetPressure(alt);
+                        Pressure = stockpressure;
                         HasPress = false;
                     }
+                }
+                else
+                {
+                    Pressure = stockpressure;
+                    HasPress = false;
                 }
             }
             else
             {
                 Pressure = 0.0;
                 Temperature = PhysicsGlobals.SpaceTemperature;
-                HasWind = HasTemp = HasPress = false;
+                HasWind = HasTemp = HasPress = hasflowmaps = haswinddata = false;
             }
         }
 

@@ -22,10 +22,21 @@ namespace ModularClimateWeatherSystems
                 Instance = this;
                 Utils.LogInfo("Initializing Modular Climate & Weather Systems: Version " + Utils.version);
 
+                ConfigNode[] settingsnodes = GameDatabase.Instance.GetConfigNodes("MCWS_SETTINGS");
+                if(settingsnodes.Length > 0 )
+                {
+                    bool debug = false;
+                    settingsnodes[0].TryGetValue("debugMode", ref debug);
+                    if (debug)
+                    {
+                        Utils.LogInfo("Debug mode enabled.");
+                        Settings.debugmode = true;
+                    }
+                }
+
                 Utils.LogInfo("Caching Localization Tags.");
                 try
                 {
-
                     Utils.LOCCache = new Dictionary<string, string>();
                     IEnumerator tags = Localizer.Tags.Keys.GetEnumerator();
                     while (tags.MoveNext())
@@ -123,20 +134,24 @@ namespace ModularClimateWeatherSystems
         internal bool HasTemperature(string body) => BodyExists(body) && bodydata[body].HasTemperature;
         internal bool HasPressure(string body) => BodyExists(body) && bodydata[body].HasPressure;
 
-        internal int GetWind(string body, double lon, double lat, double alt, double time, out Vector3 windvec)
+        internal int GetWind(string body, double lon, double lat, double alt, double time, out Vector3 windvec, out Vector3 flowmapvec, out DataInfo windinfo)
         {
             windvec = Vector3.zero;
-            return HasWind(body) ? bodydata[body].GetWind(lon, lat, alt, time, out windvec) : -1;
+            flowmapvec = Vector3.zero;
+            windinfo = DataInfo.Zero;
+            return HasWind(body) ? bodydata[body].GetWind(lon, lat, alt, time, ref windvec, ref flowmapvec, ref windinfo) : -1;
         }
-        internal int GetTemperature(string body, double lon, double lat, double alt, double time, out double temp)
+        internal int GetTemperature(string body, double lon, double lat, double alt, double time, out double temp, out DataInfo tempinfo)
         {
             temp = 0.0;
-            return HasTemperature(body) ? bodydata[body].GetTemperature(lon, lat, alt, time, out temp) : -1;
+            tempinfo = DataInfo.Zero;
+            return HasTemperature(body) ? bodydata[body].GetTemperature(lon, lat, alt, time, out temp, ref tempinfo) : -1;
         }
-        internal int GetPressure(string body, double lon, double lat, double alt, double time, out double press)
+        internal int GetPressure(string body, double lon, double lat, double alt, double time, out double press, out DataInfo pressinfo)
         {
             press = 0.0;
-            return HasPressure(body) ? bodydata[body].GetPressure(lon, lat, alt, time, out press) : -1;
+            pressinfo = DataInfo.Zero;
+            return HasPressure(body) ? bodydata[body].GetPressure(lon, lat, alt, time, out press, ref pressinfo) : -1;
         }
 
         internal double WindModelTop(string body) => HasWind(body) ? bodydata[body].WindModelTop : double.MaxValue;

@@ -273,8 +273,18 @@ namespace ModularClimateWeatherSystems
                     {
                         return extwind;
                     }
-                    int retcode = InternalData.GetWind(body, lon, lat, alt, time, out Vector3 windvec);
-                    return retcode == 0 ? windvec : Vector3.zero;
+                    int retcode = InternalData.GetWind(body, lon, lat, alt, time, out Vector3 datavec, out Vector3 flowmapvec, out DataInfo garbage); //dont need datainfo, get rid of it
+                    switch (retcode)
+                    {
+                        case 0:
+                            return datavec + flowmapvec;
+                        case 1:
+                            return datavec;
+                        case 2:
+                            return flowmapvec;
+                        default:
+                            return Vector3.zero;
+                    }
                 }
             }
             catch (Exception ex)
@@ -296,7 +306,7 @@ namespace ModularClimateWeatherSystems
                 {
                     return exttemp;
                 }
-                int retcode = InternalData.GetTemperature(body, lon, lat, alt, time, out double temp);
+                int retcode = InternalData.GetTemperature(body, lon, lat, alt, time, out double temp, out DataInfo garbage); //dont need datainfo, get rid of it
                 switch (retcode)
                 {
                     case 0:
@@ -330,7 +340,7 @@ namespace ModularClimateWeatherSystems
                 {
                     return extpress;
                 }
-                int retcode = InternalData.GetPressure(body, lon, lat, alt, time, out double press);
+                int retcode = InternalData.GetPressure(body, lon, lat, alt, time, out double press, out DataInfo garbage); //dont need datainfo, get rid of it
                 switch (retcode)
                 {
                     case 0:
