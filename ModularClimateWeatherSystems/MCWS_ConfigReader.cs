@@ -320,7 +320,7 @@ namespace ModularClimateWeatherSystems
             float[][,,] newarray = new float[steps][,,];
             using (BinaryReader reader = new BinaryReader(File.OpenRead(Utils.GameDataPath + path)))
             {
-                if (offset > 0) //dispose of the initial offset
+                if (offset > 0) //eat the initial offset
                 {
                     reader.ReadBytes(offset);
                 }
@@ -329,8 +329,23 @@ namespace ModularClimateWeatherSystems
                     float[,,] floatbuffer = new float[alt, lat, lon];
                     for (int j = 0; j < alt; j++)
                     {
-                        byte[] bufferarray = reader.ReadBytes(Blocksize);
-                        Buffer.BlockCopy(bufferarray, 0, floatbuffer, Blocksize * (invertalt ? (alt - 1 - j) : j), Buffer.ByteLength(bufferarray));
+                        if (doubleprecision)
+                        {
+                            //support for double precision files.
+                            //this will run more slowly than reading single-precision files, but too bad. not performance-critical anyways.
+                            for (int y = 0; y < lat; y++)
+                            {
+                                for (int x = 0; x < lon; x++)
+                                {
+                                    floatbuffer[(invertalt ? (alt - 1 - j) : j), y, x] = (float)reader.ReadDouble();
+                                }
+                            }
+                        }
+                        else
+                        {
+                            byte[] bufferarray = reader.ReadBytes(Blocksize);
+                            Buffer.BlockCopy(bufferarray, 0, floatbuffer, Blocksize * (invertalt ? (alt - 1 - j) : j), Buffer.ByteLength(bufferarray));
+                        }
                     }
                     newarray[i] = floatbuffer;
                 }
@@ -346,11 +361,11 @@ namespace ModularClimateWeatherSystems
             float[][][,,] newbigarray = new float[numvars][][,,];
             using (BinaryReader reader = new BinaryReader(File.OpenRead(Utils.GameDataPath + path)))
             {
-                if (offset > 0) //dispose of the initial offset
+                if (offset > 0) //nom the initial offset
                 {
                     reader.ReadBytes(offset);
                 }
-                for (int x = 0; x < numvars; x++)
+                for (int n = 0; n < numvars; n++)
                 {
                     float[][,,] newarray = new float[steps][,,];
                     for (int i = 0; i < steps; i++)
@@ -358,12 +373,27 @@ namespace ModularClimateWeatherSystems
                         float[,,] floatbuffer = new float[alt, lat, lon];
                         for (int j = 0; j < alt; j++)
                         {
-                            byte[] bufferarray = reader.ReadBytes(Blocksize);
-                            Buffer.BlockCopy(bufferarray, 0, floatbuffer, Blocksize * (invertalt ? (alt - 1 - j) : j), Buffer.ByteLength(bufferarray));
+                            if (doubleprecision)
+                            {
+                                //support for double precision files.
+                                //this will run more slowly than reading single-precision files, but too bad. not performance-critical anyways
+                                for (int y = 0; y < lat; y++) 
+                                {
+                                    for (int x = 0; x < lon; x++)
+                                    {
+                                        floatbuffer[(invertalt ? (alt - 1 - j) : j), y, x] = (float)reader.ReadDouble();
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                byte[] bufferarray = reader.ReadBytes(Blocksize);
+                                Buffer.BlockCopy(bufferarray, 0, floatbuffer, Blocksize * (invertalt ? (alt - 1 - j) : j), Buffer.ByteLength(bufferarray));
+                            }
                         }
                         newarray[i] = floatbuffer;
                     }
-                    newbigarray[x] = newarray;
+                    newbigarray[n] = newarray;
                 }
                 reader.Close();
             }

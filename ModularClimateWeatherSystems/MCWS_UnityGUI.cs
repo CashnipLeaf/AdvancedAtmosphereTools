@@ -224,6 +224,7 @@ namespace ModularClimateWeatherSystems
                     //Ground Track
                     DrawHeader(GetLOC("#LOC_MCWS_grdtrk"));
                     DrawElement(GetLOC("#LOC_MCWS_body"), Localizer.Format(bodyname));
+                    //TODO: add biome info (?)
                     DrawElement(GetLOC("#LOC_MCWS_lon"), DegreesString(activevessel.longitude, 1, false)); //east/west
                     DrawElement(GetLOC("#LOC_MCWS_lat"), DegreesString(activevessel.latitude, 0, false)); //north/south
                     DrawElement(GetLOC("#LOC_MCWS_alt"), altitude);
