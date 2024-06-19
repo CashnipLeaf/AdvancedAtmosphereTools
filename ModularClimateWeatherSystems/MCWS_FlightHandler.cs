@@ -15,6 +15,7 @@ namespace ModularClimateWeatherSystems
     {
         public static MCWS_FlightHandler Instance { get; private set; }
 
+        #region variables
         private Vessel activevessel;
         private CelestialBody mainbody;
         private Matrix4x4 Vesselframe = Matrix4x4.identity;
@@ -68,6 +69,7 @@ namespace ModularClimateWeatherSystems
         private double vary2 = 1.0;
         private const double varyinterval = 100d;
         private double timeofnextvary = 0d;
+        #endregion
 
         void Awake()
         {
@@ -103,6 +105,7 @@ namespace ModularClimateWeatherSystems
             InternalAppliedWind.Zero();
             datawind.Zero();
             flowmapwind.Zero();
+
             WindDataInfo.SetZero();
             TemperatureDataInfo.SetZero();
             PressureDataInfo.SetZero();
@@ -148,26 +151,6 @@ namespace ModularClimateWeatherSystems
                 if (extwindcode == 0)
                 {
                     normalwind.Set(extwind);
-                    if (!Settings.debugmode)
-                    {
-                        normalwind.MultiplyByConstant(VaryFactor);
-                    }
-                    transformedwind = Vesselframe * normalwind;
-
-                    RawWind.Set(normalwind);
-                    RawWind.MultiplyByConstant(Settings.GlobalWindSpeedMultiplier);
-                    AppliedWind = Vesselframe * RawWind;
-
-                    if (activevessel.easingInToSurface)
-                    {
-                        InternalAppliedWind.Zero();
-                    }
-                    else
-                    {
-                        InternalAppliedWind.Set(AppliedWind);
-                        InternalAppliedWind.MultiplyByConstant(DisableMultiplier);
-                    }
-
                     HasWind = true;
                 }
                 else if (Data.HasWind(mainbody.name))
@@ -200,26 +183,6 @@ namespace ModularClimateWeatherSystems
                                 normalwind.Add(flowmapwind);
                                 haswinddata = hasflowmaps = true;
                                 WindDataInfo.SetNew(winfo);
-                            }
-
-                            if (!Settings.debugmode)
-                            {
-                                normalwind.MultiplyByConstant(VaryFactor);
-                            }
-                            transformedwind = Vesselframe * normalwind;
-
-                            RawWind.Set(normalwind);
-                            RawWind.MultiplyByConstant(Settings.GlobalWindSpeedMultiplier);
-                            AppliedWind = Vesselframe * RawWind;
-
-                            if (activevessel.easingInToSurface)
-                            {
-                                InternalAppliedWind.Zero();
-                            }
-                            else
-                            {
-                                InternalAppliedWind.Set(AppliedWind);
-                                InternalAppliedWind.MultiplyByConstant(DisableMultiplier);
                             }
 
                             HasWind = true;
@@ -339,6 +302,52 @@ namespace ModularClimateWeatherSystems
                     Pressure = stockpressure;
                     HasPress = false;
                 }
+
+                //post-processing through API
+                Vector3 windbackup = normalwind;
+                double tempbackup = Temperature;
+                double pressbackup = Pressure;
+
+                int postretcode = MCWS_API.PostProcess(ref windbackup, ref tempbackup, ref pressbackup, mainbody.name, lon, lat, alt, CurrentTime);
+                if (postretcode == 0)
+                {
+                    if (windbackup.IsFinite())
+                    {
+                        normalwind.Set(windbackup);
+                    }
+                    if (double.IsFinite(tempbackup))
+                    {
+                        Temperature = tempbackup;
+                    }
+                    if (double.IsFinite(pressbackup))
+                    {
+                        Pressure = pressbackup;
+                    }
+                }
+
+                //do other shenanigans with the wind
+                if (!normalwind.IsZero())
+                {
+                    if (!Settings.debugmode)
+                    {
+                        normalwind.MultiplyByConstant(VaryFactor);
+                    }
+                    transformedwind = Vesselframe * normalwind;
+
+                    RawWind.Set(normalwind);
+                    RawWind.MultiplyByConstant(Settings.GlobalWindSpeedMultiplier);
+                    AppliedWind = Vesselframe * RawWind;
+
+                    if (activevessel.easingInToSurface)
+                    {
+                        InternalAppliedWind.Zero();
+                    }
+                    else
+                    {
+                        InternalAppliedWind.Set(AppliedWind);
+                        InternalAppliedWind.MultiplyByConstant(DisableMultiplier);
+                    }
+                }
             }
             else
             {
@@ -360,10 +369,10 @@ namespace ModularClimateWeatherSystems
             {
                 Instance = null;
             }
-        }        
+        }
 
         //----------------FerramAerospaceResearch Compatibility--------------
-
+        #region FAR
         //Functions for FAR to call
         internal Vector3 GetTheWind(CelestialBody body, Part p, Vector3 pos) => InternalAppliedWind;
         internal double GetTheTemperature(CelestialBody body, Part p, Vector3 pos) => Temperature;
@@ -452,5 +461,6 @@ namespace ModularClimateWeatherSystems
             }
             return false;
         }
+        #endregion
     }
 }

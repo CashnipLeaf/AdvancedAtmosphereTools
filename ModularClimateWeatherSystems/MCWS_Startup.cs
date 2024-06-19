@@ -15,6 +15,7 @@ namespace ModularClimateWeatherSystems
 
         internal Dictionary<string, MCWS_BodyData> bodydata;
 
+        #region startup
         void Awake()
         {
             if (Instance == null)
@@ -128,7 +129,9 @@ namespace ModularClimateWeatherSystems
                 Instance = null;
             }
         }
+        #endregion
 
+        #region getdata
         internal bool BodyExists(string body) => bodydata != null && bodydata.ContainsKey(body);
         internal bool HasWind(string body) => BodyExists(body) && bodydata[body].HasWind;
         internal bool HasTemperature(string body) => BodyExists(body) && bodydata[body].HasTemperature;
@@ -192,5 +195,6 @@ namespace ModularClimateWeatherSystems
             }
             return null;
         }
+        #endregion
     }
 }

@@ -181,5 +181,8 @@ namespace ModularClimateWeatherSystems
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static bool IsFinite(ref this Vector3 v) => float.IsFinite(v.x) && float.IsFinite(v.y) && float.IsFinite(v.z);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static bool IsZero(ref this Vector3 v) => v.x != 0.0f && v.y != 0.0f && v.z != 0.0f;
     }
 }

@@ -105,30 +105,30 @@ namespace ModularClimateWeatherSystems
                     DrawElement("Universal Time", string.Format("{0:F1}", CurrentTime));
 
                     DrawHeader("Wind Info");
-                    DrawElement("X Position", haswinddata && inatmo ? string.Format("{0},{1}", WindDataInfo.x1, WindDataInfo.x2) : na);
-                    DrawElement("Y Position", haswinddata && inatmo ? string.Format("{0},{1}", WindDataInfo.y1, WindDataInfo.y2) : na);
-                    string windzinfo = WindDataInfo.abovetop ? string.Format("{0}+", WindDataInfo.z2) : string.Format("{0},{1}", WindDataInfo.z1, WindDataInfo.z2);
+                    DrawElement("X Position", haswinddata && inatmo ? string.Format("{0} <> {1}", WindDataInfo.x1, WindDataInfo.x2) : na);
+                    DrawElement("Y Position", haswinddata && inatmo ? string.Format("{0} <> {1}", WindDataInfo.y1, WindDataInfo.y2) : na);
+                    string windzinfo = WindDataInfo.abovetop ? string.Format("{0}+", WindDataInfo.z2) : string.Format("{0} <> {1}", WindDataInfo.z1, WindDataInfo.z2);
                     DrawElement("Z Position", haswinddata && inatmo ? windzinfo : na);
-                    DrawElement("Time Position", haswinddata && inatmo ? string.Format("{0},{1}", WindDataInfo.t1, WindDataInfo.t2) : na);
+                    DrawElement("Time Position", haswinddata && inatmo ? string.Format("{0} <> {1}", WindDataInfo.t1, WindDataInfo.t2) : na);
                     DrawElement("Data Wind Vec", haswinddata && inatmo ? datawind.ToString() : na);
                     DrawElement("Flowmap Wind Vec", hasflowmaps && inatmo ? flowmapwind.ToString() : na);
                     DrawElement("Combined Wind Vec", HasWind && inatmo ? RawWind.ToString() : na);
 
                     DrawHeader("Temperature Info");
-                    DrawElement("X Position", HasTemp && inatmo ? string.Format("{0},{1}", TemperatureDataInfo.x1, TemperatureDataInfo.x2) : na);
-                    DrawElement("Y Position", HasTemp && inatmo ? string.Format("{0},{1}", TemperatureDataInfo.y1, TemperatureDataInfo.y2) : na);
-                    string tempzinfo = TemperatureDataInfo.abovetop ? string.Format("{0}+", TemperatureDataInfo.z2) : string.Format("{0},{1}", TemperatureDataInfo.z1, TemperatureDataInfo.z2);
+                    DrawElement("X Position", HasTemp && inatmo ? string.Format("{0} <> {1}", TemperatureDataInfo.x1, TemperatureDataInfo.x2) : na);
+                    DrawElement("Y Position", HasTemp && inatmo ? string.Format("{0} <> {1}", TemperatureDataInfo.y1, TemperatureDataInfo.y2) : na);
+                    string tempzinfo = TemperatureDataInfo.abovetop ? string.Format("{0}+", TemperatureDataInfo.z2) : string.Format("{0} <> {1}", TemperatureDataInfo.z1, TemperatureDataInfo.z2);
                     DrawElement("Z Position", HasTemp && inatmo ? tempzinfo : na);
-                    DrawElement("Time Position", HasTemp && inatmo ? string.Format("{0},{1}", TemperatureDataInfo.t1, TemperatureDataInfo.t2) : na);
+                    DrawElement("Time Position", HasTemp && inatmo ? string.Format("{0} <> {1}", TemperatureDataInfo.t1, TemperatureDataInfo.t2) : na);
                     DrawElement("Derived Temp", HasTemp && inatmo ? string.Format("{0:F1} {1}", Temperature, Tempunit) : na);
                     DrawElement("Stock Temp", string.Format("{0:F1} {1}", stocktemperature, Tempunit));
 
                     DrawHeader("Pressure Info");
-                    DrawElement("X Position", HasPress && inatmo ? string.Format("{0},{1}", PressureDataInfo.x1, PressureDataInfo.x2) : na);
-                    DrawElement("Y Position", HasPress && inatmo ? string.Format("{0},{1}", PressureDataInfo.y1, PressureDataInfo.y2) : na);
-                    string presszinfo = PressureDataInfo.abovetop ? string.Format("{0}+", PressureDataInfo.z2) : string.Format("{0},{1}", PressureDataInfo.z1, PressureDataInfo.z2);
+                    DrawElement("X Position", HasPress && inatmo ? string.Format("{0} <> {1}", PressureDataInfo.x1, PressureDataInfo.x2) : na);
+                    DrawElement("Y Position", HasPress && inatmo ? string.Format("{0} <> {1}", PressureDataInfo.y1, PressureDataInfo.y2) : na);
+                    string presszinfo = PressureDataInfo.abovetop ? string.Format("{0}+", PressureDataInfo.z2) : string.Format("{0} <> {1}", PressureDataInfo.z1, PressureDataInfo.z2);
                     DrawElement("Z Position", HasPress && inatmo ? presszinfo : na);
-                    DrawElement("Time Position", HasPress && inatmo ? string.Format("{0},{1}", PressureDataInfo.t1, PressureDataInfo.t2) : na);
+                    DrawElement("Time Position", HasPress && inatmo ? string.Format("{0} <> {1}", PressureDataInfo.t1, PressureDataInfo.t2) : na);
                     DrawElement("Derived Press", HasPress && inatmo ? string.Format("{0:F3} {1}", Pressure, Pressunit) : na);
                     DrawElement("Stock Press", string.Format("{0:F3} {1}", stockpressure, Pressunit));
                 }

@@ -7,6 +7,7 @@ namespace ModularClimateWeatherSystems
 {
     partial class MCWS_Startup
     {
+        #region readconfigs
         void ReadConfigs() //why did I put myself through the pain of writing this?
         {
             Utils.LogInfo("Loading configs.");
@@ -312,7 +313,9 @@ namespace ModularClimateWeatherSystems
             }
             Utils.LogInfo("Cleanup Complete.");
         }
+        #endregion
 
+        #region helpers
         //read a binary file containing one kind of data
         internal float[][,,] ReadBinaryFile(string path, int lon, int lat, int alt, int steps, int offset, bool invertalt, bool doubleprecision)
         {
@@ -596,6 +599,7 @@ namespace ModularClimateWeatherSystems
                 curve.Add(1000, 1.0f, 0, 0);
             }
             return curve;
-        } 
+        }
+        #endregion
     }
 }
