@@ -12,10 +12,12 @@ namespace ModularClimateWeatherSystems
         private ToolbarControl toolbarController;
         private bool toolbarButtonAdded = false;
         private bool GUIEnabled = false;
+        private bool enabledebug = false;
 
         internal const string LogoPath = "ModularClimateWeatherSystems/Textures/MCWS_Logo";
         internal const string modNAME = "MCWS";
         internal const string modID = "MCWS_NS";
+        private const string na = "N/A";
 
         internal string UIHeader => "MCWS v" + (Settings.debugmode ? Utils.version + " DEBUG MODE" : Utils.version);
 
@@ -90,13 +92,23 @@ namespace ModularClimateWeatherSystems
             }
             GUILayout.EndHorizontal();
 
+            if (Settings.debugmode)
+            {
+                //switch to debug info
+                GUILayout.BeginHorizontal();
+                if (GUILayout.Button("Switch to " + (enabledebug ? "Flight Info" : "Debug Info"), button))
+                {
+                    enabledebug = !enabledebug;
+                }
+                GUILayout.EndHorizontal();
+            }
+
             if (activevessel != null && mainbody != null)
             {
                 bool inatmo = mainbody.atmosphere && activevessel.staticPressurekPa > 0.0;
                 string altitude = string.Format(Math.Abs(activevessel.altitude) > 1000000d ? "{0:0.#####E+00} {1}" : "{0:F2} {1}", activevessel.altitude, Localizer.Format(GetLOC("#LOC_MCWS_meter")));
-                if (Settings.debugmode)
+                if (Settings.debugmode && enabledebug)
                 {
-                    string na = "N/A";
                     DrawHeader("Position Info");
                     DrawElement("Body", mainbody.name);
                     DrawElement("Longitude", DegreesString(activevessel.longitude, 1, true)); //east/west
