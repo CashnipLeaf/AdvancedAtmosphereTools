@@ -19,7 +19,7 @@ namespace ModularClimateWeatherSystems
         internal const string modID = "MCWS_NS";
         private const string na = "N/A";
 
-        internal string UIHeader => "MCWS v" + (Settings.debugmode ? Utils.version + " DEBUG MODE" : Utils.version);
+        internal string UIHeader => "MCWS v" + (Settings.debugmode ? Utils.version + " DEBUG ENABLED" : Utils.version);
 
         private Rect windowPos;        
         private static float Xpos => 100f * GameSettings.UI_SCALE;
@@ -132,8 +132,9 @@ namespace ModularClimateWeatherSystems
                     string tempzinfo = TemperatureDataInfo.abovetop ? string.Format("{0}+", TemperatureDataInfo.z2) : string.Format("{0} <> {1}", TemperatureDataInfo.z1, TemperatureDataInfo.z2);
                     DrawElement("Z Position", HasTemp && inatmo ? tempzinfo : na);
                     DrawElement("Time Position", HasTemp && inatmo ? string.Format("{0} <> {1}", TemperatureDataInfo.t1, TemperatureDataInfo.t2) : na);
-                    DrawElement("Derived Temp", HasTemp && inatmo ? string.Format("{0:F1} {1}", Temperature, Tempunit) : na);
+                    DrawElement("Derived Temp", HasTemp && inatmo && usinginternaltemperature ? string.Format("{0:F1} {1}", derivedtemp, Tempunit) : na);
                     DrawElement("Stock Temp", string.Format("{0:F1} {1}", stocktemperature, Tempunit));
+                    DrawElement("Final Temp", string.Format("{0:F1} {1}", Temperature, Tempunit));
 
                     DrawHeader("Pressure Info");
                     DrawElement("X Position", HasPress && inatmo ? string.Format("{0} <> {1}", PressureDataInfo.x1, PressureDataInfo.x2) : na);

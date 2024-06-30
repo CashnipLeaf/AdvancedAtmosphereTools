@@ -221,7 +221,7 @@ namespace ModularClimateWeatherSystems
 
         internal static int PostProcess(ref Vector3 windvec, ref double temp, ref double press, string body, double lon, double lat, double alt, double time)
         {
-            if (!BodyExists(body) && globalpostprocesswind == null && globalpostprocesstemperature == null && globalpostprocesspressure == null)
+            if (!BodyExists(body) || ( globalpostprocesswind == null && globalpostprocesstemperature == null && globalpostprocesspressure == null))
             {
                 return -1;
             }
@@ -232,7 +232,8 @@ namespace ModularClimateWeatherSystems
 
             if (BodyExists(body))
             {
-                if(externalbodydata[body].PostProcess(ref windbackup, ref tempbackup, ref pressbackup, lon, lat, alt, time) == 0)
+                int retcode = externalbodydata[body].PostProcess(ref windbackup, ref tempbackup, ref pressbackup, lon, lat, alt, time);
+                if (retcode == 0)
                 {
                     windvec = windbackup; 
                     temp = tempbackup; 
@@ -531,7 +532,7 @@ namespace ModularClimateWeatherSystems
                 {
                     return exttemp;
                 }
-                int retcode = InternalData.GetTemperature(body, lon, lat, alt, time, out double temp, out DataInfo garbage); //dont need datainfo, get rid of it
+                int retcode = InternalData.GetTemperature(body, lon, lat, alt, time, out double temp, out DataInfo garbage, out double garbage2); //dont need datainfo or blending, get rid of it
                 switch (retcode)
                 {
                     case 0:

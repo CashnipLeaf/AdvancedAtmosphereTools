@@ -8,7 +8,7 @@ namespace ModularClimateWeatherSystems
 
     //Delegates for FAR
     using WindDelegate = Func<CelestialBody, Part, Vector3, Vector3>;
-    using PropertyDelegate = Func<CelestialBody, Part, Vector3, double>;
+    using PropertyDelegate = Func<CelestialBody, Vector3d, double, double>;
 
     [KSPAddon(KSPAddon.Startup.Flight, false)]
     partial class MCWS_FlightHandler : MonoBehaviour //This is a partial class because I do not feel like passing variables to a separate GUI class.
@@ -50,6 +50,8 @@ namespace ModularClimateWeatherSystems
             private set => temperature = UtilMath.Clamp(value, PhysicsGlobals.SpaceTemperature, float.MaxValue);
         }
         private double stocktemperature = PhysicsGlobals.SpaceTemperature;
+        private double derivedtemp = PhysicsGlobals.SpaceTemperature;
+        private bool usinginternaltemperature = false;
 
         private double pressure = 0.0;
         internal double Pressure
@@ -65,9 +67,13 @@ namespace ModularClimateWeatherSystems
 
         //stuff for wind speed variability
         private Random varywind;
-        private double vary1 = 1.0;
-        private double vary2 = 1.0;
-        private const double varyinterval = 100d;
+        private double varyonex = 0.0;
+        private double varyoney = 0.0;
+        private double varyonez = 0.0;
+        private double varytwox = 0.0;
+        private double varytwoy = 0.0;
+        private double varytwoz = 0.0;
+        private const double varyinterval = 60d;
         private double timeofnextvary = 0d;
         #endregion
 
@@ -86,7 +92,9 @@ namespace ModularClimateWeatherSystems
 
                 //set up wind variability. seed the variability generator based on current time.
                 varywind = new Random((DateTime.Now.Hour * 10000) + (DateTime.Now.Minute * 100) + DateTime.Now.Second);
-                vary2 = varywind.NextDouble();
+                varytwox = varywind.NextDouble();
+                varytwoy = varywind.NextDouble();
+                varytwoz = varywind.NextDouble();
             }
             else
             {
@@ -109,7 +117,7 @@ namespace ModularClimateWeatherSystems
             WindDataInfo.SetZero();
             TemperatureDataInfo.SetZero();
             PressureDataInfo.SetZero();
-            HasWind = HasTemp = HasPress = hasflowmaps = haswinddata = false;
+            HasWind = HasTemp = HasPress = hasflowmaps = haswinddata = usinginternaltemperature = false;
 
             if (!FlightGlobals.ready || FlightGlobals.ActiveVessel == null)
             {
@@ -130,19 +138,27 @@ namespace ModularClimateWeatherSystems
             if (TimeWarp.CurrentRate <= 1.0f && CurrentTime > timeofnextvary) //pause updating the vary shenanigans when timewarp is active
             {
                 timeofnextvary = CurrentTime + varyinterval;
-                vary1 = vary2;
-                vary2 = varywind.NextDouble();
+                varyonex = varytwox;
+                varyoney = varytwoy;
+                varyonez = varytwoz;
+                varytwox = varywind.NextDouble();
+                varytwoy = varywind.NextDouble();
+                varytwoz = varywind.NextDouble();
             }
 
             //pre-calculate a few factors to be used
-            float VaryFactor = (float)(1.0 + UtilMath.Lerp(-Settings.WindSpeedVariability, Settings.WindSpeedVariability, UtilMath.Lerp(vary1, vary2, (CurrentTime - timeofnextvary) / varyinterval)));
+            float varyx = (float)(1.0 + UtilMath.Lerp(-Settings.WindSpeedVariability, Settings.WindSpeedVariability, UtilMath.Lerp(varyonex, varytwox, (CurrentTime - timeofnextvary) / varyinterval)));
+            float varyy = (float)(1.0 + UtilMath.Lerp(-Settings.WindSpeedVariability, Settings.WindSpeedVariability, UtilMath.Lerp(varyoney, varytwoy, (CurrentTime - timeofnextvary) / varyinterval)));
+            float varyz = (float)(1.0 + UtilMath.Lerp(-Settings.WindSpeedVariability, Settings.WindSpeedVariability, UtilMath.Lerp(varyonez, varytwoz, (CurrentTime - timeofnextvary) / varyinterval)));
+
             DisableMultiplier = activevessel != null && activevessel.LandedOrSplashed && Settings.DisableWindWhenStationary ? (float)UtilMath.Lerp(0.0, 1.0, (activevessel.srfSpeed - 5.0) * 0.2) : 1.0f;
 
             if (mainbody.atmosphere && alt <= mainbody.atmosphereDepth)
             {
                 //set fallback data
                 FlightIntegrator FI = activevessel.GetComponent<FlightIntegrator>();
-                stocktemperature = FI != null ? mainbody.GetFullTemperature(alt, FI.atmosphereTemperatureOffset) : mainbody.GetTemperature(alt);
+                double temperatureoffset = FI != null ? FI.atmosphereTemperatureOffset : 0.0;
+                stocktemperature = derivedtemp = FI != null ? mainbody.GetFullTemperature(alt, temperatureoffset) : mainbody.GetTemperature(alt);
                 Temperature = stocktemperature;
                 stockpressure = mainbody.GetPressure(alt);
                 Pressure = stockpressure;
@@ -212,12 +228,16 @@ namespace ModularClimateWeatherSystems
                 {
                     Temperature = exttemp;
                     HasTemp = true;
+                    usinginternaltemperature = false;
                 }
                 else if (Data.HasTemperature(mainbody.name))
                 {
                     try
                     {
-                        int retcode = Data.GetTemperature(mainbody.name, lon, lat, alt, CurrentTime, out double Final, out DataInfo tinfo);
+                        int retcode = Data.GetTemperature(mainbody.name, lon, lat, alt, CurrentTime, out double Final, out DataInfo tinfo, out double blendwithstock);
+                        derivedtemp = Final;
+                        usinginternaltemperature = true;
+                        Final = UtilMath.Lerp(Final, stocktemperature, blendwithstock);
                         switch (retcode)
                         {
                             case -2:
@@ -231,8 +251,7 @@ namespace ModularClimateWeatherSystems
                             case 1:
                                 double TempModelTop = Math.Min(Data.TemperatureModelTop(mainbody.name), mainbody.atmosphereDepth);
                                 double extralerp = (alt - TempModelTop) / (mainbody.atmosphereDepth - TempModelTop);
-                                double realtemp = FI != null ? mainbody.GetFullTemperature(alt, FI.atmosphereTemperatureOffset) : mainbody.GetTemperature(alt);
-                                double temp = UtilMath.Lerp(Final, realtemp, Math.Pow(extralerp, 0.25));
+                                double temp = UtilMath.Lerp(Final, stocktemperature, Math.Pow(extralerp, 0.25));
                                 Temperature = double.IsFinite(temp) ? temp : throw new NotFiniteNumberException();
                                 HasTemp = true;
                                 TemperatureDataInfo.SetNew(tinfo);
@@ -245,13 +264,13 @@ namespace ModularClimateWeatherSystems
                     {
                         Utils.LogError("Exception thrown when deriving point Temperature data for " + mainbody.name + ": " + ex.ToString());
                         Temperature = stocktemperature;
-                        HasTemp = false;
+                        HasTemp = usinginternaltemperature = false;
                     }
                 }
                 else
                 {
                     Temperature = stocktemperature;
-                    HasTemp = false;
+                    HasTemp = usinginternaltemperature = false;
                 }
 
                 int extpresscode = MCWS_API.GetExternalPressure(mainbody.name, lon, lat, alt, CurrentTime, out double extpress);
@@ -311,7 +330,7 @@ namespace ModularClimateWeatherSystems
                 int postretcode = MCWS_API.PostProcess(ref windbackup, ref tempbackup, ref pressbackup, mainbody.name, lon, lat, alt, CurrentTime);
                 if (postretcode == 0)
                 {
-                    if (windbackup.IsFinite())
+                    if (windbackup.IsFinite() && !windbackup.IsZero())
                     {
                         normalwind.Set(windbackup);
                     }
@@ -326,27 +345,27 @@ namespace ModularClimateWeatherSystems
                 }
 
                 //do other shenanigans with the wind
-                if (!normalwind.IsZero())
+                if (!Settings.debugmode)
                 {
-                    if (!Settings.debugmode)
-                    {
-                        normalwind.MultiplyByConstant(VaryFactor);
-                    }
-                    transformedwind = Vesselframe * normalwind;
+                    //normalwind.MultiplyByConstant(VaryFactor);
+                    normalwind.x *= varyx;
+                    normalwind.y *= varyy;
+                    normalwind.z *= varyz;
+                }
+                transformedwind = Vesselframe * normalwind;
 
-                    RawWind.Set(normalwind);
-                    RawWind.MultiplyByConstant(Settings.GlobalWindSpeedMultiplier);
-                    AppliedWind = Vesselframe * RawWind;
+                RawWind.Set(normalwind);
+                RawWind.MultiplyByConstant(Settings.GlobalWindSpeedMultiplier);
+                AppliedWind = Vesselframe * RawWind;
 
-                    if (activevessel.easingInToSurface)
-                    {
-                        InternalAppliedWind.Zero();
-                    }
-                    else
-                    {
-                        InternalAppliedWind.Set(AppliedWind);
-                        InternalAppliedWind.MultiplyByConstant(DisableMultiplier);
-                    }
+                if (activevessel.easingInToSurface)
+                {
+                    InternalAppliedWind.Zero();
+                }
+                else
+                {
+                    InternalAppliedWind.Set(AppliedWind);
+                    InternalAppliedWind.MultiplyByConstant(DisableMultiplier);
                 }
             }
             else
@@ -375,8 +394,8 @@ namespace ModularClimateWeatherSystems
         #region FAR
         //Functions for FAR to call
         internal Vector3 GetTheWind(CelestialBody body, Part p, Vector3 pos) => InternalAppliedWind;
-        internal double GetTheTemperature(CelestialBody body, Part p, Vector3 pos) => Temperature;
-        internal double GetThePressure(CelestialBody body, Part p, Vector3 pos) => Pressure;
+        internal double GetTheTemperature(CelestialBody body, Vector3d pos, double time) => Temperature;
+        internal double GetThePressure(CelestialBody body, Vector3d pos, double time) => Pressure;
 
         internal bool RegisterWithFAR() //Register MCWS with FAR.
         {

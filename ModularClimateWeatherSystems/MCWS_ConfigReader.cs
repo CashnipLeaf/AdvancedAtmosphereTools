@@ -47,7 +47,7 @@ namespace ModularClimateWeatherSystems
 
                         if (hascommons && data.TryGetValue("path", ref path) && !string.IsNullOrEmpty(path) && data.TryGetValue("readOrder", ref readorder))
                         {
-                            ReadOptionals(data, out int offset, out double scaleFactor, out bool invertalt, out double modelTop, out double lonoffset, out double vertmult, out double timeoffset, out bool doubleprecision);
+                            ReadOptionals(data, out int offset, out double scaleFactor, out bool invertalt, out double modelTop, out double lonoffset, out double vertmult, out double timeoffset, out bool doubleprecision, out bool blendWithStock, out double offsetmultiplier); //offsetmultiplier should be named blendwithstock, but im lazy and cba to change it
 
                             if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && readorder.Length > 1 && offset >= 0)
                             {
@@ -77,7 +77,7 @@ namespace ModularClimateWeatherSystems
                                             windz = true;
                                             break;
                                         case "temperature":
-                                            bodydata[body].AddTemperatureData(dataarray[v], scaleFactor, timestep, modelTop, lonoffset, timeoffset);
+                                            bodydata[body].AddTemperatureData(dataarray[v], scaleFactor, timestep, modelTop, lonoffset, timeoffset, blendWithStock, offsetmultiplier);
                                             break;
                                         case "pressure":
                                             bodydata[body].AddPressureData(dataarray[v], scaleFactor, timestep, modelTop, lonoffset, timeoffset);
@@ -124,7 +124,7 @@ namespace ModularClimateWeatherSystems
 
                         if (hascommons)
                         {
-                            ReadOptionals(data, out int offset, out double scaleFactor, out bool invertalt, out double modelTop, out double lonoffset, out double vertmult, out double timeoffset, out bool doubleprecision);
+                            ReadOptionals(data, out int offset, out double scaleFactor, out bool invertalt, out double modelTop, out double lonoffset, out double vertmult, out double timeoffset, out bool doubleprecision, out bool garbage, out double garbage2);
 
                             if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && offset >= 0)
                             {
@@ -223,12 +223,12 @@ namespace ModularClimateWeatherSystems
 
                         if (hascommons && data.TryGetValue("path", ref path) && !string.IsNullOrEmpty(path))
                         {
-                            ReadOptionals(data, out int offset, out double scaleFactor, out bool invertalt, out double modelTop, out double lonoffset, out double vertmult, out double timeoffset, out bool doubleprecision);
+                            ReadOptionals(data, out int offset, out double scaleFactor, out bool invertalt, out double modelTop, out double lonoffset, out double vertmult, out double timeoffset, out bool doubleprecision, out bool blendWithStock, out double offsetmultiplier); //offsetmultiplier should be named blendwithstock, but im lazy and cba to change it
 
                             if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && offset >= 0)
                             {
                                 float[][,,] temparray = ReadBinaryFile(path, lon, lat, alt, steps, offset, invertalt, doubleprecision);
-                                bodydata[body].AddTemperatureData(temparray, scaleFactor, timestep, modelTop, lonoffset, timeoffset);
+                                bodydata[body].AddTemperatureData(temparray, scaleFactor, timestep, modelTop, lonoffset, timeoffset, blendWithStock, offsetmultiplier);
                             }
                             else
                             {
@@ -255,7 +255,7 @@ namespace ModularClimateWeatherSystems
                         bool hascommons = ReadCommons(data, out int lon, out int lat, out int alt, out int steps, out double timestep);
                         if (hascommons && data.TryGetValue("path", ref path) && !string.IsNullOrEmpty(path))
                         {
-                            ReadOptionals(data, out int offset, out double scaleFactor, out bool invertalt, out double modelTop, out double lonoffset, out double vertmult, out double timeoffset, out bool doubleprecision);
+                            ReadOptionals(data, out int offset, out double scaleFactor, out bool invertalt, out double modelTop, out double lonoffset, out double vertmult, out double timeoffset, out bool doubleprecision, out bool garbage, out double garbage2);
 
                             if (lon >= 2 && lat >= 2 && alt >= 2 && steps >= 1 && timestep > 0.0 && scaleFactor >= 1.0f && offset >= 0)
                             {
@@ -329,6 +329,10 @@ namespace ModularClimateWeatherSystems
                 }
                 for (int i = 0; i < steps; i++)
                 {
+                    if(reader.BaseStream.Position >= reader.BaseStream.Length)
+                    {
+                        throw new EndOfStreamException("Attempted to read beyond the end of the file. Verify that your size and timestep parameters match that of the actual file.");
+                    }
                     float[,,] floatbuffer = new float[alt, lat, lon];
                     for (int j = 0; j < alt; j++)
                     {
@@ -370,6 +374,10 @@ namespace ModularClimateWeatherSystems
                 }
                 for (int n = 0; n < numvars; n++)
                 {
+                    if (reader.BaseStream.Position >= reader.BaseStream.Length)
+                    {
+                        throw new EndOfStreamException("Attempted to read beyond the end of the file. Verify that your size, timesteps, initialOffset, doublePrecision, and readOrder parameters match that of the actual file.");
+                    }
                     float[][,,] newarray = new float[steps][,,];
                     for (int i = 0; i < steps; i++)
                     {
@@ -404,7 +412,7 @@ namespace ModularClimateWeatherSystems
         }
 
         //get the optional variables easily.
-        internal void ReadOptionals(ConfigNode cn, out int offset, out double scaleFactor, out bool invertalt, out double modelTop, out double lonoffset, out double verticalwindmult, out double timeoffset, out bool doubleprecision) 
+        internal void ReadOptionals(ConfigNode cn, out int offset, out double scaleFactor, out bool invertalt, out double modelTop, out double lonoffset, out double verticalwindmult, out double timeoffset, out bool doubleprecision, out bool blendWithStock, out double blendFactor) 
         {
             offset = 0;
             scaleFactor = 1.0;
@@ -414,6 +422,8 @@ namespace ModularClimateWeatherSystems
             verticalwindmult = 1.0;
             timeoffset = 0.0;
             doubleprecision = false;
+            blendWithStock = false;
+            blendFactor = 0.5;
 
             cn.TryGetValue("initialOffset", ref offset);
             cn.TryGetValue("scaleFactor", ref scaleFactor);
@@ -423,6 +433,8 @@ namespace ModularClimateWeatherSystems
             cn.TryGetValue("verticalWindMultiplier", ref verticalwindmult);
             cn.TryGetValue("timeOffset", ref timeoffset);
             cn.TryGetValue("doublePrecision", ref  doubleprecision);
+            cn.TryGetValue("blendTemperatureWithStock", ref blendWithStock);
+            cn.TryGetValue("temperatureBlendFactor", ref blendFactor);
         }
 
         internal bool ReadCommons(ConfigNode cn, out int lon, out int lat, out int alt, out int steps, out double timestep)

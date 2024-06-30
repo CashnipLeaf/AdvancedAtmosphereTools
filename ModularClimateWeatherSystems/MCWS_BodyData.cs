@@ -12,9 +12,8 @@ namespace ModularClimateWeatherSystems
     internal class MCWS_BodyData
     {
         private readonly string body;
-        private readonly bool hasatmo = false;
-        internal bool HasAtmo => hasatmo;
-        private readonly double atmodepth = 0.0;
+        internal bool HasAtmo { get; private set; } = false;
+        internal double Atmodepth { get; private set; } = 0.0;
 
         private float[][,,] WindDataX;
         private float[][,,] WindDataY;
@@ -25,7 +24,7 @@ namespace ModularClimateWeatherSystems
         internal double WindModelTop
         {
             get => windmodeltop;
-            set => windmodeltop = (hasatmo && (value <= 0.0 || value >= atmodepth)) ? atmodepth : value;
+            set => windmodeltop = (HasAtmo && (value <= 0.0 || value >= Atmodepth)) ? Atmodepth : value;
         }
         private double WindLonOffset = 0.0;
         private double WindTimeOffset = 0.0;
@@ -45,11 +44,14 @@ namespace ModularClimateWeatherSystems
         internal double TempModelTop
         {
             get => tempmodeltop;
-            set => tempmodeltop = (hasatmo && (value <= 0.0 || value >= atmodepth)) ? atmodepth : value;
+            set => tempmodeltop = (HasAtmo && (value <= 0.0 || value >= Atmodepth)) ? Atmodepth : value;
         }
         private double TempLonOffset = 0.0;
         private double TempTimeOffset = 0.0;
         internal bool HasTemperature => TempData != null;
+        private bool blendtempwithstock = false;
+        private double blendtempfactor = 0.0;
+        internal double BlendTempFactor => blendtempwithstock && double.IsFinite(blendtempfactor) ? blendtempfactor : 0.0;
 
         private float[][,,] PressData;
         private double PressScaleFactor = double.NaN;
@@ -58,7 +60,7 @@ namespace ModularClimateWeatherSystems
         internal double PressModelTop
         {
             get => pressmodeltop;
-            set => pressmodeltop = (hasatmo && (value <= 0.0 || value >= atmodepth)) ? atmodepth : value;
+            set => pressmodeltop = (HasAtmo && (value <= 0.0 || value >= Atmodepth)) ? Atmodepth : value;
         }
         private double PressLonOffset = 0.0;
         private double PressTimeOffset = 0.0;
@@ -68,10 +70,10 @@ namespace ModularClimateWeatherSystems
         {
             Flowmaps = new List<FlowMap>();
             this.body = body;
-            hasatmo = bod.atmosphere;
-            if (hasatmo)
+            HasAtmo = bod.atmosphere;
+            if (HasAtmo)
             {
-                atmodepth = bod.atmosphereDepth;
+                Atmodepth = bod.atmosphereDepth;
             }
         }
 
@@ -98,7 +100,7 @@ namespace ModularClimateWeatherSystems
             }
         }
 
-        internal int AddTemperatureData(float[][,,] Temp, double scalefactor, double timestep, double modeltop, double lonoffset, double timeoffset)
+        internal int AddTemperatureData(float[][,,] Temp, double scalefactor, double timestep, double modeltop, double lonoffset, double timeoffset, bool blendwithstock, double blendfactor)
         {
             if (HasTemperature)
             {
@@ -113,6 +115,8 @@ namespace ModularClimateWeatherSystems
                 TempModelTop = modeltop;
                 TempLonOffset = lonoffset;
                 TempTimeOffset = timeoffset;
+                blendtempwithstock = blendwithstock;
+                blendtempfactor = blendfactor;
                 Utils.LogInfo(string.Format("Successfully added Temperature Data to {0}.", body));
                 return 0;
             }
@@ -146,8 +150,6 @@ namespace ModularClimateWeatherSystems
 
         internal int GetWind(double lon, double lat, double alt, double time, ref Vector3 winddatavector, ref Vector3 flowmapvector, ref DataInfo windinfo)
         {
-            //winddatavector = Vector3.zero;
-            //flowmapvector = Vector3.zero;
             bool winddatagood = false;
             bool flowmapgood = false;
             if (HasWindData)
@@ -251,7 +253,7 @@ namespace ModularClimateWeatherSystems
                 return -1;
             }
         }
-        internal int GetTemperature(double lon, double lat, double alt, double time, out double temp, ref DataInfo tempinfo)
+        internal int GetTemperature(double lon, double lat, double alt, double time, out double temp, ref DataInfo tempinfo, ref double tempblendwithstock)
         {
             temp = 0.0;
             if (TempData != null)
@@ -290,6 +292,7 @@ namespace ModularClimateWeatherSystems
                     temp = UtilMath.Lerp(UtilMath.Lerp((double)BottomPlane1, (double)TopPlane1, lerpz), UtilMath.Lerp((double)BottomPlane2, (double)TopPlane2, lerpz), lerpt);
                     if (double.IsFinite(temp))
                     {
+                        tempblendwithstock = BlendTempFactor;
                         tempinfo.SetNew(x1, x2, lerpx, y1, y2, lerpy, z1, z2, lerpz, timeindex, timeindex2, lerpt, alt > TempModelTop);
                         return alt > TempModelTop ? 1 : 0;
                     }

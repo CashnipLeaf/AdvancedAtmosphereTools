@@ -144,11 +144,12 @@ namespace ModularClimateWeatherSystems
             windinfo = DataInfo.Zero;
             return HasWind(body) ? bodydata[body].GetWind(lon, lat, alt, time, ref windvec, ref flowmapvec, ref windinfo) : -1;
         }
-        internal int GetTemperature(string body, double lon, double lat, double alt, double time, out double temp, out DataInfo tempinfo)
+        internal int GetTemperature(string body, double lon, double lat, double alt, double time, out double temp, out DataInfo tempinfo, out double blendfactor)
         {
             temp = 0.0;
             tempinfo = DataInfo.Zero;
-            return HasTemperature(body) ? bodydata[body].GetTemperature(lon, lat, alt, time, out temp, ref tempinfo) : -1;
+            blendfactor = 0.0;
+            return HasTemperature(body) ? bodydata[body].GetTemperature(lon, lat, alt, time, out temp, ref tempinfo, ref blendfactor) : -1;
         }
         internal int GetPressure(string body, double lon, double lat, double alt, double time, out double press, out DataInfo pressinfo)
         {

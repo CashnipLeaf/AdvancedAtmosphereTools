@@ -7,7 +7,7 @@ namespace ModularClimateWeatherSystems
 {
     internal static class Utils
     {
-        internal const string version = "0.9.6";
+        internal const string version = "0.9.7";
         internal static string GameDataPath => KSPUtil.ApplicationRootPath + "GameData/";
         internal static Dictionary<string, string> LOCCache; //localization cache
 
@@ -20,7 +20,6 @@ namespace ModularClimateWeatherSystems
         //------------------------------MATH AND RELATED-------------------------
         internal static double Epsilon => float.Epsilon * 16d; //value that is very nearly zero to prevent the log interpolation from breaking
 
-        //Desperate solution to try and save lines, did not end up saving that many lines. Might inline.
         internal static float BiLerp(float first1, float second1, float first2, float second2, float by1, float by2)
         {
             return Mathf.Lerp(Mathf.Lerp(first1, second1, by1), Mathf.Lerp(first2, second2, by1), by2);
@@ -55,7 +54,64 @@ namespace ModularClimateWeatherSystems
         }
 
         //Apparently no such function exists for integers in either UtilMath or Mathf. Why?
-        internal static int Clamp(int value, int min, int max) => Math.Min(Math.Max(value, min), max); 
+        internal static int Clamp(int value, int min, int max) => Math.Min(Math.Max(value, min), max);
+
+
+        //--------------------EXTENSION METHODS---------------------
+
+        //faster extension methods for Vector3
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static void Add(ref this Vector3 v, Vector3 other)
+        {
+            v.x += other.x;
+            v.y += other.y;
+            v.z += other.z;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static void Subtract(ref this Vector3 v, Vector3 other)
+        {
+            v.x -= other.x;
+            v.y -= other.y;
+            v.z -= other.z;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static void Set(ref this Vector3 v, Vector3 other)
+        {
+            v.x = other.x;
+            v.y = other.y;
+            v.z = other.z;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static void MultiplyByConstant(ref this Vector3 v, float other)
+        {
+            v.x *= other;
+            v.y *= other;
+            v.z *= other;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static void LerpWith(ref this Vector3 v, Vector3 other, float by)
+        {
+            by = Mathf.Clamp01(by);
+            v.x = (v.x * (1.0f - by)) + (other.x * by);
+            v.y = (v.x * (1.0f - by)) + (other.y * by);
+            v.z = (v.y * (1.0f - by)) + (other.z * by);
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static void Multiply(ref this Vector3 v, Vector3 other)
+        {
+            v.x *= other.x;
+            v.y *= other.y;
+            v.z *= other.z;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static void Zero(ref this Vector3 v) => v.x = v.y = v.z = 0;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static bool IsFinite(ref this Vector3 v) => float.IsFinite(v.x) && float.IsFinite(v.y) && float.IsFinite(v.z);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static bool IsZero(ref this Vector3 v) => v.x == 0.0f && v.y == 0.0f && v.z == 0.0f;
     }
 
     //struct to encapsulate data info nicely
@@ -134,55 +190,5 @@ namespace ModularClimateWeatherSystems
             xlerp = ylerp = zlerp = tlerp = 0;
             abovetop = false;
         }
-    }
-
-    internal static class Extensions
-    {
-        //faster extension methods for vector3 structs
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static void Add(ref this Vector3 v, Vector3 other)
-        {
-            v.x += other.x;
-            v.y += other.y;
-            v.z += other.z;
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static void Subtract(ref this Vector3 v, Vector3 other)
-        {
-            v.x -= other.x;
-            v.y -= other.y;
-            v.z -= other.z;
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static void Set(ref this Vector3 v, Vector3 other)
-        {
-            v.x = other.x;
-            v.y = other.y;
-            v.z = other.z;
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static void MultiplyByConstant(ref this Vector3 v, float other)
-        {
-            v.x *= other;
-            v.y *= other;
-            v.z *= other;
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static void LerpWith(ref this Vector3 v, Vector3 other, float by)
-        {
-            by = Mathf.Clamp01(by);
-            v.x = (v.x * (1.0f - by)) + (other.x * by);
-            v.y = (v.x * (1.0f - by)) + (other.y * by);
-            v.z = (v.y * (1.0f - by)) + (other.z * by);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static void Zero(ref this Vector3 v) => v.x = v.y = v.z = 0;
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static bool IsFinite(ref this Vector3 v) => float.IsFinite(v.x) && float.IsFinite(v.y) && float.IsFinite(v.z);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static bool IsZero(ref this Vector3 v) => v.x == 0.0f && v.y == 0.0f && v.z == 0.0f;
     }
 }
