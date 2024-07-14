@@ -290,7 +290,59 @@ namespace ModularClimateWeatherSystems
                         }
                         catch (Exception ex)
                         {
-                            Utils.LogWarning("Unable to load Flowmap object: " + ex.Message);
+                            Utils.LogWarning("Unable to load Flowmap: " + ex.Message);
+                        }
+                    }
+                }
+
+                //TODO: add parsing for new classes
+                ConfigNode[] tempoffsetmaps = node.GetNodes("TemperatureOffsetMap");
+                if (tempoffsetmaps.Length > 0)
+                {
+                    foreach (ConfigNode tempoffsetmap in tempoffsetmaps)
+                    {
+                        try
+                        {
+                            ReadMapValues(tempoffsetmap, bod.atmosphereDepth, out Texture2D map, out double deformity, out double offset, out FloatCurve altmult, out FloatCurve timemult, out bool canscroll, out double scrollperiod, out bool normalizealt);
+                            bodydata[body].AddTempOffsetMap(new OffsetMap(map, deformity, offset, altmult, timemult, canscroll, scrollperiod, normalizealt));
+                        }
+                        catch (Exception ex)
+                        {
+                            Utils.LogWarning("Unable to load TemperatureOffsetMap: " + ex.Message);
+                        }
+                    }
+                }
+
+                ConfigNode[] tempswingmaps = node.GetNodes("TemperatureSwingMultiplierMap");
+                if (tempswingmaps.Length > 0)
+                {
+                    foreach (ConfigNode tempswingmap in tempswingmaps)
+                    {
+                        try
+                        {
+                            ReadMapValues(tempswingmap, bod.atmosphereDepth, out Texture2D map, out double deformity, out double offset, out FloatCurve altmult, out FloatCurve timemult, out bool canscroll, out double scrollperiod, out bool normalizealt);
+                            bodydata[body].AddTempSwingMap(new MultiplierMap(map, deformity, offset, altmult, timemult, canscroll, scrollperiod, normalizealt));
+                        }
+                        catch (Exception ex)
+                        {
+                            Utils.LogWarning("Unable to load TemperatureSwingMultiplierMap: " + ex.Message);
+                        }
+                    }
+                }
+
+                ConfigNode[] pressmaps = node.GetNodes("PressureMultiplierMap");
+                if (pressmaps.Length > 0)
+                {
+                    foreach (ConfigNode pressmap in pressmaps)
+                    {
+                        try
+                        {
+                            ReadMapValues(pressmap, bod.atmosphereDepth, out Texture2D map, out double deformity, out double offset, out FloatCurve altmult, out FloatCurve timemult, out bool canscroll, out double scrollperiod, out bool normalizealt);
+                            bodydata[body].AddPressMap(new MultiplierMap(map, deformity, offset, altmult, timemult, canscroll, scrollperiod, normalizealt));
+                        }
+                        catch (Exception ex)
+                        {
+                            Utils.LogWarning("Unable to load PressureMultiplerMap: " + ex.Message);
                         }
                     }
                 }
@@ -315,7 +367,7 @@ namespace ModularClimateWeatherSystems
         }
         #endregion
 
-        #region helpers
+        #region binaryhelpers
         //read a binary file containing one kind of data
         internal float[][,,] ReadBinaryFile(string path, int lon, int lat, int alt, int steps, int offset, bool invertalt, bool doubleprecision)
         {
@@ -331,7 +383,7 @@ namespace ModularClimateWeatherSystems
                 {
                     if(reader.BaseStream.Position >= reader.BaseStream.Length)
                     {
-                        throw new EndOfStreamException("Attempted to read beyond the end of the file. Verify that your size and timestep parameters match that of the actual file.");
+                        throw new EndOfStreamException("Attempted to read beyond the end of the file. Verify that your size, timestep, and doublePrecision parameters match that of the actual file.");
                     }
                     float[,,] floatbuffer = new float[alt, lat, lon];
                     for (int j = 0; j < alt; j++)
@@ -443,7 +495,9 @@ namespace ModularClimateWeatherSystems
             timestep = 0.0; 
             return cn.TryGetValue("sizeLon", ref lon) && cn.TryGetValue("sizeLat", ref lat) && cn.TryGetValue("sizeAlt", ref alt) && cn.TryGetValue("timesteps", ref steps) && cn.TryGetValue("timestepLength", ref timestep);
         }
+        #endregion
 
+        #region maphelpers
         internal FlowMap ReadFlowMapNode(ConfigNode cn)
         {
             bool thirdchannel = false;
@@ -456,12 +510,36 @@ namespace ModularClimateWeatherSystems
             string path = "";
             bool curveExists;
 
+            bool canscroll = false;
+            double scrollperiod = 0.0;
+            bool normalizealtitudecurves = false;
+
             ConfigNode floaty = new ConfigNode();
 
             cn.TryGetValue("useThirdChannel", ref thirdchannel);
             cn.TryGetValue("minAlt", ref minalt);
             cn.TryGetValue("maxAlt", ref maxalt);
             cn.TryGetValue("windSpeed", ref windSpeed);
+            cn.TryGetValue("nornmalizeAltitudeCurves", ref normalizealtitudecurves);
+
+            cn.TryGetValue("canScroll", ref canscroll);
+            double period = float.MaxValue;
+            if (cn.TryGetValue("scrollPeriod", ref period))
+            {
+                scrollperiod = period;
+            }
+            else if (cn.TryGetValue("scrollRate", ref period))
+            {
+                scrollperiod = 1 / (2 * Math.PI * period);
+            }
+            else if (cn.TryGetValue("scrollRateD", ref period))
+            {
+                scrollperiod = 1 / (360 * period);
+            }
+            if (!double.IsFinite(scrollperiod) || scrollperiod == 0.0)
+            {
+                canscroll = false; //failsafe to prevent things from breaking down
+            }
             if (!cn.TryGetValue("eastWestWindSpeed", ref EWwind))
             {
                 EWwind = windSpeed;
@@ -474,13 +552,15 @@ namespace ModularClimateWeatherSystems
             {
                 vWind = windSpeed;
             }
+
             cn.TryGetValue("map", ref path);
 
             if (string.IsNullOrEmpty(path))
             {
                 throw new ArgumentNullException("Flowmap field 'map' cannot be empty");
             }
-            if (!File.Exists(Utils.GameDataPath + path))
+            string gdpath = Utils.GameDataPath + path;
+            if (!File.Exists(gdpath))
             {
                 throw new FileNotFoundException("Could not locate Flowmap at file path: " + path + " . Verify that the given file path is correct.");
             }
@@ -553,10 +633,67 @@ namespace ModularClimateWeatherSystems
             curveExists = cn.TryGetNode("VerticalAltitudeSpeedMultiplierCurve", ref floaty);
             FloatCurve VertAltMult = CheckCurve(floaty, 1.0f, curveExists);
 
-            byte[] fileData = File.ReadAllBytes(Utils.GameDataPath + path);
-            Texture2D flowmap = new Texture2D(2, 2);
-            ImageConversion.LoadImage(flowmap, fileData);
-            return new FlowMap(flowmap, thirdchannel, AltitudeSpeedMultCurve, EWAltMult, NSAltMult, VertAltMult, EWwind, NSwind, vWind, WindSpeedMultTimeCurve, offset);
+            Texture2D flowmap = CreateTexture(gdpath);
+            return new FlowMap(flowmap, thirdchannel, AltitudeSpeedMultCurve, EWAltMult, NSAltMult, VertAltMult, EWwind, NSwind, vWind, WindSpeedMultTimeCurve, offset, canscroll, scrollperiod, normalizealtitudecurves);
+        }
+
+        internal void ReadMapValues(ConfigNode cn, double maxalt, out Texture2D map, out double deformity, out double offset, out FloatCurve altitudemultcurve, out FloatCurve timemultcurve, out bool canscroll, out double scrollperiod, out bool normalizealtitudecurves)
+        {
+            deformity = offset =  0.0;
+            altitudemultcurve = new FloatCurve();
+            timemultcurve = new FloatCurve();
+            canscroll = normalizealtitudecurves = false;
+            scrollperiod = float.MaxValue;
+
+            string path = "";
+            if (!cn.TryGetValue("map", ref path))
+            {
+                throw new ArgumentNullException("Map cannot be empty");
+            }
+            string gdpath = Utils.GameDataPath + path;
+            if (!File.Exists(gdpath))
+            {
+                throw new FileNotFoundException("Could not locate Map at file path: " + path + " . Verify that the given file path is correct.");
+            }
+            map = CreateTexture(gdpath);
+
+            ConfigNode floatcurveholder = new ConfigNode();
+            altitudemultcurve = new FloatCurve();
+            bool hascurve = cn.TryGetNode("AltitudeMultiplierCurve", ref floatcurveholder);
+            if (hascurve)
+            {
+                altitudemultcurve.Load(floatcurveholder);
+            }
+            else
+            {
+                altitudemultcurve.Add(0.0f, 1.0f, 0.0f, (float)(-1.0 / (maxalt * 0.3)));
+                altitudemultcurve.Add((float)(maxalt * 0.3), 1.0f, (float)(-1.0 / (maxalt * 0.3)), 0.0f);
+            }
+
+            hascurve = cn.TryGetNode("TimeMultiplierCurve", ref floatcurveholder);
+            timemultcurve = CheckCurve(floatcurveholder, 1.0f, hascurve);
+
+            cn.TryGetValue("deformity", ref deformity);
+            cn.TryGetValue("offset", ref offset);
+            cn.TryGetValue("canScroll", ref canscroll);
+            double period = float.MaxValue;
+            if (cn.TryGetValue("scrollPeriod", ref period))
+            {
+                scrollperiod = period;
+            }
+            else if(cn.TryGetValue("scrollRate", ref period))
+            {
+                scrollperiod = 1 / (2 * Math.PI * period);
+            }
+            else if(cn.TryGetValue("scrollRateD", ref period))
+            {
+                scrollperiod = 1 / (360 * period);
+            }
+            if (!double.IsFinite(scrollperiod) || scrollperiod == 0.0)
+            {
+                canscroll = false; //failsafe to prevent things from breaking down
+            }
+            cn.TryGetValue("nornmalizeAltitudeCurves", ref normalizealtitudecurves);
         }
 
         //Creates the float curve, or if one isnt available, converts a relevant float value into one.
@@ -611,6 +748,14 @@ namespace ModularClimateWeatherSystems
                 curve.Add(1000, 1.0f, 0, 0);
             }
             return curve;
+        }
+
+        internal Texture2D CreateTexture(string path)
+        {
+            byte[] fileData = File.ReadAllBytes(path);
+            Texture2D tex = new Texture2D(2, 2);
+            ImageConversion.LoadImage(tex, fileData);
+            return tex;
         }
         #endregion
     }

@@ -51,6 +51,7 @@ namespace ModularClimateWeatherSystems
         }
         private double stocktemperature = PhysicsGlobals.SpaceTemperature;
         private double derivedtemp = PhysicsGlobals.SpaceTemperature;
+        private double maptemperature = PhysicsGlobals.SpaceTemperature;
         private bool usinginternaltemperature = false;
 
         private double pressure = 0.0;
@@ -60,6 +61,16 @@ namespace ModularClimateWeatherSystems
             private set => pressure = UtilMath.Clamp(value, 0.0, float.MaxValue);
         }
         private double stockpressure = 0.0;
+        private double derivedpressure = 0.0;
+        private double mappressure = 0.0;
+        private bool usinginternalpressure = false;
+
+        private double pressuremultiplier = 1.0;
+        internal double FIPressureMultiplier
+        {
+            get => HasPress ? pressuremultiplier : 1.0;
+            set => pressuremultiplier = double.IsFinite(value) ? value : 1.0;
+        }
 
         private DataInfo WindDataInfo = DataInfo.Zero;
         private DataInfo TemperatureDataInfo = DataInfo.Zero;
@@ -117,7 +128,8 @@ namespace ModularClimateWeatherSystems
             WindDataInfo.SetZero();
             TemperatureDataInfo.SetZero();
             PressureDataInfo.SetZero();
-            HasWind = HasTemp = HasPress = hasflowmaps = haswinddata = usinginternaltemperature = false;
+            HasWind = HasTemp = HasPress = hasflowmaps = haswinddata = usinginternaltemperature = usinginternalpressure = false;
+            FIPressureMultiplier = 1.0;
 
             if (!FlightGlobals.ready || FlightGlobals.ActiveVessel == null)
             {
@@ -158,10 +170,8 @@ namespace ModularClimateWeatherSystems
                 //set fallback data
                 FlightIntegrator FI = activevessel.GetComponent<FlightIntegrator>();
                 double temperatureoffset = FI != null ? FI.atmosphereTemperatureOffset : 0.0;
-                stocktemperature = derivedtemp = FI != null ? mainbody.GetFullTemperature(alt, temperatureoffset) : mainbody.GetTemperature(alt);
-                Temperature = stocktemperature;
-                stockpressure = mainbody.GetPressure(alt);
-                Pressure = stockpressure;
+                Temperature = stocktemperature = derivedtemp = maptemperature = FI != null ? mainbody.GetFullTemperature(alt, temperatureoffset) : mainbody.GetTemperature(alt);
+                Pressure = derivedpressure = mappressure = stockpressure = mainbody.GetPressure(alt);
 
                 int extwindcode = MCWS_API.GetExternalWind(mainbody.name, lon, lat, alt, CurrentTime, out Vector3 extwind);
                 if (extwindcode == 0)
@@ -234,30 +244,82 @@ namespace ModularClimateWeatherSystems
                 {
                     try
                     {
-                        int retcode = Data.GetTemperature(mainbody.name, lon, lat, alt, CurrentTime, out double Final, out DataInfo tinfo, out double blendwithstock);
-                        derivedtemp = Final;
-                        usinginternaltemperature = true;
-                        Final = UtilMath.Lerp(Final, stocktemperature, blendwithstock);
-                        switch (retcode)
+                        int tempretcode = Data.GetTemperature(mainbody.name, lon, lat, alt, CurrentTime, out double Final, out DataInfo tinfo);
+                        bool tempdatagood = false;
+                        switch (tempretcode)
                         {
                             case -2:
                                 Utils.LogError("Error when reading temperature data for body " + mainbody.name);
                                 break;
                             case 0:
-                                Temperature = Final;
-                                HasTemp = true;
+                                derivedtemp = Final;
+                                tempdatagood = true;
                                 TemperatureDataInfo.SetNew(tinfo);
                                 break;
                             case 1:
                                 double TempModelTop = Math.Min(Data.TemperatureModelTop(mainbody.name), mainbody.atmosphereDepth);
                                 double extralerp = (alt - TempModelTop) / (mainbody.atmosphereDepth - TempModelTop);
                                 double temp = UtilMath.Lerp(Final, stocktemperature, Math.Pow(extralerp, 0.25));
-                                Temperature = double.IsFinite(temp) ? temp : throw new NotFiniteNumberException();
-                                HasTemp = true;
-                                TemperatureDataInfo.SetNew(tinfo);
+                                if (double.IsFinite(temp))
+                                {
+                                    derivedtemp = double.IsFinite(temp) ? temp : stocktemperature;
+                                    tempdatagood = true;
+                                    TemperatureDataInfo.SetNew(tinfo);
+                                }
                                 break;
                             default:
                                 break;
+                        }
+                        if (!tempdatagood && tempretcode >= 0)
+                        {
+                            tempretcode = -1;
+                        }
+
+                        int tempmapretcode = Data.GetTemperatureMapData(mainbody.name, lon, lat, alt, CurrentTime, out double tempoffset, out double tempswingmult);
+                        if (tempmapretcode >= 0)
+                        {
+                            double latbias = mainbody.latitudeTemperatureBiasCurve.Evaluate((float)Math.Abs(lat));
+                            double offsetnolatbias = temperatureoffset - latbias;
+                            double newoffset = offsetnolatbias * tempswingmult;
+                            switch (tempmapretcode)
+                            {
+                                case 1:
+                                    maptemperature = stocktemperature + tempoffset;
+                                    break;
+                                case 2:
+                                    maptemperature = mainbody.GetFullTemperature(alt, newoffset + latbias);
+                                    break;
+                                default:
+                                    maptemperature = mainbody.GetFullTemperature(alt, newoffset + latbias) + tempoffset;
+                                    break;
+                            }
+                            if (!double.IsFinite(maptemperature))
+                            {
+                                tempmapretcode = -1;
+                            }
+                        }
+
+                        bool blendtemp = Data.BlendTemperature(mainbody.name, out double tempblendfactor);
+                        if (tempretcode >= 0 && tempmapretcode >= 0)
+                        {
+                            Temperature = UtilMath.Lerp(derivedtemp, maptemperature, tempblendfactor);
+                            HasTemp = usinginternaltemperature = true;
+                        }
+                        else if (tempretcode >= 0 && tempmapretcode < 0)
+                        {
+                            Temperature = blendtemp ? UtilMath.Lerp(derivedtemp, stocktemperature, tempblendfactor) : derivedtemp;
+                            HasTemp = usinginternaltemperature = true;
+                        }
+                        else if (tempretcode < 0 && tempmapretcode >= 0)
+                        {
+                            Temperature = maptemperature;
+                            HasTemp = true;
+                            usinginternaltemperature = false;
+                        }
+                        else
+                        {
+                            Temperature = derivedtemp;
+                            HasTemp = usinginternaltemperature = false;
                         }
                     }
                     catch (Exception ex) //fallback data
@@ -278,20 +340,23 @@ namespace ModularClimateWeatherSystems
                 {
                     Pressure = extpress * 0.001;
                     HasPress = true;
+                    usinginternalpressure = false;
+                    FIPressureMultiplier = Pressure / stockpressure;
                 }
                 else if (Data.HasPressure(mainbody.name))
                 {
                     try
                     {
-                        int retcode = Data.GetPressure(mainbody.name, lon, lat, alt, CurrentTime, out double Final, out DataInfo pinfo);
-                        switch (retcode)
+                        int pressretcode = Data.GetPressure(mainbody.name, lon, lat, alt, CurrentTime, out double Final, out DataInfo pinfo);
+                        bool pressdatagood = false;
+                        switch (pressretcode)
                         {
                             case -2:
                                 Utils.LogError("Error when reading pressure data for body " + mainbody.name);
                                 break;
                             case 0:
-                                Pressure = Final * 0.001;
-                                HasPress = true;
+                                derivedpressure = Final * 0.001;
+                                pressdatagood = true;
                                 PressureDataInfo.SetNew(pinfo);
                                 break;
                             case 1:
@@ -301,25 +366,66 @@ namespace ModularClimateWeatherSystems
                                 double press1 = mainbody.GetPressure(PressModelTop);
                                 double scaleheight = PressModelTop / Math.Log(press0 / press1, Math.E);
                                 double press = UtilMath.Lerp(Final * Math.Pow(Math.E, -((alt - PressModelTop) / scaleheight)), mainbody.GetPressure(alt) * 1000, Math.Pow(extralerp, 0.125)) * 0.001;
-                                Pressure = double.IsFinite(press) ? press : throw new NotFiniteNumberException();
-                                HasPress = true;
-                                PressureDataInfo.SetNew(pinfo);
+                                if (double.IsFinite(press))
+                                {
+                                    derivedpressure = press;
+                                    pressdatagood = true;
+                                    PressureDataInfo.SetNew(pinfo);
+                                }
                                 break;
                             default:
                                 break;
                         }
+                        if (!pressdatagood && pressretcode >= 0)
+                        {
+                            pressretcode = -1;
+                        }
+
+                        int pressmapretcode = Data.GetPressureMapData(mainbody.name, lon, lat, alt, CurrentTime, out double pressmult);
+                        if(pressmapretcode >= 0)
+                        {
+                            mappressure = stockpressure * pressmult;
+                        }
+
+                        bool blendpress = Data.BlendPressure(mainbody.name, out double pressblendfactor);
+                        if (pressretcode >= 0 && pressmapretcode == 0)
+                        {
+                            Pressure = UtilMath.Lerp(derivedpressure, mappressure, pressblendfactor);
+                            FIPressureMultiplier = Pressure / stockpressure;
+                            HasPress = usinginternalpressure = true;
+                        }
+                        else if (pressretcode >= 0 && pressmapretcode != 0)
+                        {
+                            Pressure = blendpress ? UtilMath.Lerp(derivedpressure, stockpressure, pressblendfactor) : derivedpressure;
+                            FIPressureMultiplier = Pressure / stockpressure;
+                            HasPress = usinginternalpressure = true;
+                        }
+                        else if (pressretcode < 0 && pressmapretcode == 0)
+                        {
+                            Pressure = mappressure;
+                            FIPressureMultiplier = pressmult;
+                            HasPress = true;
+                            usinginternalpressure = false;
+                        }
+                        else
+                        {
+                            Pressure = stockpressure;
+                            FIPressureMultiplier = 1.0;
+                            HasPress = usinginternalpressure = false;
+                        }
+                        
                     }
                     catch (Exception ex) //fallback data
                     {
                         Utils.LogError("Exception thrown when deriving point Pressure data for " + mainbody.name + ": " + ex.ToString());
                         Pressure = stockpressure;
-                        HasPress = false;
+                        HasPress = usinginternalpressure = false;
                     }
                 }
                 else
                 {
                     Pressure = stockpressure;
-                    HasPress = false;
+                    HasPress = usinginternalpressure = false;
                 }
 
                 //post-processing through API
@@ -347,7 +453,6 @@ namespace ModularClimateWeatherSystems
                 //do other shenanigans with the wind
                 if (!Settings.debugmode)
                 {
-                    //normalwind.MultiplyByConstant(VaryFactor);
                     normalwind.x *= varyx;
                     normalwind.y *= varyy;
                     normalwind.z *= varyz;
@@ -372,7 +477,7 @@ namespace ModularClimateWeatherSystems
             {
                 Pressure = 0.0;
                 Temperature = PhysicsGlobals.SpaceTemperature;
-                HasWind = HasTemp = HasPress = hasflowmaps = haswinddata = false;
+                HasWind = HasTemp = HasPress = hasflowmaps = haswinddata = usinginternalpressure = usinginternaltemperature = false;
             }
         }
 
@@ -390,8 +495,9 @@ namespace ModularClimateWeatherSystems
             }
         }
 
-        //----------------FerramAerospaceResearch Compatibility--------------
         #region FAR
+        //----------------FerramAerospaceResearch Compatibility--------------
+
         //Functions for FAR to call
         internal Vector3 GetTheWind(CelestialBody body, Part p, Vector3 pos) => InternalAppliedWind;
         internal double GetTheTemperature(CelestialBody body, Vector3d pos, double time) => Temperature;

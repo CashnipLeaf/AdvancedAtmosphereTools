@@ -10,7 +10,7 @@ namespace ModularClimateWeatherSystems
     [KSPAddon(KSPAddon.Startup.SpaceCentre, true)]
     public class FlightDynamicsOverrides : MonoBehaviour
     {
-        public static bool registeredoverrides = false;
+        static bool registeredoverrides = false;
         private static MCWS_FlightHandler FH => MCWS_FlightHandler.Instance;
 
         void Start()
@@ -19,11 +19,37 @@ namespace ModularClimateWeatherSystems
             {
                 Utils.LogInfo("Initializing Flight Dynamics Overrides.");
 
-                //If FAR is installed, do not override flight dynamics. Leave the aerodynamics calulations to FAR.
-                if (!Settings.FAR_Exists)
+                Utils.LogInfo("Registering MCWS with ModularFlightIntegrator.");
+                try
                 {
                     //register overrides with ModularFI
-                    Utils.LogInfo("Registering MCWS with ModularFlightIntegrator.");
+                    if (ModularFlightIntegrator.RegisterCalculatePressureOverride(CalcPressureOverride))
+                    {
+                        Utils.LogInfo("Successfully registered MCWS's Pressure Override with ModularFlightIntegrator.");
+                    }
+                    else
+                    {
+                        Utils.LogWarning("Unable to register MCWS's Pressure Override with ModularFlightIntegrator.");
+                    }
+
+                    if (ModularFlightIntegrator.RegistercalculateConstantsAtmosphereOverride(CalculateConstantsAtmosphereOverride))
+                    {
+                        Utils.LogInfo("Successfully registered MCWS's Atmosphere and Thermodynamics Overrides with ModularFlightIntegrator.");
+                    }
+                    else
+                    {
+                        Utils.LogWarning("Unable to register MCWS's Atmosphere and Thermodynamics Overrides with ModularFlightIntegrator.");
+                    }
+                    Utils.LogInfo("ModularFlightIntegrator Registration Complete.");
+                }
+                catch (Exception ex)
+                {
+                    Utils.LogError("ModularFlightIntegrator Registration Failed. Exception thrown: " + ex.ToString());
+                }
+
+                //If FAR is installed, do not override aerodynamics. Leave the aerodynamics calulations to FAR.
+                if (!Settings.FAR_Exists)
+                {
                     try
                     {
                         if (ModularFlightIntegrator.RegisterUpdateAerodynamicsOverride(NewAeroUpdate))
@@ -36,29 +62,22 @@ namespace ModularClimateWeatherSystems
                             Utils.LogWarning("Unable to register MCWS's Aerodynamics Override with ModularFlightIntegrator.");
                         }
 
-                        if (ModularFlightIntegrator.RegisterCalculatePressureOverride(CalcPressureOverride))
+                        /*
+                        if (ModularFlightIntegrator.RegisterIntegrateOverride(IntegrateOverride))
                         {
-                            Utils.LogInfo("Successfully registered MCWS's Pressure Override with ModularFlightIntegrator.");
+                            Utils.LogInfo("Successfully registered MCWS's Aerodynamics Overrides with ModularFlightIntegrator.");
                         }
                         else
                         {
-                            Utils.LogWarning("Unable to register MCWS's Pressure Override with ModularFlightIntegrator.");
+                            Utils.LogWarning("Unable to register MCWS's Aerodynamics Override with ModularFlightIntegrator.");
                         }
-
-                        if (ModularFlightIntegrator.RegistercalculateConstantsAtmosphereOverride(CalculateConstantsAtmosphereOverride))
-                        {
-                            Utils.LogInfo("Successfully registered MCWS's Atmosphere and Thermodynamics Overrides with ModularFlightIntegrator.");
-                        }
-                        else
-                        {
-                            Utils.LogWarning("Unable to register MCWS's Atmosphere and Thermodynamics Overrides with ModularFlightIntegrator.");
-                        }
-                        Utils.LogInfo("ModularFlightIntegrator Registration Complete.");
+                        */
                     }
                     catch (Exception ex)
                     {
                         Utils.LogError("ModularFlightIntegrator Registration Failed. Exception thrown: " + ex.ToString());
                     }
+                    
                     Utils.LogInfo("Patching Lifting Surface and Air Intake behavior.");
                     try
                     {
@@ -82,15 +101,182 @@ namespace ModularClimateWeatherSystems
             }
         }
 
-        void NewAeroUpdate(ModularFlightIntegrator fi, Part part)
+        #region aerodynamics
+        //FlightIntegrator.Integrate() but with nearly all methods inlined to eliminate the overhead of as many method calls as possible
+        //TODO: Finish.
+        static void IntegrateOverride(ModularFlightIntegrator fi, Part part)
+        {
+            //recalculate part static pressure
+            if (FH != null && FH.HasPress)
+            {
+                double altitudeAtPos = FlightGlobals.getAltitudeAtPos((Vector3d)part.partTransform.position, fi.CurrentMainBody);
+                //hack solution. i dont wanna have to recalculate the pressure all over again for each part, so this is probably good enough.
+                double staticpress = fi.CurrentMainBody.GetPressure(altitudeAtPos) * FH.FIPressureMultiplier;
+                if (fi.CurrentMainBody.ocean && altitudeAtPos <= 0.0)
+                {
+                    staticpress += fi.Vessel.gravityTrue.magnitude * -altitudeAtPos * fi.CurrentMainBody.oceanDensity;
+                }
+                staticpress *= 0.0098692326671601278;
+                if (double.IsFinite(staticpress))
+                {
+                    part.staticPressureAtm = staticpress;
+                }
+            }
+
+            if (part.rb != null)
+            {
+                part.rb.AddForce((Vector3)fi.Vessel.precalc.integrationAccel, ForceMode.Acceleration);
+                part.rb.AddForce((Vector3)part.force);
+                part.rb.AddTorque((Vector3)part.torque);
+                int forcecount = part.forces.Count;
+                while (forcecount-- > 0)
+                {
+                    part.rb.AddForceAtPosition((Vector3)part.forces[forcecount].force, (Vector3)part.forces[forcecount].pos);
+                }
+            }
+            //single line null check for servoRb
+            part.servoRb?.AddForce((Vector3)fi.Vessel.precalc.integrationAccel, ForceMode.Acceleration);
+            
+            part.forces.Clear();
+            part.force.Zero();
+            part.torque.Zero();
+            
+            //inlined UpdateAerodynamics() 
+            #region updateaerodynamics
+            Rigidbody rigidbody = part.Rigidbody;
+            if (rigidbody != null)
+            {
+                bool rbexists = part.rb != null;
+                bool servorbexists = part.servoRb != null;
+                part.aerodynamicArea = 0.0;
+
+                //inlined CalculateAreaExposed
+                if (!part.DragCubes.None)
+                {
+                    part.exposedArea = part.DragCubes.ExposedArea;
+                }
+                else
+                {
+                    switch (part.dragModel)
+                    {
+                        case Part.DragModel.DEFAULT:
+                        case Part.DragModel.CUBE:
+                            part.exposedArea = !PhysicsGlobals.DragCubesUseSpherical && !part.DragCubes.None ? part.DragCubes.ExposedArea : part.maximum_drag;
+                            break;
+                        case Part.DragModel.CONIC:
+                            part.exposedArea = part.maximum_drag;
+                            break;
+                        case Part.DragModel.CYLINDRICAL:
+                            part.exposedArea = part.maximum_drag;
+                            break;
+                        case Part.DragModel.SPHERICAL:
+                            part.exposedArea = part.maximum_drag;
+                            break;
+                        default:
+                            part.exposedArea = part.maximum_drag;
+                            break;
+                    }
+                }
+                part.dynamicPressurekPa = part.submergedDynamicPressurekPa = 0.0;
+
+                if (rbexists && part.angularDragByFI)
+                {
+                    part.rb.angularDrag = 0.0f;
+                }
+                if (servorbexists && part.angularDragByFI)
+                {
+                    part.servoRb.angularDrag = 0.0f;
+                }
+
+                Vector3 windvec = (FH != null && FH.HasWind) ? FH.InternalAppliedWind : Vector3.zero;
+                double submergedPortion = part.submergedPortion;
+                windvec.LerpWith(Vector3.zero, (float)(submergedPortion * submergedPortion));
+
+                part.dragVector = rigidbody.velocity + Krakensbane.GetFrameVelocity() - windvec;
+                part.dragVectorSqrMag = part.dragVector.sqrMagnitude;
+                bool dragvecnotzero = false;
+                if (part.dragVectorSqrMag != 0.0)
+                {
+                    dragvecnotzero = true;
+                    part.dragVectorMag = Mathf.Sqrt(part.dragVectorSqrMag);
+                    part.dragVectorDir = part.dragVector / part.dragVectorMag;
+                    part.dragVectorDirLocal = -part.partTransform.InverseTransformDirection(part.dragVectorDir);
+                }
+                else
+                {
+                    part.dragVectorMag = 0.0f;
+                    part.dragVectorDir = part.dragVectorDirLocal = Vector3.zero;
+                }
+                part.dragScalar = 0.0f;
+                if (part.ShieldedFromAirstream || (part.atmDensity <= 0.0 && submergedPortion <= 0.0))
+                {
+                    goto integratenextpart;
+                }
+
+                //this if/else statement contains an inlined CalculateAerodynamicArea()
+                if (!part.DragCubes.None)
+                {
+                    //update the drag from the drag cubes if they exist
+                    part.DragCubes.SetDrag(part.dragVectorDirLocal, (float)fi.mach);
+                    part.aerodynamicArea = part.DragCubes.Area;
+                }
+                else
+                {
+                    switch (part.dragModel)
+                    {
+                        case Part.DragModel.DEFAULT:
+                        case Part.DragModel.CUBE:
+                            part.aerodynamicArea = (!PhysicsGlobals.DragCubesUseSpherical && !part.DragCubes.None) ? part.DragCubes.Area : part.maximum_drag;
+                            break;
+                        case Part.DragModel.CONIC:
+                            part.aerodynamicArea = part.maximum_drag;
+                            break;
+                        case Part.DragModel.CYLINDRICAL:
+                            part.aerodynamicArea = part.maximum_drag;
+                            break;
+                        case Part.DragModel.SPHERICAL:
+                            part.aerodynamicArea = part.maximum_drag;
+                            break;
+                        default:
+                            part.aerodynamicArea = part.maximum_drag;
+                            break;
+                    }
+                }
+                if (PhysicsGlobals.ApplyDrag && dragvecnotzero)
+                {
+                    if (part.rb != rigidbody && !PhysicsGlobals.ApplyDragToNonPhysicsParts)
+                    {
+                        goto integratenextpart;
+                    }
+                    double nonsubmergedportion = 1.0;
+                    bool issubmerged = false;
+
+                }
+            }
+
+            #endregion
+
+        integratenextpart:
+            int children = part.children.Count;
+            for (int i = 0; i < children; ++i)
+            {
+                Part child = part.children[i];
+                if (child.isAttached)
+                {
+                    IntegrateOverride(fi, child);
+                }
+            }
+        }
+
+        
+        static void NewAeroUpdate(ModularFlightIntegrator fi, Part part)
         {
             //This override really just occupies the slot so that no other mod can take it.
             fi.BaseFIUpdateAerodynamics(part);
         }
 
-        //Takes advantage of CalculateAerodynamicArea()'s placement inside UpdateAerodynamics()
-        //to inject a new drag vector into the part before UpdateAerodynamics() uses to calculate anything.
-        double AerodynamicAreaOverride(ModularFlightIntegrator fi, Part part)
+        //Takes advantage of CalculateAerodynamicArea()'s placement inside UpdateAerodynamics() to inject a new drag vector into the part before UpdateAerodynamics() uses to calculate anything.
+        static double AerodynamicAreaOverride(ModularFlightIntegrator fi, Part part)
         {
             Vector3 windvec = (FH != null && FH.HasWind) ? FH.InternalAppliedWind : Vector3.zero;
             float submerged = (float)part.submergedPortion;
@@ -120,6 +306,23 @@ namespace ModularClimateWeatherSystems
                 }
             }
 
+            //recalculate part static pressure
+            if (FH != null && FH.HasPress)
+            {
+                double altitudeAtPos = FlightGlobals.getAltitudeAtPos((Vector3d)part.partTransform.position, fi.CurrentMainBody);
+                //hack solution. i dont wanna have to recalculate the pressure all over again for each part, so this is probably good enough.
+                double staticpress = fi.CurrentMainBody.GetPressure(altitudeAtPos) * FH.FIPressureMultiplier; 
+                if (fi.CurrentMainBody.ocean && altitudeAtPos <= 0.0)
+                {
+                    staticpress += fi.Vessel.gravityTrue.magnitude * -altitudeAtPos * fi.CurrentMainBody.oceanDensity;
+                }
+                staticpress *= 0.0098692326671601278;
+                if (double.IsFinite(staticpress))
+                {
+                    part.staticPressureAtm = staticpress;
+                }
+            }
+
             //inline the rest of CaclulateAerodynamicArea() to avoid passing an object reference again
             if (!part.DragCubes.None)
             {
@@ -143,8 +346,10 @@ namespace ModularClimateWeatherSystems
                 }
             }
         }
+        #endregion
 
-        void CalculateConstantsAtmosphereOverride(ModularFlightIntegrator fi)
+        #region thermodynamics
+        static void CalculateConstantsAtmosphereOverride(ModularFlightIntegrator fi)
         {
             Vector3 windvec = (FH != null && FH.HasWind) ? FH.InternalAppliedWind : Vector3.zero;
             if (windvec.IsFinite() && !Mathf.Approximately(windvec.magnitude, 0.0f))
@@ -171,7 +376,7 @@ namespace ModularClimateWeatherSystems
             fi.pseudoReDragMult = (double)PhysicsGlobals.DragCurvePseudoReynolds.Evaluate((float)fi.pseudoReynolds);
         }
 
-        double CalculateConvectiveCoeff(ModularFlightIntegrator fi) //I would love to clean this up, but it works and I dont wanna touch it.
+        static double CalculateConvectiveCoeff(ModularFlightIntegrator fi) //I would love to clean this up, but it works and I dont wanna touch it.
         {
             double coeff;
             double density = fi.density;
@@ -194,19 +399,19 @@ namespace ModularClimateWeatherSystems
             }
             return coeff * fi.CurrentMainBody.convectionMultiplier;
         }
-        double CalculateConvecCoeffNewtonian(double density, double spd) //used to take in fi. now passes variables to prevent object references from being tossed around like hot potatoes
+        static double CalculateConvecCoeffNewtonian(double density, double spd) //used to take in fi. now passes variables to prevent object references from being tossed around like hot potatoes
         {
             double coeff = density <= 1.0 ? Math.Pow(density, PhysicsGlobals.NewtonianDensityExponent) : density;
             double multiplier = PhysicsGlobals.NewtonianConvectionFactorBase + Math.Pow(spd, PhysicsGlobals.NewtonianVelocityExponent);
             return coeff * multiplier * PhysicsGlobals.NewtonianConvectionFactorTotal;
         }
-        double CalculateConvecCoeffMach(double density, double spd) 
+        static double CalculateConvecCoeffMach(double density, double spd) 
         {
             double coeff = density <= 1.0 ? Math.Pow(density, PhysicsGlobals.MachConvectionDensityExponent) : density;
             return coeff * 1E-07 * PhysicsGlobals.MachConvectionFactor * Math.Pow(spd, PhysicsGlobals.MachConvectionVelocityExponent);
         }
 
-        void CalcPressureOverride(ModularFlightIntegrator fi)
+        static void CalcPressureOverride(ModularFlightIntegrator fi)
         {
             if (FH == null || !FH.HasPress)
             {
@@ -224,6 +429,7 @@ namespace ModularClimateWeatherSystems
                 fi.staticPressureAtm = fi.staticPressurekPa = 0.0;
             }
         }
+        #endregion
     }
 
     //--------------------------HARMONY PATCHES-------------------------------

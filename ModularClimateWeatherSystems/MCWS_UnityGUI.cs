@@ -133,7 +133,7 @@ namespace ModularClimateWeatherSystems
                     DrawElement("Z Position", HasTemp && inatmo ? tempzinfo : na);
                     DrawElement("Time Position", HasTemp && inatmo ? string.Format("{0} <> {1}", TemperatureDataInfo.t1, TemperatureDataInfo.t2) : na);
                     DrawElement("Derived Temp", HasTemp && inatmo && usinginternaltemperature ? string.Format("{0:F1} {1}", derivedtemp, Tempunit) : na);
-                    DrawElement("Stock Temp", string.Format("{0:F1} {1}", stocktemperature, Tempunit));
+                    DrawElement("Stock/Map Temp", string.Format("{0:F1} {1}", stocktemperature, Tempunit));
                     DrawElement("Final Temp", string.Format("{0:F1} {1}", Temperature, Tempunit));
 
                     DrawHeader("Pressure Info");
@@ -142,8 +142,9 @@ namespace ModularClimateWeatherSystems
                     string presszinfo = PressureDataInfo.abovetop ? string.Format("{0}+", PressureDataInfo.z2) : string.Format("{0} <> {1}", PressureDataInfo.z1, PressureDataInfo.z2);
                     DrawElement("Z Position", HasPress && inatmo ? presszinfo : na);
                     DrawElement("Time Position", HasPress && inatmo ? string.Format("{0} <> {1}", PressureDataInfo.t1, PressureDataInfo.t2) : na);
-                    DrawElement("Derived Press", HasPress && inatmo ? string.Format("{0:F3} {1}", Pressure, Pressunit) : na);
-                    DrawElement("Stock Press", string.Format("{0:F3} {1}", stockpressure, Pressunit));
+                    DrawElement("Derived Press", HasPress && inatmo && usinginternalpressure ? string.Format("{0:F3} {1}", Pressure, Pressunit) : na);
+                    DrawElement("Stock/Map Press", string.Format("{0:F3} {1}", mappressure, Pressunit));
+                    DrawElement("Final Press", string.Format("{0:F3} {1}", Pressure, Pressunit));
                 }
                 else
                 {

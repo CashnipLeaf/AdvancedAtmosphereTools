@@ -7,7 +7,7 @@ namespace ModularClimateWeatherSystems
 {
     internal static class Utils
     {
-        internal const string version = "0.9.7";
+        internal const string version = "0.9.8";
         internal static string GameDataPath => KSPUtil.ApplicationRootPath + "GameData/";
         internal static Dictionary<string, string> LOCCache; //localization cache
 

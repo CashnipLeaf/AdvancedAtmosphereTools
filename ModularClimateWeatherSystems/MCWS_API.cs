@@ -532,7 +532,7 @@ namespace ModularClimateWeatherSystems
                 {
                     return exttemp;
                 }
-                int retcode = InternalData.GetTemperature(body, lon, lat, alt, time, out double temp, out DataInfo garbage, out double garbage2); //dont need datainfo or blending, get rid of it
+                int retcode = InternalData.GetTemperature(body, lon, lat, alt, time, out double temp, out DataInfo garbage);
                 switch (retcode)
                 {
                     case 0:

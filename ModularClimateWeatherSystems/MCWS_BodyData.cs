@@ -48,10 +48,18 @@ namespace ModularClimateWeatherSystems
         }
         private double TempLonOffset = 0.0;
         private double TempTimeOffset = 0.0;
-        internal bool HasTemperature => TempData != null;
+
+        private List<OffsetMap> TempOffsetMaps;
+        private List<MultiplierMap> TempSwingMultiplierMaps;
+
+        internal bool HasTemperature => HasTemperatureData || HasTemperatureOffsetMaps || HasTemperatureSwingMaps;
+        internal bool HasTemperatureData => TempData != null;
+        internal bool HasTemperatureOffsetMaps => TempOffsetMaps != null && TempOffsetMaps.Count > 0;
+        internal bool HasTemperatureSwingMaps => TempSwingMultiplierMaps != null && TempSwingMultiplierMaps.Count > 0;
+
         private bool blendtempwithstock = false;
-        private double blendtempfactor = 0.0;
-        internal double BlendTempFactor => blendtempwithstock && double.IsFinite(blendtempfactor) ? blendtempfactor : 0.0;
+        internal bool BlendTempWithStock => (HasTemperatureData && (HasTemperatureOffsetMaps || HasTemperatureSwingMaps)) || blendtempwithstock;
+        internal double BlendTempFactor { get; private set; } = 0.5;
 
         private float[][,,] PressData;
         private double PressScaleFactor = double.NaN;
@@ -64,11 +72,23 @@ namespace ModularClimateWeatherSystems
         }
         private double PressLonOffset = 0.0;
         private double PressTimeOffset = 0.0;
-        internal bool HasPressure => PressData != null;
+        internal bool HasPressure => HasPressureData || HasPressureMaps;
+        internal bool HasPressureData => PressData != null;
+        internal bool HasPressureMaps => PressMultiplierMaps != null && PressMultiplierMaps?.Count > 0;
+
+        private List<MultiplierMap> PressMultiplierMaps;
+        private bool blendpresswithstock = false;
+        internal bool BlendPressWithStock => (HasPressureData && HasPressureMaps) || blendpresswithstock;
+        internal double BlendPressFactor { get; private set; } = 0.5;
+
 
         internal MCWS_BodyData(string body, CelestialBody bod)
         {
             Flowmaps = new List<FlowMap>();
+            TempOffsetMaps = new List<OffsetMap>();
+            TempSwingMultiplierMaps = new List<MultiplierMap>();
+            PressMultiplierMaps = new List<MultiplierMap>();
+
             this.body = body;
             HasAtmo = bod.atmosphere;
             if (HasAtmo)
@@ -116,7 +136,7 @@ namespace ModularClimateWeatherSystems
                 TempLonOffset = lonoffset;
                 TempTimeOffset = timeoffset;
                 blendtempwithstock = blendwithstock;
-                blendtempfactor = blendfactor;
+                BlendTempFactor = blendfactor;
                 Utils.LogInfo(string.Format("Successfully added Temperature Data to {0}.", body));
                 return 0;
             }
@@ -146,6 +166,24 @@ namespace ModularClimateWeatherSystems
         {
             Flowmaps?.Add(flowmap);
             return Flowmaps == null ? -1 : 0;
+        }
+
+        internal int AddTempOffsetMap(OffsetMap map)
+        {
+            TempOffsetMaps?.Add(map);
+            return TempOffsetMaps == null ? -1 : 0;
+        }
+
+        internal int AddTempSwingMap(MultiplierMap map)
+        {
+            TempSwingMultiplierMaps?.Add(map);
+            return TempSwingMultiplierMaps == null ? -1 : 0;
+        }
+
+        internal int AddPressMap(MultiplierMap map)
+        {
+            PressMultiplierMaps?.Add(map);
+            return PressMultiplierMaps == null ? -1 : 0;
         }
 
         internal int GetWind(double lon, double lat, double alt, double time, ref Vector3 winddatavector, ref Vector3 flowmapvector, ref DataInfo windinfo)
@@ -224,7 +262,7 @@ namespace ModularClimateWeatherSystems
                         for (int i = 0; i < count; i++)
                         {
                             FlowMap map = Flowmaps[i];
-                            flowmapvector.Add(map.GetWindVec(lon, lat, alt, time));
+                            flowmapvector.Add(map.GetWindVec(lon, lat, alt, time, Atmodepth));
                         }
                         flowmapgood = flowmapvector.IsFinite();
                     }
@@ -253,7 +291,7 @@ namespace ModularClimateWeatherSystems
                 return -1;
             }
         }
-        internal int GetTemperature(double lon, double lat, double alt, double time, out double temp, ref DataInfo tempinfo, ref double tempblendwithstock)
+        internal int GetTemperature(double lon, double lat, double alt, double time, out double temp, ref DataInfo tempinfo)
         {
             temp = 0.0;
             if (TempData != null)
@@ -292,7 +330,6 @@ namespace ModularClimateWeatherSystems
                     temp = UtilMath.Lerp(UtilMath.Lerp((double)BottomPlane1, (double)TopPlane1, lerpz), UtilMath.Lerp((double)BottomPlane2, (double)TopPlane2, lerpz), lerpt);
                     if (double.IsFinite(temp))
                     {
-                        tempblendwithstock = BlendTempFactor;
                         tempinfo.SetNew(x1, x2, lerpx, y1, y2, lerpy, z1, z2, lerpz, timeindex, timeindex2, lerpt, alt > TempModelTop);
                         return alt > TempModelTop ? 1 : 0;
                     }
@@ -305,6 +342,36 @@ namespace ModularClimateWeatherSystems
             }
             return -1;
         }
+
+        internal int GetTemperatureOffset(double lon, double lat, double alt, double time, out double offset)
+        {
+            offset = 0.0;
+            int count = TempOffsetMaps.Count;
+            if (count > 0)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    offset += TempOffsetMaps[i].GetOffset(lon, lat, alt, time, Atmodepth);
+                }
+                return 0;
+            }
+            return -1;
+        }
+        internal int GetTemperatureSwingMultiplier(double lon, double lat, double alt, double time, out double swing)
+        {
+            swing = 1.0;
+            int count = TempSwingMultiplierMaps.Count;
+            if (count > 0)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    swing *= TempSwingMultiplierMaps[i].GetMultiplier(lon, lat, alt, time, Atmodepth);
+                }
+                return 0;
+            }
+            return -1;
+        }
+
         internal int GetPressure(double lon, double lat, double alt, double time, out double press, ref DataInfo pressinfo)
         {
             press = 0.0;
@@ -360,6 +427,21 @@ namespace ModularClimateWeatherSystems
             return -1;
         }
 
+        internal int GetPressureMultiplier(double lon, double lat, double alt, double time, out double multiplier)
+        {
+            multiplier = 1.0;
+            int count = PressMultiplierMaps.Count;
+            if (count > 0)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    multiplier *= PressMultiplierMaps[i].GetMultiplier(lon, lat, alt, time, Atmodepth);
+                }
+                return 0;
+            }
+            return -1;
+        }
+
         internal int GetWindData(double time, out float[][,,] dataarray)
         {
             dataarray = null;
@@ -380,6 +462,7 @@ namespace ModularClimateWeatherSystems
             }
             return -1;
         }
+
         internal int GetTemperatureData(double time, out float[,,] dataarray)
         {
             dataarray = null;
@@ -398,6 +481,7 @@ namespace ModularClimateWeatherSystems
             }
             return -1;
         }
+
         internal int GetPressureData(double time, out float[,,] dataarray)
         {
             dataarray = null;
@@ -418,25 +502,30 @@ namespace ModularClimateWeatherSystems
         }
     }
 
+    #region mapclasses
     internal class FlowMap
     {
-        internal Texture2D flowmap;
-        internal bool useThirdChannel; //whether or not to use the Blue channel to add a vertical component to the winds.
-        internal FloatCurve AltitudeSpeedMultCurve;
-        internal FloatCurve EW_AltitudeSpeedMultCurve;
-        internal FloatCurve NS_AltitudeSpeedMultCurve;
-        internal FloatCurve V_AltitudeSpeedMultCurve;
-        internal FloatCurve WindSpeedMultiplierTimeCurve;
-        internal float EWwind;
-        internal float NSwind;
-        internal float vWind;
+        private Texture2D flowmap;
+        private bool useThirdChannel = false; //whether or not to use the Blue channel to add a vertical component to the winds.
+        private bool normalizealtitudecurves = false;
+        private FloatCurve AltitudeSpeedMultCurve;
+        private FloatCurve EW_AltitudeSpeedMultCurve;
+        private FloatCurve NS_AltitudeSpeedMultCurve;
+        private FloatCurve V_AltitudeSpeedMultCurve;
+        private FloatCurve WindSpeedMultiplierTimeCurve;
+        private float EWwind = 0.0f;
+        private float NSwind = 0.0f;
+        private float vWind = 0.0f;
 
-        internal float timeoffset;
+        private bool canscroll = false;
+        private double scrollperiod = 0.0;
 
-        internal int x;
-        internal int y;
+        private float timeoffset = 0.0f;
 
-        internal FlowMap(Texture2D path, bool use3rdChannel, FloatCurve altmult, FloatCurve ewaltmultcurve, FloatCurve nsaltmultcurve, FloatCurve valtmultcurve, float EWwind, float NSwind, float vWind, FloatCurve speedtimecurve, float offset)
+        private int x = 0;
+        private int y = 0;
+
+        internal FlowMap(Texture2D path, bool use3rdChannel, FloatCurve altmult, FloatCurve ewaltmultcurve, FloatCurve nsaltmultcurve, FloatCurve valtmultcurve, float EWwind, float NSwind, float vWind, FloatCurve speedtimecurve, float offset, bool canscroll, double scrollperiod, bool normalizealtitudecurves)
         {
             flowmap = path;
             useThirdChannel = use3rdChannel;
@@ -445,23 +534,32 @@ namespace ModularClimateWeatherSystems
             NS_AltitudeSpeedMultCurve = nsaltmultcurve;
             V_AltitudeSpeedMultCurve = valtmultcurve;
             WindSpeedMultiplierTimeCurve = speedtimecurve;
+            this.normalizealtitudecurves = normalizealtitudecurves;
+            this.scrollperiod = scrollperiod;
+            this.canscroll = scrollperiod != 0.0 && canscroll;
             this.EWwind = EWwind;
             this.NSwind = NSwind;
             this.vWind = vWind;
-            timeoffset = WindSpeedMultiplierTimeCurve.maxTime != 0.0f ? offset % WindSpeedMultiplierTimeCurve.maxTime : 0.0f;
+            timeoffset = WindSpeedMultiplierTimeCurve.maxTime != 0.0f ? UtilMath.WrapAround(offset, 0.0f, WindSpeedMultiplierTimeCurve.maxTime) : 0.0f;
 
             x = flowmap.width;
             y = flowmap.height;
         }
 
-        internal Vector3 GetWindVec(double lon, double lat, double alt, double time)
+        internal Vector3 GetWindVec(double lon, double lat, double alt, double time, double atmodepth)
         {
             //AltitudeSpeedMultiplierCurve cannot go below 0.
+            if (normalizealtitudecurves)
+            {
+                alt = atmodepth > 0.0 ? alt / atmodepth : 1.0;
+            }
+
             float speedmult = Math.Max(AltitudeSpeedMultCurve.Evaluate((float)alt), 0.0f) * WindSpeedMultiplierTimeCurve.Evaluate((float)(time - timeoffset + WindSpeedMultiplierTimeCurve.maxTime) % WindSpeedMultiplierTimeCurve.maxTime);
             if (speedmult > 0.0f)
             {
+                double scroll = canscroll ? ((time / scrollperiod) * 360.0) % 360.0 : 0.0;
                 //adjust longitude so the center of the map is the prime meridian for the purposes of these calculations
-                double mapx = (((lon + 270.0) / 360.0) * x) - 0.5;
+                double mapx = ((UtilMath.WrapAround(lon + 630.0 - scroll, 0, 360) / 360.0) * x) - 0.5;
                 double mapy = (((lat + 90.0) / 180.0) * y) - 0.5;
                 double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
                 double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
@@ -496,4 +594,147 @@ namespace ModularClimateWeatherSystems
             return Vector3.zero;
         }
     }
+
+    internal class OffsetMap
+    {
+        private Texture2D offsetMap;
+        private double deformity = 0.0;
+        private double offset = 0.0;
+
+        private bool normalizealtitudecurve = false;
+        private FloatCurve AltitudeMultiplierCurve;
+        private FloatCurve TimeMultiplierCurve;
+        private bool canscroll = false;
+        private double scrollperiod = 0.0;
+
+        private int x = 0;
+        private int y = 0;
+
+        internal OffsetMap(Texture2D offsetMap, double deformity, double offset, FloatCurve altitudeMultiplierCurve, FloatCurve timeMultiplierCurve, bool canscroll, double scrollperiod, bool normalizealtitudecurve)
+        {
+            this.offsetMap = offsetMap;
+            this.deformity = deformity;
+            this.offset = offset;
+            AltitudeMultiplierCurve = altitudeMultiplierCurve;
+            TimeMultiplierCurve = timeMultiplierCurve;
+            this.scrollperiod = scrollperiod;
+            this.canscroll = scrollperiod != 0.0 && canscroll;
+            this.normalizealtitudecurve = normalizealtitudecurve;
+
+            x = offsetMap.width;
+            y = offsetMap.height;
+        }
+
+        internal double GetOffset(double lon, double lat, double alt, double time, double atmodepth)
+        {
+            if (normalizealtitudecurve)
+            {
+                alt = atmodepth > 0.0 ? alt / atmodepth : 0.0;
+            }
+
+            double multiplier = (double)(AltitudeMultiplierCurve.Evaluate((float)alt) * TimeMultiplierCurve.Evaluate((float)time % TimeMultiplierCurve.maxTime));
+            if (double.IsFinite(multiplier) && multiplier != 0.0)
+            {
+                double scroll = canscroll ? ((time / scrollperiod) * 360.0) % 360.0 : 0.0;
+                double mapx = ((UtilMath.WrapAround(lon + 630.0 - scroll, 0, 360) / 360.0) * x) - 0.5;
+                double mapy = (((lat + 90.0) / 180.0) * y) - 0.5;
+                double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
+                double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
+
+                //locate the four nearby points, but don't go over the poles.
+                int leftx = UtilMath.WrapAround((int)Math.Truncate(mapx), 0, x);
+                int topy = Utils.Clamp((int)Math.Truncate(mapy), 0, y - 1);
+                int rightx = UtilMath.WrapAround(leftx + 1, 0, x);
+                int bottomy = Utils.Clamp(topy + 1, 0, y - 1);
+
+                Color TopLeft = offsetMap.GetPixel(leftx, topy);
+                Color TopRight = offsetMap.GetPixel(rightx, topy);
+                Color BottomLeft = offsetMap.GetPixel(leftx, bottomy);
+                Color BottomRight = offsetMap.GetPixel(rightx, bottomy);
+
+                //get sum now, divide by 3 later
+                double TL = TopLeft.r + TopLeft.g + TopLeft.b;
+                double TR = TopRight.r + TopRight.g + TopRight.b;
+                double BL = BottomLeft.r + BottomLeft.g + BottomLeft.b;
+                double BR = BottomRight.r + BottomRight.g + BottomRight.b;
+
+                double value = ((UtilMath.Lerp(UtilMath.Lerp(TL, TR, lerpx), UtilMath.Lerp(BL, BR, lerpx), lerpy) * deformity) + offset) * multiplier * 0.3333333333;
+                return double.IsFinite(value) ? value : 0;
+            }
+
+            return 0.0;
+        }
+    }
+
+    internal class MultiplierMap
+    {
+        private Texture2D multiplierMap;
+        private double deformity = 0.0;
+        private double offset = 0.0;
+
+        private bool normalizealtitudecurve = false;
+        private FloatCurve AltitudeMultiplierCurve;
+        private FloatCurve TimeMultiplierCurve;
+        private bool canscroll = false;
+        private double scrollperiod = 0.0;
+
+        private int x = 0;
+        private int y = 0;
+
+        internal MultiplierMap(Texture2D multiplierMap, double deformity, double offset, FloatCurve altitudeMultiplierCurve, FloatCurve timeMultiplierCurve, bool canscroll, double scrollperiod, bool normalizealtitudecurve)
+        {
+            this.multiplierMap = multiplierMap;
+            this.deformity = Math.Max(-1.0, deformity);
+            this.offset = Math.Max(-1.0, offset);
+            AltitudeMultiplierCurve = altitudeMultiplierCurve;
+            TimeMultiplierCurve = timeMultiplierCurve;
+            this.scrollperiod = scrollperiod;
+            this.canscroll = scrollperiod != 0.0 && canscroll;
+            this.normalizealtitudecurve = normalizealtitudecurve;
+
+            x = multiplierMap.width;
+            y = multiplierMap.height;
+        }
+
+        internal double GetMultiplier(double lon, double lat, double alt, double time, double atmodepth)
+        {
+            if (normalizealtitudecurve)
+            {
+                alt = atmodepth > 0.0 ? alt / atmodepth : 0.0;
+            }
+
+            double multiplier = (double)(AltitudeMultiplierCurve.Evaluate((float)alt) * TimeMultiplierCurve.Evaluate((float)time % TimeMultiplierCurve.maxTime));
+            if (double.IsFinite(multiplier) && multiplier != 0.0)
+            {
+                double scroll = canscroll ? ((time / scrollperiod) * 360.0) % 360.0 : 0.0;
+                double mapx = ((UtilMath.WrapAround(lon + 630.0 - scroll, 0, 360) / 360.0) * x) - 0.5;
+                double mapy = (((lat + 90.0) / 180.0) * y) - 0.5;
+                double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
+                double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
+
+                //locate the four nearby points, but don't go over the poles.
+                int leftx = UtilMath.WrapAround((int)Math.Truncate(mapx), 0, x);
+                int topy = Utils.Clamp((int)Math.Truncate(mapy), 0, y - 1);
+                int rightx = UtilMath.WrapAround(leftx + 1, 0, x);
+                int bottomy = Utils.Clamp(topy + 1, 0, y - 1);
+
+                Color TopLeft = multiplierMap.GetPixel(leftx, topy);
+                Color TopRight = multiplierMap.GetPixel(rightx, topy);
+                Color BottomLeft = multiplierMap.GetPixel(leftx, bottomy);
+                Color BottomRight = multiplierMap.GetPixel(rightx, bottomy);
+
+                //get sum now, divide by 3 later
+                double TL = TopLeft.r + TopLeft.g + TopLeft.b;
+                double TR = TopRight.r + TopRight.g + TopRight.b;
+                double BL = BottomLeft.r + BottomLeft.g + BottomLeft.b;
+                double BR = BottomRight.r + BottomRight.g + BottomRight.b;
+
+                double value = ((UtilMath.Lerp(UtilMath.Lerp(TL, TR, lerpx), UtilMath.Lerp(BL, BR, lerpx), lerpy) * deformity) + offset) * multiplier * 0.3333333333;
+                return double.IsFinite(value) ? Math.Max(1.0 + value, 0.0) : 1.0;
+            }
+
+            return 1.0;
+        }
+    }
+    #endregion
 }
