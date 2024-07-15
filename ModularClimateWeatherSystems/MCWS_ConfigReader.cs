@@ -281,7 +281,7 @@ namespace ModularClimateWeatherSystems
                 ConfigNode[] flowmaps = node.GetNodes("Flowmap");
                 if(flowmaps.Length > 0)
                 {
-                    Utils.LogInfo("Loading Flowmap Objects for " + body);
+                    Utils.LogInfo("Loading Flowmaps for " + body);
                     foreach (ConfigNode flowmap in flowmaps)
                     {
                         try
@@ -299,6 +299,7 @@ namespace ModularClimateWeatherSystems
                 ConfigNode[] tempoffsetmaps = node.GetNodes("TemperatureOffsetMap");
                 if (tempoffsetmaps.Length > 0)
                 {
+                    Utils.LogInfo("Loading TemperatureOffsetMaps for " + body);
                     foreach (ConfigNode tempoffsetmap in tempoffsetmaps)
                     {
                         try
@@ -316,6 +317,7 @@ namespace ModularClimateWeatherSystems
                 ConfigNode[] tempswingmaps = node.GetNodes("TemperatureSwingMultiplierMap");
                 if (tempswingmaps.Length > 0)
                 {
+                    Utils.LogInfo("Loading TemperatureSwingMultiplierMaps for " + body);
                     foreach (ConfigNode tempswingmap in tempswingmaps)
                     {
                         try
@@ -333,6 +335,7 @@ namespace ModularClimateWeatherSystems
                 ConfigNode[] pressmaps = node.GetNodes("PressureMultiplierMap");
                 if (pressmaps.Length > 0)
                 {
+                    Utils.LogInfo("Loading PressureMultiplierMaps for " + body);
                     foreach (ConfigNode pressmap in pressmaps)
                     {
                         try
@@ -521,6 +524,7 @@ namespace ModularClimateWeatherSystems
             cn.TryGetValue("maxAlt", ref maxalt);
             cn.TryGetValue("windSpeed", ref windSpeed);
             cn.TryGetValue("nornmalizeAltitudeCurves", ref normalizealtitudecurves);
+            cn.TryGetValue("nornmalizeAltitudeCurve", ref normalizealtitudecurves);
 
             cn.TryGetValue("canScroll", ref canscroll);
             double period = float.MaxValue;
@@ -694,6 +698,7 @@ namespace ModularClimateWeatherSystems
                 canscroll = false; //failsafe to prevent things from breaking down
             }
             cn.TryGetValue("nornmalizeAltitudeCurves", ref normalizealtitudecurves);
+            cn.TryGetValue("nornmalizeAltitudeCurve", ref normalizealtitudecurves);
         }
 
         //Creates the float curve, or if one isnt available, converts a relevant float value into one.

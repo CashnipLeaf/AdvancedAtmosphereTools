@@ -122,7 +122,7 @@ namespace ModularClimateWeatherSystems
 
         internal int AddTemperatureData(float[][,,] Temp, double scalefactor, double timestep, double modeltop, double lonoffset, double timeoffset, bool blendwithstock, double blendfactor)
         {
-            if (HasTemperature)
+            if (HasTemperatureData)
             {
                 Utils.LogWarning(string.Format("Temperature data already exists for {0}.", body));
                 return -1;
@@ -144,7 +144,7 @@ namespace ModularClimateWeatherSystems
 
         internal int AddPressureData(float[][,,] Press, double scalefactor, double timestep, double modeltop, double lonoffset, double timeoffset)
         {
-            if (HasPressure)
+            if (HasPressureData)
             {
                 Utils.LogWarning(string.Format("Pressure data already exists for {0}.", body));
                 return -1;

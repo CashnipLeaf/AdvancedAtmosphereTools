@@ -173,7 +173,7 @@ namespace ModularClimateWeatherSystems
                 Temperature = stocktemperature = derivedtemp = maptemperature = FI != null ? mainbody.GetFullTemperature(alt, temperatureoffset) : mainbody.GetTemperature(alt);
                 Pressure = derivedpressure = mappressure = stockpressure = mainbody.GetPressure(alt);
 
-                int extwindcode = MCWS_API.GetExternalWind(mainbody.name, lon, lat, alt, CurrentTime, out Vector3 extwind);
+                int extwindcode = MCWS_API.GetExternalWind(mainbody.name, lon, lat, Math.Max(alt, 0.0), CurrentTime, out Vector3 extwind);
                 if (extwindcode == 0)
                 {
                     normalwind.Set(extwind);
@@ -183,7 +183,7 @@ namespace ModularClimateWeatherSystems
                 {
                     try
                     {
-                        int retcode = Data.GetWind(mainbody.name, lon, lat, alt, CurrentTime, out Vector3 datavec, out Vector3 flowmapvec, out DataInfo winfo);
+                        int retcode = Data.GetWind(mainbody.name, lon, lat, Math.Max(alt, 0.0), CurrentTime, out Vector3 datavec, out Vector3 flowmapvec, out DataInfo winfo);
                         if (retcode >= 0)
                         {
                             if (retcode == 2)
@@ -233,7 +233,7 @@ namespace ModularClimateWeatherSystems
                     HasWind = hasflowmaps = haswinddata = false;
                 }
 
-                int exttempcode = MCWS_API.GetExternalTemperature(mainbody.name, lon, lat, alt, CurrentTime, out double exttemp);
+                int exttempcode = MCWS_API.GetExternalTemperature(mainbody.name, lon, lat, Math.Max(alt, 0.0), CurrentTime, out double exttemp);
                 if (exttempcode == 0) 
                 {
                     Temperature = exttemp;
@@ -244,7 +244,7 @@ namespace ModularClimateWeatherSystems
                 {
                     try
                     {
-                        int tempretcode = Data.GetTemperature(mainbody.name, lon, lat, alt, CurrentTime, out double Final, out DataInfo tinfo);
+                        int tempretcode = Data.GetTemperature(mainbody.name, lon, lat, Math.Max(alt, 0.0), CurrentTime, out double Final, out DataInfo tinfo);
                         bool tempdatagood = false;
                         switch (tempretcode)
                         {
@@ -275,7 +275,7 @@ namespace ModularClimateWeatherSystems
                             tempretcode = -1;
                         }
 
-                        int tempmapretcode = Data.GetTemperatureMapData(mainbody.name, lon, lat, alt, CurrentTime, out double tempoffset, out double tempswingmult);
+                        int tempmapretcode = Data.GetTemperatureMapData(mainbody.name, lon, lat, Math.Max(alt, 0.0), CurrentTime, out double tempoffset, out double tempswingmult);
                         if (tempmapretcode >= 0)
                         {
                             double latbias = mainbody.latitudeTemperatureBiasCurve.Evaluate((float)Math.Abs(lat));
@@ -335,7 +335,7 @@ namespace ModularClimateWeatherSystems
                     HasTemp = usinginternaltemperature = false;
                 }
 
-                int extpresscode = MCWS_API.GetExternalPressure(mainbody.name, lon, lat, alt, CurrentTime, out double extpress);
+                int extpresscode = MCWS_API.GetExternalPressure(mainbody.name, lon, lat, Math.Max(alt, 0.0), CurrentTime, out double extpress);
                 if (extpresscode == 0)
                 {
                     Pressure = extpress * 0.001;
@@ -347,7 +347,7 @@ namespace ModularClimateWeatherSystems
                 {
                     try
                     {
-                        int pressretcode = Data.GetPressure(mainbody.name, lon, lat, alt, CurrentTime, out double Final, out DataInfo pinfo);
+                        int pressretcode = Data.GetPressure(mainbody.name, lon, lat, Math.Max(alt, 0.0), CurrentTime, out double Final, out DataInfo pinfo);
                         bool pressdatagood = false;
                         switch (pressretcode)
                         {
@@ -381,7 +381,7 @@ namespace ModularClimateWeatherSystems
                             pressretcode = -1;
                         }
 
-                        int pressmapretcode = Data.GetPressureMapData(mainbody.name, lon, lat, alt, CurrentTime, out double pressmult);
+                        int pressmapretcode = Data.GetPressureMapData(mainbody.name, lon, lat, Math.Max(alt, 0.0), CurrentTime, out double pressmult);
                         if(pressmapretcode >= 0)
                         {
                             mappressure = stockpressure * pressmult;
