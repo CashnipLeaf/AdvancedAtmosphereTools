@@ -190,7 +190,7 @@ namespace ModularClimateWeatherSystems
                             {
                                 datawind.Zero();
                                 flowmapwind.Set(flowmapvec);
-                                normalwind.Set(flowmapwind);
+                                normalwind.Set(flowmapvec);
                                 hasflowmaps = true;
                             }
                             else if (retcode == 1)
@@ -205,8 +205,7 @@ namespace ModularClimateWeatherSystems
                             {
                                 datawind.Set(datavec);
                                 flowmapwind.Set(flowmapvec);
-                                normalwind.Set(datawind);
-                                normalwind.Add(flowmapwind);
+                                normalwind = datawind + flowmapwind;
                                 haswinddata = hasflowmaps = true;
                                 WindDataInfo.SetNew(winfo);
                             }

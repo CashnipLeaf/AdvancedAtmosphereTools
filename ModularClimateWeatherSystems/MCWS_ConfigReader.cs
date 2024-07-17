@@ -286,7 +286,7 @@ namespace ModularClimateWeatherSystems
                     {
                         try
                         {
-                            bodydata[body].AddFlowMap(ReadFlowMapNode(flowmap));
+                            bodydata[body].AddFlowMap(ReadFlowMapNode(flowmap, bod.atmosphereDepth));
                         }
                         catch (Exception ex)
                         {
@@ -501,15 +501,12 @@ namespace ModularClimateWeatherSystems
         #endregion
 
         #region maphelpers
-        internal FlowMap ReadFlowMapNode(ConfigNode cn)
+        internal FlowMap ReadFlowMapNode(ConfigNode cn, double atmodepth)
         {
             bool thirdchannel = false;
             float minalt = 0.0f;
-            float maxalt = float.MaxValue;
+            float maxalt = (float)atmodepth;
             float windSpeed = 0.0f;
-            float EWwind = 0.0f;
-            float NSwind = 0.0f;
-            float vWind = 0.0f;
             string path = "";
             bool curveExists;
 
@@ -523,8 +520,13 @@ namespace ModularClimateWeatherSystems
             cn.TryGetValue("minAlt", ref minalt);
             cn.TryGetValue("maxAlt", ref maxalt);
             cn.TryGetValue("windSpeed", ref windSpeed);
-            cn.TryGetValue("nornmalizeAltitudeCurves", ref normalizealtitudecurves);
-            cn.TryGetValue("nornmalizeAltitudeCurve", ref normalizealtitudecurves);
+            float EWwind = windSpeed;
+            float NSwind = windSpeed;
+            float vWind = windSpeed;
+
+            cn.TryGetValue("eastWestWindSpeed", ref EWwind);
+            cn.TryGetValue("northSouthWindSpeed", ref NSwind);
+            cn.TryGetValue("verticalWindSpeed", ref vWind);
 
             cn.TryGetValue("canScroll", ref canscroll);
             double period = float.MaxValue;
@@ -540,21 +542,10 @@ namespace ModularClimateWeatherSystems
             {
                 scrollperiod = 1 / (360 * period);
             }
+
             if (!double.IsFinite(scrollperiod) || scrollperiod == 0.0)
             {
                 canscroll = false; //failsafe to prevent things from breaking down
-            }
-            if (!cn.TryGetValue("eastWestWindSpeed", ref EWwind))
-            {
-                EWwind = windSpeed;
-            }
-            if (!cn.TryGetValue("northSouthWindSpeed", ref NSwind))
-            {
-                NSwind = windSpeed;
-            }
-            if (!cn.TryGetValue("verticalWindSpeed", ref vWind))
-            {
-                vWind = windSpeed;
             }
 
             cn.TryGetValue("map", ref path);
@@ -576,7 +567,7 @@ namespace ModularClimateWeatherSystems
             float difference = Math.Min(1000.0f, (maxalt - minalt) / 10.0f);
             if (minalt == 0.0f)
             {
-                minalt -= difference;
+                minalt = -difference;
             }
             float lowerfade = minalt + difference;
             float upperfade = maxalt - difference;

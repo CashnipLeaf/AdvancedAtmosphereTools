@@ -259,10 +259,9 @@ namespace ModularClimateWeatherSystems
                     int count = Flowmaps.Count;
                     if (count > 0)
                     {
-                        for (int i = 0; i < count; i++)
+                        foreach (FlowMap map in Flowmaps)
                         {
-                            FlowMap map = Flowmaps[i];
-                            flowmapvector.Add(map.GetWindVec(lon, lat, alt, time, Atmodepth));
+                            flowmapvector += map.GetWindVec(lon, lat, alt, time, Atmodepth);
                         }
                         flowmapgood = flowmapvector.IsFinite();
                     }
@@ -549,17 +548,12 @@ namespace ModularClimateWeatherSystems
         internal Vector3 GetWindVec(double lon, double lat, double alt, double time, double atmodepth)
         {
             //AltitudeSpeedMultiplierCurve cannot go below 0.
-            if (normalizealtitudecurves)
-            {
-                alt = atmodepth > 0.0 ? alt / atmodepth : 1.0;
-            }
-
-            float speedmult = Math.Max(AltitudeSpeedMultCurve.Evaluate((float)alt), 0.0f) * WindSpeedMultiplierTimeCurve.Evaluate((float)(time - timeoffset + WindSpeedMultiplierTimeCurve.maxTime) % WindSpeedMultiplierTimeCurve.maxTime);
+            float speedmult = Math.Max(AltitudeSpeedMultCurve.Evaluate((float)alt) * WindSpeedMultiplierTimeCurve.Evaluate((float)(time - timeoffset + WindSpeedMultiplierTimeCurve.maxTime) % WindSpeedMultiplierTimeCurve.maxTime), 0.0f);
             if (speedmult > 0.0f)
             {
                 double scroll = canscroll ? ((time / scrollperiod) * 360.0) % 360.0 : 0.0;
                 //adjust longitude so the center of the map is the prime meridian for the purposes of these calculations
-                double mapx = ((UtilMath.WrapAround(lon + 630.0 - scroll, 0, 360) / 360.0) * x) - 0.5;
+                double mapx = ((UtilMath.WrapAround(lon + 630.0 - scroll, 0.0, 360.0) / 360.0) * x) - 0.5;
                 double mapy = (((lat + 90.0) / 180.0) * y) - 0.5;
                 double lerpx = UtilMath.Clamp01(mapx - Math.Truncate(mapx));
                 double lerpy = UtilMath.Clamp01(mapy - Math.Truncate(mapy));
@@ -581,8 +575,8 @@ namespace ModularClimateWeatherSystems
 
                 for (int i = 0; i < 4; i++)
                 {
-                    windx[i] = (colors[i].r * 2.0f) - 1.0f;
-                    windz[i] = (colors[i].g * 2.0f) - 1.0f;
+                    windx[i] = (colors[i].r * 2.0) - 1.0;
+                    windz[i] = (colors[i].g * 2.0) - 1.0;
                     windy[i] = useThirdChannel ? (colors[i].b * 2.0f) - 1.0f : 0.0f;
                 }
                 double windvecx = UtilMath.Lerp(UtilMath.Lerp(windx[0], windx[1], lerpx), UtilMath.Lerp(windx[2], windx[3], lerpx), lerpy) * NSwind * NS_AltitudeSpeedMultCurve.Evaluate((float)alt) * speedmult;
