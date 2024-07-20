@@ -3,19 +3,19 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 
-namespace ModularClimateWeatherSystems
+namespace AdvancedAtmosphereTools
 {
     internal static class Utils
     {
-        internal const string version = "0.9.8";
+        internal const string version = "1.0.0";
         internal static string GameDataPath => KSPUtil.ApplicationRootPath + "GameData/";
         internal static Dictionary<string, string> LOCCache; //localization cache
 
-        internal static void LogInfo(string message) => Debug.Log("[MCWS] " + message); //General information
-        internal static void LogWarning(string message) => Debug.LogWarning("[MCWS][WARNING] " + message); //Warnings indicate that MCWS may be operating at reduced functionality.
-        internal static void LogAPI(string message) => Debug.Log("[MCWS][API] " + message); //API Logging
-        internal static void LogAPIWarning(string message) => Debug.LogWarning("[MCWS][API WARNING] " + message); //API warnings
-        internal static void LogError(string message) => Debug.LogError("[MCWS][ERROR] " + message); //Errors that invoke fail-safe protections.
+        internal static void LogInfo(string message) => Debug.Log("[AdvAtmoTools] " + message); //General information
+        internal static void LogWarning(string message) => Debug.LogWarning("[AdvAtmoTools][WARNING] " + message); //Warnings indicate that AdvAtmoTools may be operating at reduced functionality.
+        internal static void LogAPI(string message) => Debug.Log("[AdvAtmoTools][API] " + message); //API Logging
+        internal static void LogAPIWarning(string message) => Debug.LogWarning("[AdvAtmoTools][API WARNING] " + message); //API warnings
+        internal static void LogError(string message) => Debug.LogError("[AdvAtmoTools][ERROR] " + message); //Errors that invoke fail-safe protections.
 
         //------------------------------MATH AND RELATED-------------------------
         internal static double Epsilon => float.Epsilon * 16d; //value that is very nearly zero to prevent the log interpolation from breaking

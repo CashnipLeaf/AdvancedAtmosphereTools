@@ -3,17 +3,13 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
-namespace ModularClimateWeatherSystems
+namespace AdvancedAtmosphereTools
 {
-    partial class MCWS_Startup
+    partial class AAT_Startup
     {
         #region readconfigs
-        void ReadConfigs() //why did I put myself through the pain of writing this?
+        void ReadConfigs(ConfigNode[] DataNodes) //why did I put myself through the pain of writing this?
         {
-            Utils.LogInfo("Loading configs.");
-
-            bodydata = new Dictionary<string, MCWS_BodyData>();
-            ConfigNode[] DataNodes = GameDatabase.Instance.GetConfigNodes("MCWS_DATA");
             foreach (ConfigNode node in DataNodes)
             {
                 string body = "";
@@ -32,7 +28,7 @@ namespace ModularClimateWeatherSystems
                 Utils.LogInfo(string.Format("Loading config for {0}.", body));
                 if (!bodydata.ContainsKey(body))
                 {
-                    bodydata.Add(body, new MCWS_BodyData(body, bod));
+                    bodydata.Add(body, new AAT_BodyData(body, bod));
                 }
 
                 ConfigNode data = new ConfigNode();
@@ -354,7 +350,7 @@ namespace ModularClimateWeatherSystems
 
             //clean up BodyData objects with no data in them, or that somehow got assigned to a body with no atmosphere.
             List<string> todelete = new List<string>();
-            foreach (KeyValuePair<string, MCWS_BodyData> pair in bodydata)
+            foreach (KeyValuePair<string, AAT_BodyData> pair in bodydata)
             {
                 if (!pair.Value.HasAtmo || (!pair.Value.HasWind && !pair.Value.HasTemperature && !pair.Value.HasPressure && !pair.Value.HasFlowmaps))
                 {

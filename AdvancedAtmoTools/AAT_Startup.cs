@@ -5,15 +5,15 @@ using UnityEngine;
 using KSP.Localization;
 using ToolbarControl_NS;
 
-namespace ModularClimateWeatherSystems
+namespace AdvancedAtmosphereTools
 {
     //Sets up plugin settings.
     [KSPAddon(KSPAddon.Startup.MainMenu, true)]
-    partial class MCWS_Startup : MonoBehaviour
+    partial class AAT_Startup : MonoBehaviour
     {
-        public static MCWS_Startup Instance { get; private set; }
+        public static AAT_Startup Instance { get; private set; }
 
-        internal Dictionary<string, MCWS_BodyData> bodydata;
+        internal Dictionary<string, AAT_BodyData> bodydata;
 
         #region startup
         void Awake()
@@ -21,9 +21,9 @@ namespace ModularClimateWeatherSystems
             if (Instance == null)
             {
                 Instance = this;
-                Utils.LogInfo("Initializing Modular Climate & Weather Systems: Version " + Utils.version);
+                Utils.LogInfo("Initializing Advanced Atmosphere Tools: Version " + Utils.version);
 
-                ConfigNode[] settingsnodes = GameDatabase.Instance.GetConfigNodes("MCWS_SETTINGS");
+                ConfigNode[] settingsnodes = GameDatabase.Instance.GetConfigNodes("AAT_SETTINGS");
                 if(settingsnodes.Length > 0 )
                 {
                     bool debug = false;
@@ -45,7 +45,7 @@ namespace ModularClimateWeatherSystems
                         if (tags.Current != null)
                         {
                             string tag = tags.Current.ToString();
-                            if (tag.Contains("#LOC_MCWS_"))
+                            if (tag.Contains("#LOC_AAT_"))
                             {
                                 Utils.LOCCache.Add(tag, Localizer.GetStringByTag(tag).Replace("\\n", "\n"));
                             }
@@ -58,21 +58,21 @@ namespace ModularClimateWeatherSystems
                     Utils.LogError("Exception thrown when caching Localization Tags: " + ex.ToString());
                 }
 
-                Utils.LogInfo("Registering MCWS with the toolbar controller.");
+                Utils.LogInfo("Registering AAT with the toolbar controller.");
                 try
                 {
-                    if (ToolbarControl.RegisterMod(MCWS_FlightHandler.modID, MCWS_FlightHandler.modNAME))
+                    if (ToolbarControl.RegisterMod(AAT_FlightHandler.modID, AAT_FlightHandler.modNAME))
                     {
-                        Utils.LogInfo("Successfully registered MCWS with the toolbar controller.");
+                        Utils.LogInfo("Successfully registered AAT with the toolbar controller.");
                     }
                     else
                     {
-                        Utils.LogWarning("Unable to register MCWS with the toolbar. MCWS's UI will not be available.");
+                        Utils.LogWarning("Unable to register AAT with the toolbar. AAT's UI will not be available.");
                     }
                 }
                 catch (Exception e)
                 {
-                    Utils.LogError("Exception thrown when registering MCWS with the toolbar controller: " + e.ToString());
+                    Utils.LogError("Exception thrown when registering AAT with the toolbar controller: " + e.ToString());
                 }
 
                 Utils.LogInfo("Checking for an instance of FerramAerospaceResearch.");
@@ -105,9 +105,14 @@ namespace ModularClimateWeatherSystems
                     Utils.LogError("Exception thrown when checking for FerramAerospaceResearch: " + ex.ToString());
                     Settings.FAR_Exists = false;
                 }
-                ReadConfigs();
 
-                Utils.LogInfo("MCWS Setup Complete.");
+                Utils.LogInfo("Loading configs.");
+                bodydata = new Dictionary<string, AAT_BodyData>();
+
+                ConfigNode[] DataNodes = GameDatabase.Instance.GetConfigNodes("AAT_DATA");
+                ReadConfigs(DataNodes);
+
+                Utils.LogInfo("AAT Setup Complete.");
                 DontDestroyOnLoad(this);
             }
             else

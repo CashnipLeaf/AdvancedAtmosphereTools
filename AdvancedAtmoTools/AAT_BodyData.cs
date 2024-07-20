@@ -2,14 +2,14 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace ModularClimateWeatherSystems
+namespace AdvancedAtmosphereTools
 {
     //Return codes: 
     //0 = all clear
     //1 = additional post-processing needed
     //-1 = no data
     //-2 = error or exception
-    internal class MCWS_BodyData
+    internal class AAT_BodyData
     {
         private readonly string body;
         internal bool HasAtmo { get; private set; } = false;
@@ -81,13 +81,24 @@ namespace ModularClimateWeatherSystems
         internal bool BlendPressWithStock => (HasPressureData && HasPressureMaps) || blendpresswithstock;
         internal double BlendPressFactor { get; private set; } = 0.5;
 
+        internal FloatCurve MolarMassCurve;
+        internal bool HasMolarMassCurve => MolarMassCurve != null;
+        internal List<OffsetMap> MolarMassOffsetMaps;
+        internal bool HasMolarMassOffset => MolarMassOffsetMaps != null && MolarMassOffsetMaps.Count > 0;
 
-        internal MCWS_BodyData(string body, CelestialBody bod)
+        internal FloatCurve AdiabaticIndexCurve;
+        internal bool HasAdiabaticIndexCurve => AdiabaticIndexCurve != null;
+        internal List<OffsetMap> AdiabaticIndexOffsetMaps;
+        internal bool HasAdiabaticIndexOffset => AdiabaticIndexOffsetMaps != null && AdiabaticIndexOffsetMaps.Count > 0;
+
+        internal AAT_BodyData(string body, CelestialBody bod)
         {
             Flowmaps = new List<FlowMap>();
             TempOffsetMaps = new List<OffsetMap>();
             TempSwingMultiplierMaps = new List<MultiplierMap>();
             PressMultiplierMaps = new List<MultiplierMap>();
+            MolarMassOffsetMaps = new List<OffsetMap>();
+            AdiabaticIndexOffsetMaps = new List<OffsetMap>();
 
             this.body = body;
             HasAtmo = bod.atmosphere;
@@ -186,6 +197,34 @@ namespace ModularClimateWeatherSystems
             return PressMultiplierMaps == null ? -1 : 0;
         }
 
+        internal int SetMolarMassCurve(FloatCurve fc)
+        {
+            if (MolarMassCurve != null)
+            {
+                Utils.LogWarning(body + " already has a MolarMassCurve.");
+                return -1;
+            }
+            else
+            {
+                MolarMassCurve = fc;
+                return 0;
+            }
+        }
+
+        internal int SetAdiabaticIndexCurve(FloatCurve fc)
+        {
+            if (AdiabaticIndexCurve != null)
+            {
+                Utils.LogWarning(body + " already has an AdiabaticIndexCurve.");
+                return -1;
+            }
+            else
+            {
+                AdiabaticIndexCurve = fc;
+                return 0;
+            }
+        }
+
         internal int GetWind(double lon, double lat, double alt, double time, ref Vector3 winddatavector, ref Vector3 flowmapvector, ref DataInfo windinfo)
         {
             bool winddatagood = false;
@@ -261,7 +300,7 @@ namespace ModularClimateWeatherSystems
                     {
                         foreach (FlowMap map in Flowmaps)
                         {
-                            flowmapvector += map.GetWindVec(lon, lat, alt, time, Atmodepth);
+                            flowmapvector.Add(map.GetWindVec(lon, lat, alt, time, Atmodepth));
                         }
                         flowmapgood = flowmapvector.IsFinite();
                     }
@@ -621,11 +660,6 @@ namespace ModularClimateWeatherSystems
 
         internal double GetOffset(double lon, double lat, double alt, double time, double atmodepth)
         {
-            if (normalizealtitudecurve)
-            {
-                alt = atmodepth > 0.0 ? alt / atmodepth : 0.0;
-            }
-
             double multiplier = (double)(AltitudeMultiplierCurve.Evaluate((float)alt) * TimeMultiplierCurve.Evaluate((float)time % TimeMultiplierCurve.maxTime));
             if (double.IsFinite(multiplier) && multiplier != 0.0)
             {
@@ -692,11 +726,6 @@ namespace ModularClimateWeatherSystems
 
         internal double GetMultiplier(double lon, double lat, double alt, double time, double atmodepth)
         {
-            if (normalizealtitudecurve)
-            {
-                alt = atmodepth > 0.0 ? alt / atmodepth : 0.0;
-            }
-
             double multiplier = (double)(AltitudeMultiplierCurve.Evaluate((float)alt) * TimeMultiplierCurve.Evaluate((float)time % TimeMultiplierCurve.maxTime));
             if (double.IsFinite(multiplier) && multiplier != 0.0)
             {
