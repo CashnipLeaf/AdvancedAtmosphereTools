@@ -1,11 +1,10 @@
 ﻿using System;
 using System.Reflection;
 using UnityEngine;
+using Random = System.Random; //there apparently exists a UnityEngine.Random, which is not what I want or need.
 
 namespace AdvancedAtmosphereTools
 {
-    using Random = System.Random; //there apparently exists a UnityEngine.Random, which is not what I want or need.
-
     //Delegates for FAR
     using WindDelegate = Func<CelestialBody, Part, Vector3, Vector3>;
     using PropertyDelegate = Func<CelestialBody, Vector3d, double, double>;
@@ -52,7 +51,12 @@ namespace AdvancedAtmosphereTools
         private double stocktemperature = PhysicsGlobals.SpaceTemperature;
         private double derivedtemp = PhysicsGlobals.SpaceTemperature;
         private double maptemperature = PhysicsGlobals.SpaceTemperature;
-        private bool usinginternaltemperature = false;
+        private double tempswingmult = 1.0;
+        private double tempoffset = 0.0;
+        private bool hastempoffset = false;
+        private bool hastempswingmult = false;
+        private bool hastempdata = false;
+        private bool hastempmaps = false;
 
         private double pressure = 0.0;
         internal double Pressure
@@ -63,7 +67,9 @@ namespace AdvancedAtmosphereTools
         private double stockpressure = 0.0;
         private double derivedpressure = 0.0;
         private double mappressure = 0.0;
-        private bool usinginternalpressure = false;
+        private double pressmult = 1.0;
+        private bool haspressmult = false;
+        private bool haspressdata = false;
 
         private double pressuremultiplier = 1.0;
         internal double FIPressureMultiplier
@@ -82,6 +88,25 @@ namespace AdvancedAtmosphereTools
             get => molarmass;
             set => molarmass = Math.Max(value, 0.0);
         }
+        private double stockmolarmass = 0.0;
+        private double basemolarmass = 0.0;
+        private double molarmassoffset = 0.0;
+        internal bool HasMolarMass = false;
+        private bool hasbasemolarmass = false;
+        private bool hasmolarmassoffset = false;
+
+        private double adiabaticindex = 0.0;
+        internal double AdiabaticIndex
+        {
+            get => adiabaticindex;
+            set => adiabaticindex = Math.Max(value, 0.0);
+        }
+        private double stockadiabaticindex = 0.0;
+        private double baseadiabaticindex = 0.0;
+        private double adiabaticindexoffset = 0.0;
+        internal bool HasAdiabaticIndex = false;
+        private bool hasbaseadiabaticindex = false;
+        private bool hasadiabaticindexoffset = false;
 
         //stuff for wind speed variability
         private Random varywind;
@@ -135,7 +160,7 @@ namespace AdvancedAtmosphereTools
             WindDataInfo.SetZero();
             TemperatureDataInfo.SetZero();
             PressureDataInfo.SetZero();
-            HasWind = HasTemp = HasPress = hasflowmaps = haswinddata = usinginternaltemperature = usinginternalpressure = false;
+            HasWind = hasflowmaps = haswinddata = HasTemp = hastempdata = hastempmaps = hastempoffset = hastempswingmult = HasPress = haspressdata = haspressmult =  HasMolarMass = hasbasemolarmass = hasmolarmassoffset = HasAdiabaticIndex = hasbaseadiabaticindex = hasadiabaticindexoffset = false;
             FIPressureMultiplier = 1.0;
 
             if (!FlightGlobals.ready || FlightGlobals.ActiveVessel == null)
@@ -148,6 +173,7 @@ namespace AdvancedAtmosphereTools
             double lat = activevessel.latitude;
             double alt = activevessel.altitude;
             mainbody = activevessel.mainBody;
+            string bodyname = mainbody.name;
 
             //Get the worldframe of the vessel in question to transform the wind vectors to the global coordinate frame.
             Vesselframe.SetColumn(0, (Vector3)activevessel.north);
@@ -179,18 +205,21 @@ namespace AdvancedAtmosphereTools
                 double temperatureoffset = FI != null ? FI.atmosphereTemperatureOffset : 0.0;
                 Temperature = stocktemperature = derivedtemp = maptemperature = FI != null ? mainbody.GetFullTemperature(alt, temperatureoffset) : mainbody.GetTemperature(alt);
                 Pressure = derivedpressure = mappressure = stockpressure = mainbody.GetPressure(alt);
+                MolarMass = stockmolarmass = basemolarmass = mainbody.atmosphereMolarMass;
+                AdiabaticIndex = stockadiabaticindex = baseadiabaticindex = mainbody.atmosphereAdiabaticIndex;
+                molarmassoffset = adiabaticindexoffset = 0.0;
 
-                int extwindcode = AAT_API.GetExternalWind(mainbody.name, lon, lat, Math.Max(alt, 0.0), CurrentTime, out Vector3 extwind);
+                int extwindcode = AAT_API.GetExternalWind(bodyname, lon, lat, Math.Max(alt, 0.0), CurrentTime, out Vector3 extwind);
                 if (extwindcode == 0)
                 {
                     normalwind.Set(extwind);
                     HasWind = true;
                 }
-                else if (Data.HasWind(mainbody.name))
+                else if (Data.HasWind(bodyname))
                 {
                     try
                     {
-                        int retcode = Data.GetWind(mainbody.name, lon, lat, Math.Max(alt, 0.0), CurrentTime, out Vector3 datavec, out Vector3 flowmapvec, out DataInfo winfo);
+                        int retcode = Data.GetWind(bodyname, lon, lat, Math.Max(alt, 0.0), CurrentTime, out Vector3 datavec, out Vector3 flowmapvec, out DataInfo winfo);
                         if (retcode >= 0)
                         {
                             if (retcode == 2)
@@ -224,33 +253,27 @@ namespace AdvancedAtmosphereTools
                     {
                         Utils.LogError("Exception thrown when deriving point Wind data for " + mainbody.name + ": " + ex.ToString());
                         normalwind.Zero();
-                        transformedwind.Zero();
-                        RawWind.Zero();
-                        AppliedWind.Zero();
-                        InternalAppliedWind.Zero();
-                        datawind.Zero();
-                        flowmapwind.Zero();
-                        WindDataInfo.SetZero();
                         HasWind = haswinddata = hasflowmaps = false;
                     }
                 }
                 else
                 {
+                    normalwind.Zero();
                     HasWind = hasflowmaps = haswinddata = false;
                 }
 
-                int exttempcode = AAT_API.GetExternalTemperature(mainbody.name, lon, lat, Math.Max(alt, 0.0), CurrentTime, out double exttemp);
+                int exttempcode = AAT_API.GetExternalTemperature(bodyname, lon, lat, Math.Max(alt, 0.0), CurrentTime, out double exttemp);
                 if (exttempcode == 0) 
                 {
                     Temperature = exttemp;
                     HasTemp = true;
-                    usinginternaltemperature = false;
+                    hastempdata = hastempmaps = false;
                 }
-                else if (Data.HasTemperature(mainbody.name))
+                else if (Data.HasTemperature(bodyname))
                 {
                     try
                     {
-                        int tempretcode = Data.GetTemperature(mainbody.name, lon, lat, Math.Max(alt, 0.0), CurrentTime, out double Final, out DataInfo tinfo);
+                        int tempretcode = Data.GetTemperature(bodyname, lon, lat, Math.Max(alt, 0.0), CurrentTime, out double Final, out DataInfo tinfo);
                         bool tempdatagood = false;
                         switch (tempretcode)
                         {
@@ -263,7 +286,7 @@ namespace AdvancedAtmosphereTools
                                 TemperatureDataInfo.SetNew(tinfo);
                                 break;
                             case 1:
-                                double TempModelTop = Math.Min(Data.TemperatureModelTop(mainbody.name), mainbody.atmosphereDepth);
+                                double TempModelTop = Math.Min(Data.TemperatureModelTop(bodyname), mainbody.atmosphereDepth);
                                 double extralerp = (alt - TempModelTop) / (mainbody.atmosphereDepth - TempModelTop);
                                 double temp = UtilMath.Lerp(Final, stocktemperature, Math.Pow(extralerp, 0.25));
                                 if (double.IsFinite(temp))
@@ -281,7 +304,7 @@ namespace AdvancedAtmosphereTools
                             tempretcode = -1;
                         }
 
-                        int tempmapretcode = Data.GetTemperatureMapData(mainbody.name, lon, lat, Math.Max(alt, 0.0), CurrentTime, out double tempoffset, out double tempswingmult);
+                        int tempmapretcode = Data.GetTemperatureMapData(bodyname, lon, lat, Math.Max(alt, 0.0), CurrentTime, out tempoffset, out tempswingmult);
                         if (tempmapretcode >= 0)
                         {
                             double latbias = mainbody.latitudeTemperatureBiasCurve.Evaluate((float)Math.Abs(lat));
@@ -291,12 +314,17 @@ namespace AdvancedAtmosphereTools
                             {
                                 case 1:
                                     maptemperature = stocktemperature + tempoffset;
+                                    hastempoffset = true;
+                                    hastempswingmult = false;
                                     break;
                                 case 2:
                                     maptemperature = mainbody.GetFullTemperature(alt, newoffset + latbias);
+                                    hastempoffset = false;
+                                    hastempswingmult = true;
                                     break;
                                 default:
                                     maptemperature = mainbody.GetFullTemperature(alt, newoffset + latbias) + tempoffset;
+                                    hastempoffset = hastempswingmult = true;
                                     break;
                             }
                             if (!double.IsFinite(maptemperature))
@@ -305,55 +333,56 @@ namespace AdvancedAtmosphereTools
                             }
                         }
 
-                        bool blendtemp = Data.BlendTemperature(mainbody.name, out double tempblendfactor);
+                        bool blendtemp = Data.BlendTemperature(bodyname, out double tempblendfactor);
                         if (tempretcode >= 0 && tempmapretcode >= 0)
                         {
                             Temperature = UtilMath.Lerp(derivedtemp, maptemperature, tempblendfactor);
-                            HasTemp = usinginternaltemperature = true;
+                            HasTemp = hastempdata = hastempmaps = true;
                         }
                         else if (tempretcode >= 0 && tempmapretcode < 0)
                         {
                             Temperature = blendtemp ? UtilMath.Lerp(derivedtemp, stocktemperature, tempblendfactor) : derivedtemp;
-                            HasTemp = usinginternaltemperature = true;
+                            HasTemp = hastempdata = true;
+                            hastempmaps = false;
                         }
                         else if (tempretcode < 0 && tempmapretcode >= 0)
                         {
                             Temperature = maptemperature;
-                            HasTemp = true;
-                            usinginternaltemperature = false;
+                            HasTemp = hastempmaps = true;
+                            hastempdata = false;
                         }
                         else
                         {
                             Temperature = derivedtemp;
-                            HasTemp = usinginternaltemperature = false;
+                            HasTemp = hastempdata = hastempmaps = false;
                         }
                     }
                     catch (Exception ex) //fallback data
                     {
                         Utils.LogError("Exception thrown when deriving point Temperature data for " + mainbody.name + ": " + ex.ToString());
                         Temperature = stocktemperature;
-                        HasTemp = usinginternaltemperature = false;
+                        HasTemp = hastempdata = hastempmaps = false;
                     }
                 }
                 else
                 {
                     Temperature = stocktemperature;
-                    HasTemp = usinginternaltemperature = false;
+                    HasTemp = hastempdata = hastempmaps = false;
                 }
 
-                int extpresscode = AAT_API.GetExternalPressure(mainbody.name, lon, lat, Math.Max(alt, 0.0), CurrentTime, out double extpress);
+                int extpresscode = AAT_API.GetExternalPressure(bodyname, lon, lat, Math.Max(alt, 0.0), CurrentTime, out double extpress);
                 if (extpresscode == 0)
                 {
                     Pressure = extpress * 0.001;
                     HasPress = true;
-                    usinginternalpressure = false;
+                    haspressdata = haspressmult = false;
                     FIPressureMultiplier = Pressure / stockpressure;
                 }
-                else if (Data.HasPressure(mainbody.name))
+                else if (Data.HasPressure(bodyname))
                 {
                     try
                     {
-                        int pressretcode = Data.GetPressure(mainbody.name, lon, lat, Math.Max(alt, 0.0), CurrentTime, out double Final, out DataInfo pinfo);
+                        int pressretcode = Data.GetPressure(bodyname, lon, lat, Math.Max(alt, 0.0), CurrentTime, out double Final, out DataInfo pinfo);
                         bool pressdatagood = false;
                         switch (pressretcode)
                         {
@@ -366,7 +395,7 @@ namespace AdvancedAtmosphereTools
                                 PressureDataInfo.SetNew(pinfo);
                                 break;
                             case 1:
-                                double PressModelTop = Math.Min(Data.PressureModelTop(mainbody.name), mainbody.atmosphereDepth);
+                                double PressModelTop = Math.Min(Data.PressureModelTop(bodyname), mainbody.atmosphereDepth);
                                 double extralerp = (alt - PressModelTop) / (mainbody.atmosphereDepth - PressModelTop);
                                 double press0 = mainbody.GetPressure(0);
                                 double press1 = mainbody.GetPressure(PressModelTop);
@@ -387,37 +416,43 @@ namespace AdvancedAtmosphereTools
                             pressretcode = -1;
                         }
 
-                        int pressmapretcode = Data.GetPressureMapData(mainbody.name, lon, lat, Math.Max(alt, 0.0), CurrentTime, out double pressmult);
-                        if(pressmapretcode >= 0)
+                        int pressmapretcode = Data.GetPressureMapData(bodyname, lon, lat, Math.Max(alt, 0.0), CurrentTime, out pressmult);
+                        if (pressmapretcode >= 0)
                         {
                             mappressure = stockpressure * pressmult;
+                            haspressmult = true;
+                        }
+                        else
+                        {
+                            haspressmult = false;
                         }
 
-                        bool blendpress = Data.BlendPressure(mainbody.name, out double pressblendfactor);
-                        if (pressretcode >= 0 && pressmapretcode == 0)
+                        bool blendpress = Data.BlendPressure(bodyname, out double pressblendfactor);
+                        if (pressretcode >= 0 && pressmapretcode >= 0)
                         {
                             Pressure = UtilMath.Lerp(derivedpressure, mappressure, pressblendfactor);
                             FIPressureMultiplier = Pressure / stockpressure;
-                            HasPress = usinginternalpressure = true;
+                            HasPress = haspressdata = haspressmult =  true;
                         }
-                        else if (pressretcode >= 0 && pressmapretcode != 0)
+                        else if (pressretcode >= 0 && pressmapretcode < 0)
                         {
                             Pressure = blendpress ? UtilMath.Lerp(derivedpressure, stockpressure, pressblendfactor) : derivedpressure;
                             FIPressureMultiplier = Pressure / stockpressure;
-                            HasPress = usinginternalpressure = true;
+                            HasPress = haspressdata = true;
+                            haspressmult = false;
                         }
-                        else if (pressretcode < 0 && pressmapretcode == 0)
+                        else if (pressretcode < 0 && pressmapretcode >= 0)
                         {
                             Pressure = mappressure;
                             FIPressureMultiplier = pressmult;
-                            HasPress = true;
-                            usinginternalpressure = false;
+                            HasPress = haspressmult = true;
+                            haspressdata = false;
                         }
                         else
                         {
                             Pressure = stockpressure;
                             FIPressureMultiplier = 1.0;
-                            HasPress = usinginternalpressure = false;
+                            HasPress = haspressdata = haspressmult = false;
                         }
                         
                     }
@@ -425,13 +460,59 @@ namespace AdvancedAtmosphereTools
                     {
                         Utils.LogError("Exception thrown when deriving point Pressure data for " + mainbody.name + ": " + ex.ToString());
                         Pressure = stockpressure;
-                        HasPress = usinginternalpressure = false;
+                        HasPress = haspressdata = haspressmult = false;
                     }
                 }
                 else
                 {
                     Pressure = stockpressure;
-                    HasPress = usinginternalpressure = false;
+                    HasPress = haspressdata = haspressmult = false;
+                }
+
+                int mmretcode = Data.GetMolarMass(bodyname, lon, lat, alt, CurrentTime, out basemolarmass, out molarmassoffset);
+                switch (mmretcode)
+                {
+                    case 0:
+                        MolarMass = basemolarmass + molarmassoffset;
+                        HasMolarMass = hasmolarmassoffset = hasbasemolarmass = true;
+                        break;
+                    case 1:
+                        MolarMass = basemolarmass;
+                        HasMolarMass = hasbasemolarmass = true;
+                        hasmolarmassoffset = false;
+                        break;
+                    case 2:
+                        MolarMass = stockmolarmass + molarmassoffset;
+                        HasMolarMass = hasmolarmassoffset = true;
+                        hasbasemolarmass = false;
+                        break;
+                    default:
+                        MolarMass = stockmolarmass;
+                        HasMolarMass = hasmolarmassoffset = hasbasemolarmass = false;
+                        break;
+                }
+
+                int adbidxretcode = Data.GetAdiabaticIndex(bodyname, lon, lat, alt, CurrentTime, out baseadiabaticindex, out adiabaticindexoffset);
+                switch (adbidxretcode)
+                {
+                    case 0:
+                        AdiabaticIndex = baseadiabaticindex + adiabaticindexoffset;
+                        HasAdiabaticIndex = hasbaseadiabaticindex = hasadiabaticindexoffset = true; 
+                        break;
+                    case 1:
+                        AdiabaticIndex = baseadiabaticindex;
+                        HasAdiabaticIndex = hasbaseadiabaticindex = true;
+                        hasadiabaticindexoffset = false;
+                        break;
+                    case 2:
+                        AdiabaticIndex = stockadiabaticindex + adiabaticindexoffset;
+                        HasAdiabaticIndex = hasadiabaticindexoffset = true;
+                        hasbaseadiabaticindex = false;
+                        break;
+                    default:
+                        AdiabaticIndex = stockadiabaticindex;
+                        HasAdiabaticIndex = hasbaseadiabaticindex = hasadiabaticindexoffset = false;
+                        break;
                 }
 
                 //post-processing through API
@@ -439,7 +520,7 @@ namespace AdvancedAtmosphereTools
                 double tempbackup = Temperature;
                 double pressbackup = Pressure;
 
-                int postretcode = AAT_API.PostProcess(ref windbackup, ref tempbackup, ref pressbackup, mainbody.name, lon, lat, alt, CurrentTime);
+                int postretcode = AAT_API.PostProcess(ref windbackup, ref tempbackup, ref pressbackup, bodyname, lon, lat, alt, CurrentTime);
                 if (postretcode == 0)
                 {
                     if (windbackup.IsFinite() && !windbackup.IsZero())
@@ -481,9 +562,9 @@ namespace AdvancedAtmosphereTools
             }
             else
             {
-                Pressure = 0.0;
-                Temperature = PhysicsGlobals.SpaceTemperature;
-                HasWind = HasTemp = HasPress = hasflowmaps = haswinddata = usinginternalpressure = usinginternaltemperature = false;
+                Temperature = Pressure = MolarMass = AdiabaticIndex = 0.0;
+                FIPressureMultiplier = 1.0;
+                HasWind = hasflowmaps = haswinddata = HasTemp = hastempdata = hastempmaps = hastempoffset = hastempswingmult = HasPress = haspressdata = haspressmult = HasMolarMass = hasbasemolarmass = hasmolarmassoffset = HasAdiabaticIndex = hasbaseadiabaticindex = hasadiabaticindexoffset = false;
             }
         }
 

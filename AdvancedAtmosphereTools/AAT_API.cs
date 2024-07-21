@@ -326,9 +326,7 @@ namespace AdvancedAtmosphereTools
             }
 
             internal void SetPostProcessWind(PostProcessWindDelegate dlg) => postprocesswind = dlg;
-
             internal void SetPostProcessTemperature(PostProcessPropertyDelegate del) => postprocesstemp = del;
-
             internal void SetPostProcessPressure(PostProcessPropertyDelegate dlg) => postprocesspress = dlg;
 
             internal bool HasWind => !string.IsNullOrEmpty(windsource) && windfunc != null;
@@ -592,7 +590,7 @@ namespace AdvancedAtmosphereTools
         #endregion
 
         //-------------HELPER FUNCTIONS AND VALUES-----------------
-
+        #region helpers
         private static void CheckRegistration(string body)
         {
             if (HighLogic.LoadedSceneIsFlight)
@@ -642,5 +640,6 @@ namespace AdvancedAtmosphereTools
         private static void ToPost(string type, string name, string body) => Utils.LogAPI(string.Format("Registering '{0}' as a {1} post-processor for {2}.", name, type, body));
         private static void SuccessfulPost(string type, string name, string body) => Utils.LogAPI(string.Format("Successfully registered '{0}' as a {1} post-processor for {2}.", name, type, body));
         private static void CannotPost(string type, string name, string body) => Utils.LogAPIWarning(string.Format("Could not register '{0}' as a {1} post-processor for {2}. Another plugin has already registered.", name, type, body));
+        #endregion
     }
 }

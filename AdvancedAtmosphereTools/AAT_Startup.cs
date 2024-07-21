@@ -24,7 +24,7 @@ namespace AdvancedAtmosphereTools
                 Utils.LogInfo("Initializing Advanced Atmosphere Tools: Version " + Utils.version);
 
                 ConfigNode[] settingsnodes = GameDatabase.Instance.GetConfigNodes("AAT_SETTINGS");
-                if(settingsnodes.Length > 0 )
+                if(settingsnodes.Length > 0)
                 {
                     bool debug = false;
                     settingsnodes[0].TryGetValue("debugMode", ref debug);
@@ -109,10 +109,33 @@ namespace AdvancedAtmosphereTools
                 Utils.LogInfo("Loading configs.");
                 bodydata = new Dictionary<string, AAT_BodyData>();
 
-                ConfigNode[] DataNodes = GameDatabase.Instance.GetConfigNodes("AAT_DATA");
-                ReadConfigs(DataNodes);
+                ConfigNode[] DataNodes = GameDatabase.Instance.GetConfigNodes("AdvancedAtmosphereTools");
+                ReadConfigs(DataNodes, false);
 
-                Utils.LogInfo("AAT Setup Complete.");
+                //support for legacy MCWS configs
+                ConfigNode[] legacyDataNodes = GameDatabase.Instance.GetConfigNodes("MCWS_DATA");
+                ReadConfigs(legacyDataNodes, true);
+
+                Utils.LogInfo("All configs loaded. Performing cleanup.");
+
+                //clean up BodyData objects with no data in them, or that somehow got assigned to a body with no atmosphere.
+                List<string> todelete = new List<string>();
+                foreach (KeyValuePair<string, AAT_BodyData> pair in bodydata)
+                {
+                    AAT_BodyData val = pair.Value;
+                    if (!val.HasAtmo || (!val.HasWind && !val.HasTemperature && !val.HasPressure && !val.HasFlowmaps && !val.HasMolarMass && !val.HasAdiabaticIndex))
+                    {
+                        todelete.Add(pair.Key);
+                    }
+                }
+                foreach (string deleteme in todelete)
+                {
+                    Utils.LogInfo(string.Format("Removing empty data object for body {0}.", deleteme));
+                    bodydata.Remove(deleteme);
+                }
+                Utils.LogInfo("Cleanup Complete.");
+
+                Utils.LogInfo("Advanced Atmosphere Tools Setup Complete.");
                 DontDestroyOnLoad(this);
             }
             else
@@ -139,19 +162,25 @@ namespace AdvancedAtmosphereTools
         #region getdata
         internal bool BodyExists(string body) => bodydata != null && bodydata.ContainsKey(body);
         internal bool HasWind(string body) => BodyExists(body) && bodydata[body].HasWind;
+        internal bool HasWindData(string body) => BodyExists(body) && bodydata[body].HasWindData;
+        internal bool HasFlowmaps(string body) => BodyExists(body) && bodydata[body].HasFlowmaps;
         internal bool HasTemperature(string body) => BodyExists(body) && bodydata[body].HasTemperature;
         internal bool HasTemperatureData(string body) => BodyExists(body) && bodydata[body].HasTemperatureData;
         internal bool HasTemperatureMaps(string body) => BodyExists(body) && (bodydata[body].HasTemperatureOffsetMaps || bodydata[body].HasTemperatureSwingMaps);
         internal bool HasPressure(string body) => BodyExists(body) && bodydata[body].HasPressure;
         internal bool HasPressureData(string body) => BodyExists(body) && bodydata[body].HasPressureData;
         internal bool HasPressureMaps(string body) => BodyExists(body) && bodydata[body].HasPressureMaps;
+        internal bool HasMolarMass(string body) => BodyExists(body) && bodydata[body].HasMolarMass;
+        internal bool HasAdiabaticIndex(string body) => BodyExists(body) && bodydata[body].HasAdiabaticIndex;
 
         internal int GetWind(string body, double lon, double lat, double alt, double time, out Vector3 windvec, out Vector3 flowmapvec, out DataInfo windinfo)
         {
             windvec = Vector3.zero;
             flowmapvec = Vector3.zero;
             windinfo = DataInfo.Zero;
-            return HasWind(body) ? bodydata[body].GetWind(lon, lat, alt, time, ref windvec, ref flowmapvec, ref windinfo) : -1;
+            int dataretcode = HasWindData(body) ? bodydata[body].GetDataWind(lon, lat, alt, time, ref windvec,ref windinfo) : -1;
+            int flowmapretcode = HasFlowmaps(body) ? bodydata[body].GetFlowMapWind(lon, lat, alt, time, ref flowmapvec) : -1;
+            return SetDualRetCode(dataretcode, flowmapretcode);
         }
         internal int GetTemperature(string body, double lon, double lat, double alt, double time, out double temp, out DataInfo tempinfo)
         {
@@ -170,7 +199,6 @@ namespace AdvancedAtmosphereTools
         internal double TemperatureModelTop(string body) => HasTemperatureData(body) ? bodydata[body].TempModelTop : double.MaxValue;
         internal double PressureModelTop(string body) => HasPressureData(body) ? bodydata[body].PressModelTop : double.MaxValue;
 
-        //TODO: implement
         internal int GetTemperatureMapData(string body, double lon, double lat, double alt, double time, out double tempoffset, out double tempswingmult)
         {
             tempoffset = 0.0;
@@ -179,22 +207,7 @@ namespace AdvancedAtmosphereTools
             {
                 int offsetcode = bodydata[body].GetTemperatureOffset(lon, lat, alt, time, out tempoffset);
                 int swingmultcode = bodydata[body].GetTemperatureSwingMultiplier(lon, lat, alt, time, out tempswingmult);
-                if (offsetcode == 0 && swingmultcode == 0)
-                {
-                    return 0;
-                }
-                else if (offsetcode == 0 && swingmultcode != 0)
-                {
-                    return 1;
-                }
-                else if (offsetcode != 0 && swingmultcode == 0)
-                {
-                    return 2;
-                }
-                else
-                {
-                    return -1;
-                }
+                return SetDualRetCode(offsetcode, swingmultcode);
             }
             return -1;
         }
@@ -213,6 +226,32 @@ namespace AdvancedAtmosphereTools
         {
             blendfactor = HasPressure(body) ? bodydata[body].BlendPressFactor : 0.0;
             return HasPressure(body) && bodydata[body].BlendPressWithStock;
+        }
+
+        internal int GetMolarMass(string body, double lon, double lat, double alt, double time, out double molarmass, out double molarmassoffset)
+        {
+            molarmass = 0.0;
+            molarmassoffset = 0.0;
+            if (HasMolarMass(body))
+            {
+                int baseretcode = bodydata[body].GetMolarMass(alt, out molarmass);
+                int offsetretcode = bodydata[body].GetMolarMassOffset(lon, lat, alt, time, out molarmassoffset);
+                return SetDualRetCode(baseretcode, offsetretcode);
+            }
+            return -1;
+        }
+
+        internal int GetAdiabaticIndex(string body, double lon, double lat, double alt, double time, out double idx, out double idxoffset)
+        {
+            idx = 0.0;
+            idxoffset = 0.0;
+            if (HasAdiabaticIndex(body))
+            {
+                int baseretcode = bodydata[body].GetAdiabaticIndex(alt, out idx);
+                int offsetretcode = bodydata[body].GetAdiabaticIndexOffset(lon, lat, alt, time, out idxoffset);
+                return SetDualRetCode(baseretcode, offsetretcode);
+            }
+            return -1;
         }
 
         internal float[][,,] WindData(string body, double time)
@@ -250,5 +289,22 @@ namespace AdvancedAtmosphereTools
             return null;
         }
         #endregion
+
+        private static int SetDualRetCode(int retcode1, int retcode2)
+        {
+            if (retcode1 == 0 && retcode2 == 0)
+            {
+                return 0;
+            }
+            else if (retcode1 == 0 && retcode2 != 0)
+            {
+                return 1;
+            }
+            else if (retcode1 != 0 && retcode2 == 0)
+            {
+                return 2;
+            }
+            return -1;
+        }
     }
 }

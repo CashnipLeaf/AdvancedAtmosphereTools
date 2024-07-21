@@ -20,12 +20,12 @@ namespace AdvancedAtmosphereTools
         internal const string modID = "AAT_NS";
         private const string na = "N/A";
 
-        internal string UIHeader => "Adv. Atmo. Tools v" + (Settings.debugmode ? Utils.version + " DEBUG ENABLED" : Utils.version);
+        private string UIHeader => "Adv. Atmo. Tools v" + (Settings.debugmode ? Utils.version + " DEBUG ENABLED" : Utils.version);
 
         private Rect windowPos;        
         private static float Xpos => 100f * GameSettings.UI_SCALE;
         private static float Ypos => 100f * GameSettings.UI_SCALE;
-        private static float Xwidth => 285.0f * Mathf.Clamp(GameSettings.UI_SCALE, 0.75f, 1.5f);
+        private static float Xwidth => 285.0f * Mathf.Clamp(GameSettings.UI_SCALE, 0.75f, 1.25f);
         private static float Yheight => 60f * GameSettings.UI_SCALE;
         
         private static string Speedunit => Localizer.Format(GetLOC("#LOC_AAT_meterspersec"));
@@ -33,6 +33,7 @@ namespace AdvancedAtmosphereTools
         private static string Forceunit => Localizer.Format(GetLOC("#LOC_AAT_kilonewton"));
         private static string Tempunit => Localizer.Format(GetLOC("#LOC_AAT_kelvin"));
         private static string DensityUnit => Localizer.Format(GetLOC("#LOC_AAT_kgmcubed"));
+        private static string MolarMassUnit => Localizer.Format("kg/mol");
         private static string Degreesstr => Localizer.Format("°");
         private static string Minutesstr => Localizer.Format("'");
         private static string Secondsstr => Localizer.Format("″");
@@ -49,7 +50,7 @@ namespace AdvancedAtmosphereTools
             toolbarController = gameObject.AddComponent<ToolbarControl>();
             if (!toolbarButtonAdded)
             {
-                toolbarController.AddToAllToolbars(ToolbarButtonOnTrue, ToolbarButtonOnFalse, scenes, modID, "991294", LogoPath, LogoPath, Localizer.Format(modNAME));
+                toolbarController.AddToAllToolbars(ToolbarButtonOnTrue, ToolbarButtonOnFalse, scenes, modID, "991295", LogoPath, LogoPath, Localizer.Format(modNAME));
                 toolbarButtonAdded = true;
             }
             windowPos = new Rect(Xpos, Ypos, Xwidth, Yheight);
@@ -60,7 +61,7 @@ namespace AdvancedAtmosphereTools
         {
             if (GUIEnabled)
             {
-                windowPos = GUILayout.Window("AAT".GetHashCode(), windowPos, DrawWindow, UIHeader);
+                windowPos = GUILayout.Window("AdvAtmoTools".GetHashCode(), windowPos, DrawWindow, UIHeader);
             }
         }
 
@@ -102,6 +103,20 @@ namespace AdvancedAtmosphereTools
                     enabledebug = !enabledebug;
                 }
                 GUILayout.EndHorizontal();
+
+                if (enabledebug)
+                {
+                    GUILayout.BeginHorizontal();
+                    if (GUILayout.Button("Map Data", button))
+                    {
+                        viewingbindata = false;
+                    }
+                    if (GUILayout.Button("Binary Data", button))
+                    {
+                        viewingbindata = true;
+                    }
+                    GUILayout.EndHorizontal();
+                }
             }
 
             if (activevessel != null && mainbody != null)
@@ -117,35 +132,74 @@ namespace AdvancedAtmosphereTools
                     DrawElement("Altitude", altitude);
                     DrawElement("Universal Time", string.Format("{0:F1}", CurrentTime));
 
-                    DrawHeader("Wind Info");
-                    DrawElement("X Position", haswinddata && inatmo ? string.Format("{0} <> {1}", WindDataInfo.x1, WindDataInfo.x2) : na);
-                    DrawElement("Y Position", haswinddata && inatmo ? string.Format("{0} <> {1}", WindDataInfo.y1, WindDataInfo.y2) : na);
-                    string windzinfo = WindDataInfo.abovetop ? string.Format("{0}+", WindDataInfo.z2) : string.Format("{0} <> {1}", WindDataInfo.z1, WindDataInfo.z2);
-                    DrawElement("Z Position", haswinddata && inatmo ? windzinfo : na);
-                    DrawElement("Time Position", haswinddata && inatmo ? string.Format("{0} <> {1}", WindDataInfo.t1, WindDataInfo.t2) : na);
-                    DrawElement("Data Wind Vec", haswinddata && inatmo ? datawind.ToString() : na);
-                    DrawElement("Flowmap Wind Vec", hasflowmaps && inatmo ? flowmapwind.ToString() : na);
-                    DrawElement("Combined Wind Vec", HasWind && inatmo ? RawWind.ToString() : na);
+                    if (viewingbindata)
+                    {
+                        DrawHeader("---BINARY DATA---");
+                        DrawHeader("Wind Info");
+                        DrawElement("X Position", haswinddata && inatmo ? string.Format("{0} <> {1}", WindDataInfo.x1, WindDataInfo.x2) : na);
+                        DrawElement("Y Position", haswinddata && inatmo ? string.Format("{0} <> {1}", WindDataInfo.y1, WindDataInfo.y2) : na);
+                        string windzinfo = WindDataInfo.abovetop ? string.Format("{0}+", WindDataInfo.z2) : string.Format("{0} <> {1}", WindDataInfo.z1, WindDataInfo.z2);
+                        DrawElement("Z Position", haswinddata && inatmo ? windzinfo : na);
+                        DrawElement("Time Position", haswinddata && inatmo ? string.Format("{0} <> {1}", WindDataInfo.t1, WindDataInfo.t2) : na);
+                        DrawElement("Data Wind Vec", haswinddata && inatmo ? datawind.ToString() : na);
+                        DrawElement("Flowmap Wind Vec", hasflowmaps && inatmo ? flowmapwind.ToString() : na);
+                        DrawElement("Combined Wind Vec", HasWind && inatmo ? RawWind.ToString() : na);
 
-                    DrawHeader("Temperature Info");
-                    DrawElement("X Position", HasTemp && inatmo ? string.Format("{0} <> {1}", TemperatureDataInfo.x1, TemperatureDataInfo.x2) : na);
-                    DrawElement("Y Position", HasTemp && inatmo ? string.Format("{0} <> {1}", TemperatureDataInfo.y1, TemperatureDataInfo.y2) : na);
-                    string tempzinfo = TemperatureDataInfo.abovetop ? string.Format("{0}+", TemperatureDataInfo.z2) : string.Format("{0} <> {1}", TemperatureDataInfo.z1, TemperatureDataInfo.z2);
-                    DrawElement("Z Position", HasTemp && inatmo ? tempzinfo : na);
-                    DrawElement("Time Position", HasTemp && inatmo ? string.Format("{0} <> {1}", TemperatureDataInfo.t1, TemperatureDataInfo.t2) : na);
-                    DrawElement("Derived Temp", HasTemp && inatmo && usinginternaltemperature ? string.Format("{0:F1} {1}", derivedtemp, Tempunit) : na);
-                    DrawElement("Stock/Map Temp", string.Format("{0:F1} {1}", maptemperature, Tempunit));
-                    DrawElement("Final Temp", string.Format("{0:F1} {1}", Temperature, Tempunit));
+                        DrawHeader("Temperature Info");
+                        DrawElement("X Position", hastempdata && inatmo ? string.Format("{0} <> {1}", TemperatureDataInfo.x1, TemperatureDataInfo.x2) : na);
+                        DrawElement("Y Position", hastempdata && inatmo ? string.Format("{0} <> {1}", TemperatureDataInfo.y1, TemperatureDataInfo.y2) : na);
+                        string tempzinfo = TemperatureDataInfo.abovetop ? string.Format("{0}+", TemperatureDataInfo.z2) : string.Format("{0} <> {1}", TemperatureDataInfo.z1, TemperatureDataInfo.z2);
+                        DrawElement("Z Position", hastempdata && inatmo ? tempzinfo : na);
+                        DrawElement("Time Position", hastempdata && inatmo ? string.Format("{0} <> {1}", TemperatureDataInfo.t1, TemperatureDataInfo.t2) : na);
+                        DrawElement("Derived Temp", hastempdata && inatmo ? string.Format("{0:F1} {1}", derivedtemp, Tempunit) : na);
+                        DrawElement("Stock/Map Temp", inatmo ? string.Format("{0:F1} {1}", hastempmaps ? maptemperature : stocktemperature, Tempunit) : na);
+                        DrawElement("Final Temp", string.Format("{0:F1} {1}", Temperature, Tempunit));
 
-                    DrawHeader("Pressure Info");
-                    DrawElement("X Position", HasPress && inatmo ? string.Format("{0} <> {1}", PressureDataInfo.x1, PressureDataInfo.x2) : na);
-                    DrawElement("Y Position", HasPress && inatmo ? string.Format("{0} <> {1}", PressureDataInfo.y1, PressureDataInfo.y2) : na);
-                    string presszinfo = PressureDataInfo.abovetop ? string.Format("{0}+", PressureDataInfo.z2) : string.Format("{0} <> {1}", PressureDataInfo.z1, PressureDataInfo.z2);
-                    DrawElement("Z Position", HasPress && inatmo ? presszinfo : na);
-                    DrawElement("Time Position", HasPress && inatmo ? string.Format("{0} <> {1}", PressureDataInfo.t1, PressureDataInfo.t2) : na);
-                    DrawElement("Derived Press", HasPress && inatmo && usinginternalpressure ? string.Format("{0:F3} {1}", derivedpressure, Pressunit) : na);
-                    DrawElement("Stock/Map Press", string.Format("{0:F3} {1}", mappressure, Pressunit));
-                    DrawElement("Final Press", string.Format("{0:F3} {1}", Pressure, Pressunit));
+                        DrawHeader("Pressure Info");
+                        DrawElement("X Position", haspressdata && inatmo ? string.Format("{0} <> {1}", PressureDataInfo.x1, PressureDataInfo.x2) : na);
+                        DrawElement("Y Position", haspressdata && inatmo ? string.Format("{0} <> {1}", PressureDataInfo.y1, PressureDataInfo.y2) : na);
+                        string presszinfo = PressureDataInfo.abovetop ? string.Format("{0}+", PressureDataInfo.z2) : string.Format("{0} <> {1}", PressureDataInfo.z1, PressureDataInfo.z2);
+                        DrawElement("Z Position", haspressdata && inatmo ? presszinfo : na);
+                        DrawElement("Time Position", haspressdata && inatmo ? string.Format("{0} <> {1}", PressureDataInfo.t1, PressureDataInfo.t2) : na);
+                        DrawElement("Derived Press", haspressdata && inatmo ? string.Format("{0:F3} {1}", derivedpressure, Pressunit) : na);
+                        DrawElement("Stock/Map Press", inatmo ? string.Format("{0:F3} {1}", haspressmult ? mappressure : stockpressure, Pressunit) : na);
+                        DrawElement("Final Press", string.Format("{0:F3} {1}", Pressure, Pressunit));
+                    }
+                    else
+                    {
+                        DrawHeader("---MAP DATA---");
+                        DrawHeader("Wind Info");
+                        DrawElement("Flowmap Wind Vec", hasflowmaps && inatmo ? flowmapwind.ToString() : na);
+                        DrawElement("Data Wind Vec", haswinddata && inatmo ? datawind.ToString() : na);
+                        DrawElement("Combined Wind Vec", HasWind && inatmo ? RawWind.ToString() : na);
+
+                        DrawHeader("Temperature Info");
+                        DrawElement("Stock Temp", inatmo ? string.Format("{0:F1} {1}", stocktemperature, Tempunit) : na);
+                        DrawElement("Temp Swing Multiplier", inatmo && hastempswingmult && hastempmaps ? string.Format("{0:F2}", tempswingmult) : na);
+                        DrawElement("Temp Offset", inatmo && hastempoffset && hastempmaps ? string.Format("{0:F1} {1}", tempoffset, Tempunit) : na);
+                        DrawElement("Final Map Temp", inatmo && hastempmaps ? string.Format("{0:F1} {1}", maptemperature, Tempunit) : na);
+                        DrawElement("Binary Data Temp", hastempdata && inatmo ? string.Format("{0:F1} {1}", derivedtemp, Tempunit) : na);
+                        DrawElement("Final Temp", string.Format("{0:F1} {1}", Temperature, Tempunit));
+
+                        DrawHeader("Pressure Info");
+                        DrawElement("Stock Press", inatmo ? string.Format("{0:F3} {1}", stockpressure, Pressunit) : na);
+                        DrawElement("Press Multiplier", inatmo && haspressmult ? string.Format("{0:F2}", pressmult) : na);
+                        DrawElement("Final Map Pressure", inatmo && haspressmult ? string.Format("{0:F3} {1}", mappressure, Pressunit) : na);
+                        DrawElement("Binary Data Press", haspressdata && inatmo ? string.Format("{0:F3} {1}", derivedpressure, Pressunit) : na);
+                        DrawElement("Final Press", string.Format("{0:F3} {1}", Pressure, Pressunit));
+
+                        DrawHeader("Molar Mass Info");
+                        DrawElement("Stock Molar Mass", inatmo ? string.Format("{0:F4} {1}", stockmolarmass, MolarMassUnit) : na);
+                        DrawElement("Molar Mass From Curve", inatmo && hasbasemolarmass && HasMolarMass ? string.Format("{0:4} {1}", basemolarmass, MolarMassUnit) : na);
+                        DrawElement("Molar Mass Offset", inatmo && hasmolarmassoffset && HasMolarMass ? string.Format("{0:F4} {1}", molarmassoffset, MolarMassUnit) : na);
+                        DrawElement("Final Molar Mass", inatmo && HasMolarMass ? string.Format("{0:F4} {1}", MolarMass, MolarMassUnit) : na);
+
+                        DrawHeader("Adiabatic Index Info");
+                        DrawElement("Stock Adiabatic Index", inatmo ? string.Format("{0:F2}", stockadiabaticindex) : na);
+                        DrawElement("Adb. Index From Curve", inatmo && HasAdiabaticIndex && hasbaseadiabaticindex ? string.Format("{0:F2}", baseadiabaticindex) : na);
+                        DrawElement("Adiabatic Index Offset", inatmo && HasAdiabaticIndex && hasadiabaticindexoffset ? string.Format("{0:F2}", adiabaticindexoffset) : na);
+                        DrawElement("Final Adiabatic Index", inatmo && HasAdiabaticIndex ? string.Format("{0:F2}", AdiabaticIndex) : na);
+                    }
                 }
                 else
                 {

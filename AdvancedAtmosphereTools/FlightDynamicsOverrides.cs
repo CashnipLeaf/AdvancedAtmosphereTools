@@ -10,7 +10,7 @@ namespace AdvancedAtmosphereTools
     [KSPAddon(KSPAddon.Startup.SpaceCentre, true)]
     public class FlightDynamicsOverrides : MonoBehaviour
     {
-        static bool registeredoverrides = false;
+        public static bool registeredoverrides = false;
         private static AAT_FlightHandler FH => AAT_FlightHandler.Instance;
 
         void Start()
@@ -110,7 +110,7 @@ namespace AdvancedAtmosphereTools
                 }
             }
 
-            //This override really just occupies the slot so that no other mod can take it.
+            //resume business as normal
             fi.BaseFIUpdateAerodynamics(part);
         }
 
@@ -145,7 +145,7 @@ namespace AdvancedAtmosphereTools
                 }
             }
 
-            //inline the rest of CaclulateAerodynamicArea() to avoid passing an object reference again
+            //inlined CaclulateAerodynamicArea() to avoid passing an object reference again
             if (!part.DragCubes.None)
             {
                 return part.DragCubes.Area;
@@ -177,19 +177,19 @@ namespace AdvancedAtmosphereTools
             if (windvec.IsFinite() && !Mathf.Approximately(windvec.magnitude, 0.0f))
             {
                 fi.Vel -= windvec;
-                fi.spd = !fi.Vessel.IgnoreSpeedActive ? fi.Vel.magnitude : 0.0;
-                fi.Vessel.speed = fi.spd;
+                fi.Vessel.speed = fi.spd = !fi.Vessel.IgnoreSpeedActive ? fi.Vel.magnitude : 0.0; ;
                 fi.nVel = (fi.spd != 0.0) ? fi.Vel / (float)fi.spd : Vector3.zero;
             }
 
             fi.CurrentMainBody.GetSolarAtmosphericEffects(fi.sunDot, fi.density, out fi.solarAirMass, out fi.solarFluxMultiplier);
             fi.Vessel.solarFlux = (fi.solarFlux *= fi.solarFluxMultiplier);
             fi.Vessel.atmosphericTemperature = fi.atmosphericTemperature = (FH != null && FH.HasTemp) ? FH.Temperature : fi.CurrentMainBody.GetFullTemperature(fi.altitude, fi.atmosphereTemperatureOffset);
-            double molarmass = fi.CurrentMainBody.atmosphereMolarMass;
+            
+            double molarmass = FH.HasMolarMass ? FH.MolarMass : fi.CurrentMainBody.atmosphereMolarMass;
             fi.density = fi.Vessel.atmDensity = GetDensity(fi.staticPressurekPa, fi.atmosphericTemperature, molarmass); 
             fi.Vessel.dynamicPressurekPa = fi.dynamicPressurekPa = 0.0005 * fi.density * fi.spd * fi.spd;
 
-            double adiabaticIndex = fi.CurrentMainBody.atmosphereAdiabaticIndex;
+            double adiabaticIndex = FH.HasAdiabaticIndex ? FH.AdiabaticIndex : fi.CurrentMainBody.atmosphereAdiabaticIndex;
             fi.Vessel.speedOfSound = GetSpeedOfSound(fi.staticPressurekPa, fi.density, adiabaticIndex);
             fi.Vessel.mach = fi.mach = fi.Vessel.speedOfSound > 0.0 ? fi.spd / fi.Vessel.speedOfSound : 0.0;
 
@@ -203,7 +203,8 @@ namespace AdvancedAtmosphereTools
 
         //CelestialBody.GetDensity() but manipulated for my own purposes
         static double GetDensity(double pressure, double temperature, double molarmass) => pressure > 0.0 && temperature > 0.0 ? (pressure * 1000 * molarmass) / (temperature * PhysicsGlobals.IdealGasConstant) : 0.0;
-
+        
+        //CelestialBody.GetSpeedOfSound() but manipulated for my own purposes
         static double GetSpeedOfSound(double pressure, double density, double adiabaticIndex) => pressure > 0.0 && density > 0.0 ? Math.Sqrt(adiabaticIndex * (pressure * 1000 /  density)) : 0.0;
 
         static double CalculateConvectiveCoeff(ModularFlightIntegrator fi) //I would love to clean this up, but it works and I dont wanna touch it.
@@ -229,7 +230,7 @@ namespace AdvancedAtmosphereTools
             }
             return coeff * fi.CurrentMainBody.convectionMultiplier;
         }
-        static double CalculateConvecCoeffNewtonian(double density, double spd) //used to take in fi. now passes variables to prevent object references from being tossed around like hot potatoes
+        static double CalculateConvecCoeffNewtonian(double density, double spd)
         {
             double coeff = density <= 1.0 ? Math.Pow(density, PhysicsGlobals.NewtonianDensityExponent) : density;
             double multiplier = PhysicsGlobals.NewtonianConvectionFactorBase + Math.Pow(spd, PhysicsGlobals.NewtonianVelocityExponent);

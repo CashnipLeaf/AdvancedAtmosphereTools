@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
@@ -8,7 +7,7 @@ namespace AdvancedAtmosphereTools
     partial class AAT_Startup
     {
         #region readconfigs
-        void ReadConfigs(ConfigNode[] DataNodes) //why did I put myself through the pain of writing this?
+        void ReadConfigs(ConfigNode[] DataNodes, bool legacy) //why did I put myself through the pain of writing this?
         {
             foreach (ConfigNode node in DataNodes)
             {
@@ -25,7 +24,9 @@ namespace AdvancedAtmosphereTools
                     continue;
                 }
 
-                Utils.LogInfo(string.Format("Loading config for {0}.", body));
+                Utils.LogInfo(legacy ? string.Format("Loading Legacy MCWS config for {0}.", body) : string.Format("Loading config for {0}.", body));
+
+                //create a bodydata object if one doesnt already exist
                 if (!bodydata.ContainsKey(body))
                 {
                     bodydata.Add(body, new AAT_BodyData(body, bod));
@@ -345,24 +346,61 @@ namespace AdvancedAtmosphereTools
                         }
                     }
                 }
-            }
-            Utils.LogInfo("All configs loaded. Performing cleanup.");
 
-            //clean up BodyData objects with no data in them, or that somehow got assigned to a body with no atmosphere.
-            List<string> todelete = new List<string>();
-            foreach (KeyValuePair<string, AAT_BodyData> pair in bodydata)
-            {
-                if (!pair.Value.HasAtmo || (!pair.Value.HasWind && !pair.Value.HasTemperature && !pair.Value.HasPressure && !pair.Value.HasFlowmaps))
+                ConfigNode molarmasscurveholder = new ConfigNode();
+                if (node.TryGetNode("MolarMassCurve", ref molarmasscurveholder))
                 {
-                    todelete.Add(pair.Key);
+                    Utils.LogInfo("Setting MolarMassCurve for " + body);
+                    FloatCurve fc = new FloatCurve();
+                    fc.Load(molarmasscurveholder);
+                    bodydata[body].SetMolarMassCurve(fc);
+                }
+
+                ConfigNode[] molarmassmaps = node.GetNodes("MolarMassOffsetMap");
+                if (molarmassmaps.Length > 0)
+                {
+                    Utils.LogInfo("Loading MolarMassOffsetMaps for " + body);
+                    foreach (ConfigNode molarmassmap in molarmassmaps)
+                    {
+                        try
+                        {
+                            ReadMapValues(molarmassmap, bod.atmosphereDepth, out Texture2D map, out double deformity, out double offset, out FloatCurve altmult, out FloatCurve timemult, out bool canscroll, out double scrollperiod, out bool normalizealt);
+                            bodydata[body].AddMolarMassOffsetMap(new OffsetMap(map, deformity, offset, altmult, timemult, canscroll, scrollperiod, normalizealt));
+                        }
+                        catch (Exception ex)
+                        {
+                            Utils.LogWarning("Unable to load MolarMassOffsetMap: " + ex.Message);
+                        }
+                    }
+                }
+
+                ConfigNode adiabaticindexcurveholder = new ConfigNode();
+                if (node.TryGetNode("AdiabaticIndexCurve", ref adiabaticindexcurveholder))
+                {
+                    Utils.LogInfo("Setting AdiabaticIndexCurve for " + body);
+                    FloatCurve fc = new FloatCurve();
+                    fc.Load(adiabaticindexcurveholder);
+                    bodydata[body].SetAdiabaticIndexCurve(fc);
+                }
+
+                ConfigNode[] adiabaticindexmaps = node.GetNodes("AdiabaticIndexOffsetMap");
+                if (adiabaticindexmaps.Length > 0)
+                {
+                    Utils.LogInfo("Loading AdiabaticIndexOffsetMaps for " + body);
+                    foreach (ConfigNode adiabaticindexmap in adiabaticindexmaps)
+                    {
+                        try
+                        {
+                            ReadMapValues(adiabaticindexmap, bod.atmosphereDepth, out Texture2D map, out double deformity, out double offset, out FloatCurve altmult, out FloatCurve timemult, out bool canscroll, out double scrollperiod, out bool normalizealt);
+                            bodydata[body].AddAdiabaticIndexOffsetMap(new OffsetMap(map, deformity, offset, altmult, timemult, canscroll, scrollperiod, normalizealt));
+                        }
+                        catch (Exception ex)
+                        {
+                            Utils.LogWarning("Unable to load AdiabaticIndexOffsetMap: " + ex.Message);
+                        }
+                    }
                 }
             }
-            foreach (string deleteme in todelete)
-            {
-                Utils.LogInfo(string.Format("Removing empty data object for body {0}.", deleteme));
-                bodydata.Remove(deleteme);
-            }
-            Utils.LogInfo("Cleanup Complete.");
         }
         #endregion
 

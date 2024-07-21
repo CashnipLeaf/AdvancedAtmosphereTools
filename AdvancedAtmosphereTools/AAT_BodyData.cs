@@ -4,14 +4,9 @@ using UnityEngine;
 
 namespace AdvancedAtmosphereTools
 {
-    //Return codes: 
-    //0 = all clear
-    //1 = additional post-processing needed
-    //-1 = no data
-    //-2 = error or exception
     internal class AAT_BodyData
     {
-        private readonly string body;
+        private readonly string bodyname;
         internal bool HasAtmo { get; private set; } = false;
         internal double Atmodepth { get; private set; } = 0.0;
 
@@ -34,7 +29,6 @@ namespace AdvancedAtmosphereTools
 
         internal List<FlowMap> Flowmaps;
         internal bool HasFlowmaps => Flowmaps != null && Flowmaps.Count > 0;
-
         internal bool HasWind => HasWindData || HasFlowmaps;
 
         private float[][,,] TempData;
@@ -85,13 +79,15 @@ namespace AdvancedAtmosphereTools
         internal bool HasMolarMassCurve => MolarMassCurve != null;
         internal List<OffsetMap> MolarMassOffsetMaps;
         internal bool HasMolarMassOffset => MolarMassOffsetMaps != null && MolarMassOffsetMaps.Count > 0;
+        internal bool HasMolarMass => HasMolarMassCurve || HasMolarMassOffset;
 
         internal FloatCurve AdiabaticIndexCurve;
         internal bool HasAdiabaticIndexCurve => AdiabaticIndexCurve != null;
         internal List<OffsetMap> AdiabaticIndexOffsetMaps;
         internal bool HasAdiabaticIndexOffset => AdiabaticIndexOffsetMaps != null && AdiabaticIndexOffsetMaps.Count > 0;
+        internal bool HasAdiabaticIndex => HasAdiabaticIndexCurve || HasAdiabaticIndexOffset;
 
-        internal AAT_BodyData(string body, CelestialBody bod)
+        internal AAT_BodyData(string bodyname, CelestialBody body)
         {
             Flowmaps = new List<FlowMap>();
             TempOffsetMaps = new List<OffsetMap>();
@@ -100,11 +96,11 @@ namespace AdvancedAtmosphereTools
             MolarMassOffsetMaps = new List<OffsetMap>();
             AdiabaticIndexOffsetMaps = new List<OffsetMap>();
 
-            this.body = body;
-            HasAtmo = bod.atmosphere;
+            this.bodyname = bodyname;
+            HasAtmo = body.atmosphere;
             if (HasAtmo)
             {
-                Atmodepth = bod.atmosphereDepth;
+                Atmodepth = body.atmosphereDepth;
             }
         }
 
@@ -112,7 +108,7 @@ namespace AdvancedAtmosphereTools
         {
             if (HasWindData)
             {
-                Utils.LogWarning(string.Format("Wind data already exists for {0}.", body));
+                Utils.LogWarning(string.Format("Wind data already exists for {0}.", bodyname));
                 return -1;
             }
             else
@@ -126,7 +122,7 @@ namespace AdvancedAtmosphereTools
                 WindLonOffset = lonoffset;
                 VerticalWindMultiplier = vertmult;
                 WindTimeOffset = timeoffset;
-                Utils.LogInfo(string.Format("Successfully added Wind Data to {0}.", body));
+                Utils.LogInfo(string.Format("Successfully added Wind Data to {0}.", bodyname));
                 return 0;
             }
         }
@@ -135,7 +131,7 @@ namespace AdvancedAtmosphereTools
         {
             if (HasTemperatureData)
             {
-                Utils.LogWarning(string.Format("Temperature data already exists for {0}.", body));
+                Utils.LogWarning(string.Format("Temperature data already exists for {0}.", bodyname));
                 return -1;
             }
             else
@@ -148,7 +144,7 @@ namespace AdvancedAtmosphereTools
                 TempTimeOffset = timeoffset;
                 blendtempwithstock = blendwithstock;
                 BlendTempFactor = blendfactor;
-                Utils.LogInfo(string.Format("Successfully added Temperature Data to {0}.", body));
+                Utils.LogInfo(string.Format("Successfully added Temperature Data to {0}.", bodyname));
                 return 0;
             }
         }
@@ -157,7 +153,7 @@ namespace AdvancedAtmosphereTools
         {
             if (HasPressureData)
             {
-                Utils.LogWarning(string.Format("Pressure data already exists for {0}.", body));
+                Utils.LogWarning(string.Format("Pressure data already exists for {0}.", bodyname));
                 return -1;
             }
             else
@@ -168,7 +164,7 @@ namespace AdvancedAtmosphereTools
                 PressModelTop = modeltop;
                 PressLonOffset = lonoffset;
                 PressTimeOffset = timeoffset;
-                Utils.LogInfo(string.Format("Successfully added Pressure Data to {0}.", body));
+                Utils.LogInfo(string.Format("Successfully added Pressure Data to {0}.", bodyname));
                 return 0;
             }
         }
@@ -201,7 +197,7 @@ namespace AdvancedAtmosphereTools
         {
             if (MolarMassCurve != null)
             {
-                Utils.LogWarning(body + " already has a MolarMassCurve.");
+                Utils.LogWarning(bodyname + " already has a MolarMassCurve.");
                 return -1;
             }
             else
@@ -211,11 +207,17 @@ namespace AdvancedAtmosphereTools
             }
         }
 
+        internal int AddMolarMassOffsetMap(OffsetMap map)
+        {
+            MolarMassOffsetMaps?.Add(map);
+            return MolarMassOffsetMaps == null ? -1 : 0;
+        }
+
         internal int SetAdiabaticIndexCurve(FloatCurve fc)
         {
             if (AdiabaticIndexCurve != null)
             {
-                Utils.LogWarning(body + " already has an AdiabaticIndexCurve.");
+                Utils.LogWarning(bodyname + " already has an AdiabaticIndexCurve.");
                 return -1;
             }
             else
@@ -225,10 +227,14 @@ namespace AdvancedAtmosphereTools
             }
         }
 
-        internal int GetWind(double lon, double lat, double alt, double time, ref Vector3 winddatavector, ref Vector3 flowmapvector, ref DataInfo windinfo)
+        internal int AddAdiabaticIndexOffsetMap(OffsetMap map)
         {
-            bool winddatagood = false;
-            bool flowmapgood = false;
+            AdiabaticIndexOffsetMaps?.Add(map);
+            return AdiabaticIndexOffsetMaps == null ? -1 : 0;
+        }
+
+        internal int GetDataWind(double lon, double lat, double alt, double time, ref Vector3 winddatavector, ref DataInfo windinfo)
+        {
             if (HasWindData)
             {
                 try
@@ -273,24 +279,24 @@ namespace AdvancedAtmosphereTools
                     float BottomPlaneZ2 = Utils.BiLerp(WindDataZ[timeindex2][z1, y1, x1], WindDataZ[timeindex2][z1, y1, x2], WindDataZ[timeindex2][z1, y2, x1], WindDataZ[timeindex2][z1, y2, x2], (float)lerpx, (float)lerpy);
                     float TopPlaneZ2 = Utils.BiLerp(WindDataZ[timeindex2][z2, y1, x1], WindDataZ[timeindex2][z2, y1, x2], WindDataZ[timeindex2][z2, y2, x1], WindDataZ[timeindex2][z2, y2, x2], (float)lerpx, (float)lerpy);
 
-                    //Bilinearly interpolate on the altitude and time axes
-                    float FinalX = Mathf.Lerp(Mathf.Lerp(BottomPlaneX1, TopPlaneX1, (float)lerpz), Mathf.Lerp(BottomPlaneX2, TopPlaneX2, (float)lerpz), (float)lerpt);
-                    float FinalY = Mathf.Lerp(Mathf.Lerp(BottomPlaneY1, TopPlaneY1, (float)lerpz), Mathf.Lerp(BottomPlaneY2, TopPlaneY2, (float)lerpz), (float)lerpt) * (float)VerticalWindMultiplier;
-                    float FinalZ = Mathf.Lerp(Mathf.Lerp(BottomPlaneZ1, TopPlaneZ1, (float)lerpz), Mathf.Lerp(BottomPlaneZ2, TopPlaneZ2, (float)lerpz), (float)lerpt);
-
-                    //Create the wind vector
-                    winddatavector.x = FinalX;
-                    winddatavector.y = FinalY;
-                    winddatavector.z = FinalZ;
-                    winddatagood = winddatavector.IsFinite();
+                    //Bilinearly interpolate on the altitude and time axes to create the wind vector
+                    winddatavector.x = Mathf.Lerp(Mathf.Lerp(BottomPlaneX1, TopPlaneX1, (float)lerpz), Mathf.Lerp(BottomPlaneX2, TopPlaneX2, (float)lerpz), (float)lerpt);
+                    winddatavector.y = Mathf.Lerp(Mathf.Lerp(BottomPlaneY1, TopPlaneY1, (float)lerpz), Mathf.Lerp(BottomPlaneY2, TopPlaneY2, (float)lerpz), (float)lerpt) * (float)VerticalWindMultiplier;
+                    winddatavector.z = Mathf.Lerp(Mathf.Lerp(BottomPlaneZ1, TopPlaneZ1, (float)lerpz), Mathf.Lerp(BottomPlaneZ2, TopPlaneZ2, (float)lerpz), (float)lerpt);
+                    
                     windinfo.SetNew(x1, x2, lerpx, y1, y2, lerpy, z1, z2, lerpz, timeindex, timeindex2, lerpt, alt > windmodeltop);
+                    return winddatavector.IsFinite() ? 0 : -2;
                 }
                 catch
                 {
-                    winddatagood = false;
+                    return -2;
                 }
             }
-            
+            return -1;
+        }
+
+        internal int GetFlowMapWind(double lon, double lat, double alt, double time, ref Vector3 flowmapvector)
+        {
             if (HasFlowmaps)
             {
                 try
@@ -302,33 +308,17 @@ namespace AdvancedAtmosphereTools
                         {
                             flowmapvector.Add(map.GetWindVec(lon, lat, alt, time, Atmodepth));
                         }
-                        flowmapgood = flowmapvector.IsFinite();
+                        return flowmapvector.IsFinite() ? 0 : -2;
                     }
                 }
                 catch
                 {
-                    flowmapgood = false;
+                    return -2;
                 }
             }
-
-            //if both winddata and flowmaps are present and the value is usable, add them together. otherwise, return whichever one is applicable.
-            if (winddatagood && flowmapgood)
-            {
-                return 0;
-            }
-            else if (!winddatagood && flowmapgood)
-            {
-                return 2;
-            }
-            else if (winddatagood && !flowmapgood)
-            {
-                return 1;
-            }
-            else
-            {
-                return -1;
-            }
+            return -1;
         }
+
         internal int GetTemperature(double lon, double lat, double alt, double time, out double temp, ref DataInfo tempinfo)
         {
             temp = 0.0;
@@ -480,9 +470,51 @@ namespace AdvancedAtmosphereTools
             return -1;
         }
 
+        internal int GetMolarMass(double alt, out double molarmass)
+        {
+            molarmass = MolarMassCurve != null ? MolarMassCurve.Evaluate((float)alt) : 0.0;
+            return MolarMassCurve != null ? 0 : -1;
+        }
+
+        internal int GetMolarMassOffset(double lon, double lat, double alt, double time, out double offset)
+        {
+            offset = 0.0;
+            int count = MolarMassOffsetMaps.Count;
+            if (count > 0)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    offset += MolarMassOffsetMaps[i].GetOffset(lon, lat, alt, time, Atmodepth);
+                }
+                return 0;
+            }
+            return -1;
+        }
+
+        internal int GetAdiabaticIndex(double alt, out double adiabaticindex)
+        {
+            adiabaticindex = AdiabaticIndexCurve != null ? AdiabaticIndexCurve.Evaluate((float)alt) : 0.0;
+            return AdiabaticIndexCurve != null ? 0 : -1;
+        }
+
+        internal int GetAdiabaticIndexOffset(double lon, double lat, double alt, double time, out double offset)
+        {
+            offset = 0.0;
+            int count = AdiabaticIndexOffsetMaps.Count;
+            if (count > 0)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    offset += AdiabaticIndexOffsetMaps[i].GetOffset(lon, lat, alt, time, Atmodepth);
+                }
+                return 0;
+            }
+            return -1;
+        }
+
         internal int GetWindData(double time, out float[][,,] dataarray)
         {
-            dataarray = null;
+            dataarray = new float[3][,,];
             if (WindDataX != null && WindDataY != null && WindDataZ != null)
             {
                 try
