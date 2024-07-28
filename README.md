@@ -1,5 +1,5 @@
 # Advanced Atmosphere Tools
--# This mod was originally named Modular Climate & Weather Systems. It was renamed to Advanced Atmosphere Tools reflect its new focus of manipulating atmospheres. Backwards compatibility with MCWS configs is provided.
+*This mod was originally named Modular Climate & Weather Systems. It was renamed to Advanced Atmosphere Tools reflect its new focus of manipulating atmospheres. Backwards compatibility with MCWS configs is provided.*
 
 **Advanced Atmosphere Tools** is a plugin that enables manipulation of atmospheric properties on a less-than-planetary scale, allowing for far more variability in atmospheric conditions on a given body than would otherwise be seen in stock. The manipulated properties are then seamlessly integrated into KSP’s flight dynamics systems to influence how craft fly through the atmosphere, all while having a very low performance impact, even with high part counts.
 
