@@ -1,13 +1,24 @@
-# Modular Climate & Weather Systems
-Modular Climate & Weather Systems (MCWS) is a plugin that provides a common interface for climate and weather simulations to interact with KSP's physics systems. 
+# Advanced Atmosphere Tools
+-# This mod was originally named Modular Climate & Weather Systems. It was renamed to Advanced Atmosphere Tools reflect its new focus of manipulating atmospheres. Backwards compatibility with MCWS configs is provided.
 
-The "Modular" part of MCWS comes from the fact that it can not only take in data from different sources for different bodies, including custom/modded ones, but can also take in data from separate sources for wind, temperature, and pressure. MCWS will automatically select its data sources based on the current main body, ensuring no conflicts between data sources for different bodies can occur.  It then uses this data to influence the game's aerodynamics and thermodynamics systems, including, to the best of my knowledge, the smoothest and fastest implementation of stockalike wind effects to date. 
+**Advanced Atmosphere Tools** is a plugin that enables manipulation of atmospheric properties on a less-than-planetary scale, allowing for far more variability in atmospheric conditions on a given body than would otherwise be seen in stock. The manipulated properties are then seamlessly integrated into KSP’s flight dynamics systems to influence how craft fly through the atmosphere, all while having a very low performance impact, even with high part counts.
+
+Adv. Atmo. Tools provides ways to manipulate the following five atmospheric properties: 
+- Temperature
+- Pressure
+- Molar Mass
+- Adiabatic Index
+- Wind
+All properties can be influenced through a set of maps and floatcurves. Details on how to configure all the different options, as well as their effects on flight dynamics, can be found on the GitHub wiki. 
+Link to wiki:
+
+An API is also provided to allow other plugins to interact with Adv. Atmo. Tools.
 
 Dependencies:
-- ModularFlightIntegrator: https://forum.kerbalspaceprogram.com/topic/106369-19-modularflightintegrator-127-19-october-2019/
+- ModularFlightIntegrator: https://github.com/sarbian/ModularFlightIntegrator
 - Toolbar Controller: https://github.com/linuxgurugamer/ToolbarControl/releases
 - ClickThrough Blocker: https://github.com/linuxgurugamer/ClickThroughBlocker/releases
-- HarmonyKSP (bundled with download): https://github.com/KSPModdingLibs/HarmonyKSP/releases
+- HarmonyKSP: https://github.com/KSPModdingLibs/HarmonyKSP/releases
 
 ## Mod Compatibility  
 **Recommended Mods:**
@@ -15,14 +26,14 @@ Dependencies:
 - KSPCommunityFixes
 
 **Compatible With:**
-- FerramAerospaceResearch: If installed, MCWS will defer all relevant aero/thermal calculations to FAR and supply it with wind, temperature, and pressure information.
+- FerramAerospaceResearch: If installed, Advanced Atmosphere Tools will defer all relevant aero/thermal calculations to FAR and supply it with wind, temperature, and pressure information.
 - Most, if not all parts mods
 
 **Conflicts With:** 
 - Other mods that modify the stock aerodynamics system
 
 ## Other Features
-MCWS adds a few extra features to help you out when flying, including:
+Advanced Atmosphere Tools adds a few extra features to help you out when flying, including:
 - A GUI which displays wind, temperature, and pressure information, along with other relevant aero- and thermodynamic information.
 - A new pair of navball indicators which display prograde and retrograde adjusted for wind, which will only appear if you are in an atmosphere,  the Navball is set to "Surface" mode, the wind speed is greater than 0.5m/s, and the craft is in motion.
 
