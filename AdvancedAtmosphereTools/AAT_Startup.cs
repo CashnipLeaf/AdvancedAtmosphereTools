@@ -159,7 +159,7 @@ namespace AdvancedAtmosphereTools
         }
         #endregion
 
-        #region getdata
+        #region boilerplate
         internal bool BodyExists(string body) => bodydata != null && bodydata.ContainsKey(body);
         internal bool HasWind(string body) => BodyExists(body) && bodydata[body].HasWind;
         internal bool HasWindData(string body) => BodyExists(body) && bodydata[body].HasWindData;

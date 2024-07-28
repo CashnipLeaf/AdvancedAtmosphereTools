@@ -539,7 +539,7 @@ namespace AdvancedAtmosphereTools
         {
             bool thirdchannel = false;
             float minalt = 0.0f;
-            float maxalt = (float)atmodepth;
+            float maxalt = (float)atmodepth; //DO NOT, I repeat, DO NOT **EVER** use float.MaxValue for this 
             float windSpeed = 0.0f;
             string path = "";
             bool curveExists;
@@ -736,8 +736,8 @@ namespace AdvancedAtmosphereTools
             }
             else
             {
-                curve.Add(0, backup, 0, 0);
-                curve.Add(10000, backup, 0, 0);
+                curve.Add(0.0f, backup, 0.0f, 0.0f);
+                curve.Add(10000.0f, backup, 0.0f, 0.0f);
             }
             return curve;
         }
@@ -751,8 +751,8 @@ namespace AdvancedAtmosphereTools
             else //generate a default AltitudeSpeedMultCurve with the inputted fade information.
             {
                 curve.Add(min, 0.0f, 0.0f, 1.0f / (lowerfade - min));
-                curve.Add(min + lowerfade, 1.0f, 1.0f / (lowerfade - min), 0.0f);
-                curve.Add(max - upperfade, 1.0f, 0.0f, -1.0f / (max - upperfade));
+                curve.Add(lowerfade, 1.0f, 1.0f / (lowerfade - min), 0.0f);
+                curve.Add(upperfade, 1.0f, 0.0f, -1.0f / (max - upperfade));
                 curve.Add(max, 0.0f, -1.0f / (max - upperfade), 0.0f);
             }
             return curve;

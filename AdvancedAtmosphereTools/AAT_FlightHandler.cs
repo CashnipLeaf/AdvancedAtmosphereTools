@@ -95,6 +95,7 @@ namespace AdvancedAtmosphereTools
         private bool hasbasemolarmass = false;
         private bool hasmolarmassoffset = false;
 
+        //have you had enough boilerplate? too bad! have some more!
         private double adiabaticindex = 0.0;
         internal double AdiabaticIndex
         {
@@ -209,6 +210,7 @@ namespace AdvancedAtmosphereTools
                 AdiabaticIndex = stockadiabaticindex = baseadiabaticindex = mainbody.atmosphereAdiabaticIndex;
                 molarmassoffset = adiabaticindexoffset = 0.0;
 
+                //Yes, I use return codes. They're more useful than you'd think.
                 int extwindcode = AAT_API.GetExternalWind(bodyname, lon, lat, Math.Max(alt, 0.0), CurrentTime, out Vector3 extwind);
                 if (extwindcode == 0)
                 {

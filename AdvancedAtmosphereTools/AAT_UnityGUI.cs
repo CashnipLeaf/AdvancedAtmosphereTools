@@ -6,8 +6,7 @@ using ToolbarControl_NS;
 
 namespace AdvancedAtmosphereTools
 {
-    //This portion of the FlightHandler runs the GUI
-    partial class AAT_FlightHandler
+    partial class AAT_FlightHandler //This portion of the FlightHandler runs the GUI
     {
         private ToolbarControl toolbarController;
         private bool toolbarButtonAdded = false;
@@ -190,7 +189,7 @@ namespace AdvancedAtmosphereTools
 
                         DrawHeader("Molar Mass Info");
                         DrawElement("Stock Molar Mass", inatmo ? string.Format("{0:F4} {1}", stockmolarmass, MolarMassUnit) : na);
-                        DrawElement("Molar Mass From Curve", inatmo && hasbasemolarmass && HasMolarMass ? string.Format("{0:4} {1}", basemolarmass, MolarMassUnit) : na);
+                        DrawElement("Molar Mass From Curve", inatmo && hasbasemolarmass && HasMolarMass ? string.Format("{0:F4} {1}", basemolarmass, MolarMassUnit) : na);
                         DrawElement("Molar Mass Offset", inatmo && hasmolarmassoffset && HasMolarMass ? string.Format("{0:F4} {1}", molarmassoffset, MolarMassUnit) : na);
                         DrawElement("Final Molar Mass", inatmo && HasMolarMass ? string.Format("{0:F4} {1}", MolarMass, MolarMassUnit) : na);
 

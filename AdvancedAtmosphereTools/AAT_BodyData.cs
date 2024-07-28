@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace AdvancedAtmosphereTools
 {
-    internal class AAT_BodyData
+    internal class AAT_BodyData //Boilerplate. Boilerplate everywhere.
     {
         private readonly string bodyname;
         internal bool HasAtmo { get; private set; } = false;
