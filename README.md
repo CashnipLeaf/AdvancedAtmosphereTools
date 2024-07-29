@@ -8,9 +8,8 @@ Adv. Atmo. Tools provides ways to manipulate the following five atmospheric prop
 - Pressure
 - Molar Mass
 - Adiabatic Index
-- Wind
+- Wind  
 All properties can be influenced through a set of maps and floatcurves. Details on how to configure all the different options, as well as their effects on flight dynamics, can be found on the GitHub wiki. 
-Link to wiki:
 
 An API is also provided to allow other plugins to interact with Adv. Atmo. Tools.
 
