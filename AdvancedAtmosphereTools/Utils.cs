@@ -7,7 +7,7 @@ namespace AdvancedAtmosphereTools
 {
     internal static class Utils
     {
-        internal const string version = "1.0.0";
+        internal const string version = "1.1.0";
         internal static string GameDataPath => KSPUtil.ApplicationRootPath + "GameData/";
         internal static Dictionary<string, string> LOCCache; //localization cache
 
@@ -93,8 +93,8 @@ namespace AdvancedAtmosphereTools
         {
             by = Mathf.Clamp01(by);
             v.x = (v.x * (1.0f - by)) + (other.x * by);
-            v.y = (v.x * (1.0f - by)) + (other.y * by);
-            v.z = (v.y * (1.0f - by)) + (other.z * by);
+            v.y = (v.y * (1.0f - by)) + (other.y * by);
+            v.z = (v.z * (1.0f - by)) + (other.z * by);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static void Multiply(ref this Vector3 v, Vector3 other)

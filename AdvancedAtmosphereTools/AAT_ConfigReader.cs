@@ -32,6 +32,15 @@ namespace AdvancedAtmosphereTools
                     bodydata.Add(body, new AAT_BodyData(body, bod));
                 }
 
+                bool istoxic = false;
+                node.TryGetValue("atmosphereIsToxic", ref istoxic);
+                bodydata[body].AtmosphereIsToxic = istoxic;
+                string toxicmsg = "";
+                if (node.TryGetValue("atmosphereIsToxicMessage", ref toxicmsg) && !string.IsNullOrEmpty(toxicmsg))
+                {
+                    bodydata[body].atmosphereIsToxicMessage = toxicmsg;
+                }
+
                 ConfigNode data = new ConfigNode();
                 if (node.TryGetNode("Combined_Data", ref data))
                 {
@@ -353,7 +362,14 @@ namespace AdvancedAtmosphereTools
                     Utils.LogInfo("Setting MolarMassCurve for " + body);
                     FloatCurve fc = new FloatCurve();
                     fc.Load(molarmasscurveholder);
-                    bodydata[body].SetMolarMassCurve(fc);
+                    if (bodydata[body].MolarMassCurve != null)
+                    {
+                        Utils.LogWarning(body + " already has a MolarMassCurve.");
+                    }
+                    else
+                    {
+                        bodydata[body].MolarMassCurve = fc;
+                    }
                 }
 
                 ConfigNode[] molarmassmaps = node.GetNodes("MolarMassOffsetMap");
@@ -380,7 +396,14 @@ namespace AdvancedAtmosphereTools
                     Utils.LogInfo("Setting AdiabaticIndexCurve for " + body);
                     FloatCurve fc = new FloatCurve();
                     fc.Load(adiabaticindexcurveholder);
-                    bodydata[body].SetAdiabaticIndexCurve(fc);
+                    if (bodydata[body].AdiabaticIndexCurve != null)
+                    {
+                        Utils.LogWarning(body + " already has an AdiabaticIndexCurve.");
+                    }
+                    else
+                    {
+                        bodydata[body].AdiabaticIndexCurve = fc;
+                    }
                 }
 
                 ConfigNode[] adiabaticindexmaps = node.GetNodes("AdiabaticIndexOffsetMap");

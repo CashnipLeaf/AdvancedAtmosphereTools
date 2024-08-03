@@ -18,11 +18,23 @@ namespace AdvancedAtmosphereTools
             if (!registeredoverrides) //make sure that things dont get patched more than once. That would be very bad.
             {
                 Utils.LogInfo("Initializing Flight Dynamics Overrides.");
-
-                Utils.LogInfo("Registering AdvancedAtmosphereTools with ModularFlightIntegrator.");
+                //register overrides with ModularFI
                 try
                 {
-                    //register overrides with ModularFI
+                    Utils.LogInfo("Registering AdvancedAtmosphereTools with ModularFlightIntegrator.");
+                    //If FAR is installed, do not override aerodynamics. Leave the aerodynamics calulations to FAR.
+                    if (!Settings.FAR_Exists)
+                    {
+                        if (ModularFlightIntegrator.RegisterUpdateAerodynamicsOverride(NewAeroUpdate))
+                        {
+                            ModularFlightIntegrator.RegisterCalculateAerodynamicAreaOverride(AerodynamicAreaOverride);
+                            Utils.LogInfo("Successfully registered AAT's Aerodynamics Overrides with ModularFlightIntegrator.");
+                        }
+                        else
+                        {
+                            Utils.LogWarning("Unable to register AAT's Aerodynamics Override with ModularFlightIntegrator.");
+                        }
+                    }
                     if (ModularFlightIntegrator.RegisterCalculatePressureOverride(CalcPressureOverride))
                     {
                         Utils.LogInfo("Successfully registered AAT's Pressure Override with ModularFlightIntegrator.");
@@ -47,38 +59,17 @@ namespace AdvancedAtmosphereTools
                     Utils.LogError("ModularFlightIntegrator Registration Failed. Exception thrown: " + ex.ToString());
                 }
 
-                //If FAR is installed, do not override aerodynamics. Leave the aerodynamics calulations to FAR.
-                if (!Settings.FAR_Exists)
+                Utils.LogInfo("Patching Lifting Surface, Air Intake, and Kerbal Breathing behavior.");
+                try
                 {
-                    try
-                    {
-                        if (ModularFlightIntegrator.RegisterUpdateAerodynamicsOverride(NewAeroUpdate))
-                        {
-                            ModularFlightIntegrator.RegisterCalculateAerodynamicAreaOverride(AerodynamicAreaOverride);
-                            Utils.LogInfo("Successfully registered AAT's Aerodynamics Overrides with ModularFlightIntegrator.");
-                        }
-                        else
-                        {
-                            Utils.LogWarning("Unable to register AAT's Aerodynamics Override with ModularFlightIntegrator.");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Utils.LogError("ModularFlightIntegrator Registration Failed. Exception thrown: " + ex.ToString());
-                    }
-                    
-                    Utils.LogInfo("Patching Lifting Surface and Air Intake behavior.");
-                    try
-                    {
-                        Assembly assembly = Assembly.GetExecutingAssembly();
-                        Harmony harmony = new Harmony("AAT_WingAndIntake");
-                        harmony.PatchAll(assembly);
-                        Utils.LogInfo("Patching Complete.");
-                    }
-                    catch (Exception ex)
-                    {
-                        Utils.LogError("Patching Failed. Exception thrown:" + ex.ToString());
-                    }
+                    Assembly assembly = Assembly.GetExecutingAssembly();
+                    Harmony harmony = new Harmony("AdvAtmoTools");
+                    harmony.PatchAll(assembly);
+                    Utils.LogInfo("Patching Complete.");
+                }
+                catch (Exception ex)
+                {
+                    Utils.LogError("Patching Failed. Exception thrown:" + ex.ToString());
                 }
                 registeredoverrides = true;
                 Destroy(this);
@@ -124,7 +115,7 @@ namespace AdvancedAtmosphereTools
             //add an offset to the velocity vector used for body drag/lift calcs and update the related fields.
             if (part.Rigidbody != null && windvec.IsFinite() && !Mathf.Approximately(windvec.magnitude, 0.0f))
             {
-                part.dragVector.Subtract(windvec);
+                part.dragVector = part.Rigidbody.velocity + Krakensbane.GetFrameVelocity() - windvec;
                 part.dragVectorSqrMag = part.dragVector.sqrMagnitude;
                 if (part.dragVectorSqrMag != 0.0)
                 {
@@ -263,6 +254,7 @@ namespace AdvancedAtmosphereTools
         #endregion
     }
 
+    #region harmonypatches
     //--------------------------HARMONY PATCHES-------------------------------
 
     //Add an offset to the velocity vector used for wing lift calculations to account for wind.
@@ -272,7 +264,7 @@ namespace AdvancedAtmosphereTools
         static void Prefix(ref Vector3 pointVelocity, ModuleLiftingSurface __instance)
         {
             AAT_FlightHandler FH = AAT_FlightHandler.Instance;
-            if (!pointVelocity.IsFinite() || FH == null || !FH.HasWind)
+            if (!pointVelocity.IsFinite() || FH == null || !FH.HasWind || Settings.FAR_Exists)
             {
                 return;
             }
@@ -283,7 +275,7 @@ namespace AdvancedAtmosphereTools
             }
             float submerged = (float)__instance.part.submergedPortion;
             windvec.LerpWith(Vector3.zero, submerged * submerged);
-            pointVelocity.Subtract(windvec);
+            pointVelocity -= windvec;
         }
     }
 
@@ -374,4 +366,69 @@ namespace AdvancedAtmosphereTools
             return false;
         }
     }
+
+    //first of three harmony patches to decouple oxygen from breathability
+    [HarmonyPatch(typeof(KerbalEVA),nameof(KerbalEVA.CanEVAWithoutHelmet))]
+    public static class KerbalBreathHijacker1
+    {
+        public static void Postfix(ref bool __result, KerbalEVA __instance, ref string ___helmetUnsafeReason)
+        {
+            AAT_Startup Data = AAT_Startup.Instance;
+            if (!__result || Data == null)
+            {
+                return;
+            }
+
+            string bodyname = __instance.vessel.mainBody.name;
+            bool istoxic = Data.IsAtmosphereToxic(bodyname);
+            if (istoxic)
+            {
+                __result = false;
+                ___helmetUnsafeReason = Data.AtmosphereToxicMessage(bodyname);
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(KerbalEVA), nameof(KerbalEVA.CanSafelyRemoveHelmet))]
+    public static class KerbalBreathHijacker2
+    {
+        public static void Postfix(ref bool __result, KerbalEVA __instance, ref string ___helmetUnsafeReason)
+        {
+            AAT_Startup Data = AAT_Startup.Instance;
+            if (!__result || Data == null)
+            {
+                return;
+            }
+
+            string bodyname = __instance.vessel.mainBody.name;
+            bool istoxic = Data.IsAtmosphereToxic(bodyname);
+            if (istoxic)
+            {
+                __result = false;
+                ___helmetUnsafeReason = Data.AtmosphereToxicMessage(bodyname);
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(KerbalEVA), nameof(KerbalEVA.WillDieWithoutHelmet))]
+    public static class KerbalBreathHijacker3
+    {
+        public static void Postfix(ref bool __result, KerbalEVA __instance, ref string ___helmetUnsafeReason)
+        {
+            AAT_Startup Data = AAT_Startup.Instance;
+            if (__result || Data == null)
+            {
+                return;
+            }
+
+            string bodyname = __instance.vessel.mainBody.name;
+            bool istoxic = Data.IsAtmosphereToxic(bodyname);
+            if (istoxic)
+            {
+                __result = true;
+                ___helmetUnsafeReason = Data.AtmosphereToxicMessage(bodyname);
+            }
+        }
+    }
+    #endregion
 }

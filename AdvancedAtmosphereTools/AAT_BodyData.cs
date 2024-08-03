@@ -9,6 +9,13 @@ namespace AdvancedAtmosphereTools
         private readonly string bodyname;
         internal bool HasAtmo { get; private set; } = false;
         internal double Atmodepth { get; private set; } = 0.0;
+        private bool atmosphereIsToxic = false;
+        internal bool AtmosphereIsToxic
+        {
+            get => atmosphereIsToxic;
+            set => atmosphereIsToxic = atmosphereIsToxic || value;
+        }
+        internal string atmosphereIsToxicMessage = "Atmosphere is Toxic.";
 
         private float[][,,] WindDataX;
         private float[][,,] WindDataY;
@@ -104,12 +111,11 @@ namespace AdvancedAtmosphereTools
             }
         }
 
-        internal int AddWindData(float[][,,] WindX, float[][,,] WindY, float[][,,] WindZ, double scalefactor, double timestep, double modeltop, double lonoffset, double vertmult, double timeoffset)
+        internal void AddWindData(float[][,,] WindX, float[][,,] WindY, float[][,,] WindZ, double scalefactor, double timestep, double modeltop, double lonoffset, double vertmult, double timeoffset)
         {
             if (HasWindData)
             {
                 Utils.LogWarning(string.Format("Wind data already exists for {0}.", bodyname));
-                return -1;
             }
             else
             {
@@ -123,16 +129,14 @@ namespace AdvancedAtmosphereTools
                 VerticalWindMultiplier = vertmult;
                 WindTimeOffset = timeoffset;
                 Utils.LogInfo(string.Format("Successfully added Wind Data to {0}.", bodyname));
-                return 0;
             }
         }
 
-        internal int AddTemperatureData(float[][,,] Temp, double scalefactor, double timestep, double modeltop, double lonoffset, double timeoffset, bool blendwithstock, double blendfactor)
+        internal void AddTemperatureData(float[][,,] Temp, double scalefactor, double timestep, double modeltop, double lonoffset, double timeoffset, bool blendwithstock, double blendfactor)
         {
             if (HasTemperatureData)
             {
                 Utils.LogWarning(string.Format("Temperature data already exists for {0}.", bodyname));
-                return -1;
             }
             else
             {
@@ -145,16 +149,14 @@ namespace AdvancedAtmosphereTools
                 blendtempwithstock = blendwithstock;
                 BlendTempFactor = blendfactor;
                 Utils.LogInfo(string.Format("Successfully added Temperature Data to {0}.", bodyname));
-                return 0;
             }
         }
 
-        internal int AddPressureData(float[][,,] Press, double scalefactor, double timestep, double modeltop, double lonoffset, double timeoffset)
+        internal void AddPressureData(float[][,,] Press, double scalefactor, double timestep, double modeltop, double lonoffset, double timeoffset)
         {
             if (HasPressureData)
             {
                 Utils.LogWarning(string.Format("Pressure data already exists for {0}.", bodyname));
-                return -1;
             }
             else
             {
@@ -165,73 +167,15 @@ namespace AdvancedAtmosphereTools
                 PressLonOffset = lonoffset;
                 PressTimeOffset = timeoffset;
                 Utils.LogInfo(string.Format("Successfully added Pressure Data to {0}.", bodyname));
-                return 0;
             }
         }
 
-        internal int AddFlowMap(FlowMap flowmap)
-        {
-            Flowmaps?.Add(flowmap);
-            return Flowmaps == null ? -1 : 0;
-        }
-
-        internal int AddTempOffsetMap(OffsetMap map)
-        {
-            TempOffsetMaps?.Add(map);
-            return TempOffsetMaps == null ? -1 : 0;
-        }
-
-        internal int AddTempSwingMap(MultiplierMap map)
-        {
-            TempSwingMultiplierMaps?.Add(map);
-            return TempSwingMultiplierMaps == null ? -1 : 0;
-        }
-
-        internal int AddPressMap(MultiplierMap map)
-        {
-            PressMultiplierMaps?.Add(map);
-            return PressMultiplierMaps == null ? -1 : 0;
-        }
-
-        internal int SetMolarMassCurve(FloatCurve fc)
-        {
-            if (MolarMassCurve != null)
-            {
-                Utils.LogWarning(bodyname + " already has a MolarMassCurve.");
-                return -1;
-            }
-            else
-            {
-                MolarMassCurve = fc;
-                return 0;
-            }
-        }
-
-        internal int AddMolarMassOffsetMap(OffsetMap map)
-        {
-            MolarMassOffsetMaps?.Add(map);
-            return MolarMassOffsetMaps == null ? -1 : 0;
-        }
-
-        internal int SetAdiabaticIndexCurve(FloatCurve fc)
-        {
-            if (AdiabaticIndexCurve != null)
-            {
-                Utils.LogWarning(bodyname + " already has an AdiabaticIndexCurve.");
-                return -1;
-            }
-            else
-            {
-                AdiabaticIndexCurve = fc;
-                return 0;
-            }
-        }
-
-        internal int AddAdiabaticIndexOffsetMap(OffsetMap map)
-        {
-            AdiabaticIndexOffsetMaps?.Add(map);
-            return AdiabaticIndexOffsetMaps == null ? -1 : 0;
-        }
+        internal void AddFlowMap(FlowMap flowmap) => Flowmaps?.Add(flowmap);
+        internal void AddTempOffsetMap(OffsetMap map) => TempOffsetMaps?.Add(map);
+        internal void AddTempSwingMap(MultiplierMap map) => TempSwingMultiplierMaps?.Add(map);
+        internal void AddPressMap(MultiplierMap map) => PressMultiplierMaps?.Add(map);
+        internal void AddMolarMassOffsetMap(OffsetMap map) => MolarMassOffsetMaps?.Add(map);
+        internal void AddAdiabaticIndexOffsetMap(OffsetMap map) => AdiabaticIndexOffsetMaps?.Add(map);
 
         internal int GetDataWind(double lon, double lat, double alt, double time, ref Vector3 winddatavector, ref DataInfo windinfo)
         {
