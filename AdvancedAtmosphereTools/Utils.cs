@@ -7,7 +7,7 @@ namespace AdvancedAtmosphereTools
 {
     internal static class Utils
     {
-        internal const string version = "1.1.0";
+        internal const string version = "1.2.0";
         internal static string GameDataPath => KSPUtil.ApplicationRootPath + "GameData/";
         internal static Dictionary<string, string> LOCCache; //localization cache
 
@@ -17,7 +17,7 @@ namespace AdvancedAtmosphereTools
         internal static void LogAPIWarning(string message) => Debug.LogWarning("[AdvAtmoTools][API WARNING] " + message); //API warnings
         internal static void LogError(string message) => Debug.LogError("[AdvAtmoTools][ERROR] " + message); //Errors that invoke fail-safe protections.
 
-        //------------------------------MATH AND RELATED-------------------------
+        //------------------------------MISC HELPERS-------------------------
         internal static double Epsilon => float.Epsilon * 16d; //value that is very nearly zero to prevent the log interpolation from breaking
 
         internal static float BiLerp(float first1, float second1, float first2, float second2, float by1, float by2)
@@ -56,6 +56,49 @@ namespace AdvancedAtmosphereTools
         //Apparently no such function exists for integers in either UtilMath or Mathf. Why?
         internal static int Clamp(int value, int min, int max) => Math.Min(Math.Max(value, min), max);
 
+        internal static double MeanAnomalyToTrueAnomaly(double meananomaly, double eccentricity) => meananomaly + (2 * eccentricity * Math.Sin(meananomaly));
+
+        internal static double MeanAnomalyToTrueAnomalyD(double meananomalyd, double eccentricity) => MeanAnomalyToTrueAnomaly(meananomalyd * UtilMath.Deg2Rad, eccentricity) * UtilMath.Rad2Deg;
+
+        //Get the host star of the body.
+        //Adapted from Kopernicus
+        internal static CelestialBody GetLocalStar(CelestialBody body)
+        {
+            if (body == null)
+            {
+                throw new ArgumentNullException();
+            }
+
+            while (body?.orbit?.referenceBody != null)
+            {
+                if (body.isStar || body == FlightGlobals.Bodies[0])
+                {
+                    break;
+                }
+                body = body.orbit.referenceBody;
+            }
+            return body;
+        }
+
+        //get the body referencing the host star
+        //Adapted from Kopernicus
+        internal static CelestialBody GetLocalPlanet(CelestialBody body)
+        {
+            if (body == null)
+            {
+                throw new ArgumentNullException();
+            }
+
+            while (body?.orbit?.referenceBody != null)
+            {
+                if (body.orbit.referenceBody.isStar || body.orbit.referenceBody == FlightGlobals.Bodies[0])
+                {
+                    break;
+                }
+                body = body.orbit.referenceBody;
+            }
+            return body;
+        }
 
         //--------------------EXTENSION METHODS---------------------
 

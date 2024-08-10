@@ -73,20 +73,22 @@ namespace AdvancedAtmosphereTools
         }
         private double PressLonOffset = 0.0;
         private double PressTimeOffset = 0.0;
-        internal bool HasPressure => HasPressureData || HasPressureMaps;
+        internal bool HasPressure => HasPressureData || HasPressureMultiplier;
         internal bool HasPressureData => PressData != null;
-        internal bool HasPressureMaps => PressMultiplierMaps != null && PressMultiplierMaps?.Count > 0;
+        internal bool HasPressureMultiplier => (PressMultiplierMaps != null && PressMultiplierMaps?.Count > 0) || TrueAnomalyPressureMultiplierCurve != null;
 
         private List<MultiplierMap> PressMultiplierMaps;
         private bool blendpresswithstock = false;
-        internal bool BlendPressWithStock => (HasPressureData && HasPressureMaps) || blendpresswithstock;
+        internal bool BlendPressWithStock => (HasPressureData && HasPressureMultiplier) || blendpresswithstock;
         internal double BlendPressFactor { get; private set; } = 0.5;
+        internal FloatCurve TrueAnomalyPressureMultiplierCurve;
 
         internal FloatCurve MolarMassCurve;
         internal bool HasMolarMassCurve => MolarMassCurve != null;
         internal List<OffsetMap> MolarMassOffsetMaps;
-        internal bool HasMolarMassOffset => MolarMassOffsetMaps != null && MolarMassOffsetMaps.Count > 0;
+        internal bool HasMolarMassOffset => (MolarMassOffsetMaps != null && MolarMassOffsetMaps.Count > 0) || TrueAnomalyMolarMassOffsetCurve != null;
         internal bool HasMolarMass => HasMolarMassCurve || HasMolarMassOffset;
+        internal FloatCurve TrueAnomalyMolarMassOffsetCurve;
 
         internal FloatCurve AdiabaticIndexCurve;
         internal bool HasAdiabaticIndexCurve => AdiabaticIndexCurve != null;
@@ -239,7 +241,7 @@ namespace AdvancedAtmosphereTools
             return -1;
         }
 
-        internal int GetFlowMapWind(double lon, double lat, double alt, double time, ref Vector3 flowmapvector)
+        internal int GetFlowMapWind(double lon, double lat, double alt, double time, double trueanomaly, ref Vector3 flowmapvector)
         {
             if (HasFlowmaps)
             {
@@ -250,7 +252,7 @@ namespace AdvancedAtmosphereTools
                     {
                         foreach (FlowMap map in Flowmaps)
                         {
-                            flowmapvector.Add(map.GetWindVec(lon, lat, alt, time, Atmodepth));
+                            flowmapvector.Add(map.GetWindVec(lon, lat, alt, time, trueanomaly));
                         }
                         return flowmapvector.IsFinite() ? 0 : -2;
                     }
@@ -315,7 +317,7 @@ namespace AdvancedAtmosphereTools
             return -1;
         }
 
-        internal int GetTemperatureOffset(double lon, double lat, double alt, double time, out double offset)
+        internal int GetTemperatureOffset(double lon, double lat, double alt, double time, double trueanomaly, out double offset)
         {
             offset = 0.0;
             int count = TempOffsetMaps.Count;
@@ -323,13 +325,13 @@ namespace AdvancedAtmosphereTools
             {
                 for (int i = 0; i < count; i++)
                 {
-                    offset += TempOffsetMaps[i].GetOffset(lon, lat, alt, time, Atmodepth);
+                    offset += TempOffsetMaps[i].GetOffset(lon, lat, alt, time, trueanomaly);
                 }
                 return 0;
             }
             return -1;
         }
-        internal int GetTemperatureSwingMultiplier(double lon, double lat, double alt, double time, out double swing)
+        internal int GetTemperatureSwingMultiplier(double lon, double lat, double alt, double time, double trueanomaly, out double swing)
         {
             swing = 1.0;
             int count = TempSwingMultiplierMaps.Count;
@@ -337,7 +339,7 @@ namespace AdvancedAtmosphereTools
             {
                 for (int i = 0; i < count; i++)
                 {
-                    swing *= TempSwingMultiplierMaps[i].GetMultiplier(lon, lat, alt, time, Atmodepth);
+                    swing *= TempSwingMultiplierMaps[i].GetMultiplier(lon, lat, alt, time, trueanomaly);
                 }
                 return 0;
             }
@@ -399,16 +401,20 @@ namespace AdvancedAtmosphereTools
             return -1;
         }
 
-        internal int GetPressureMultiplier(double lon, double lat, double alt, double time, out double multiplier)
+        internal int GetPressureMultiplier(double lon, double lat, double alt, double time, double trueanomaly, out double multiplier)
         {
             multiplier = 1.0;
-            int count = PressMultiplierMaps.Count;
-            if (count > 0)
+            if (HasPressureMultiplier)
             {
-                for (int i = 0; i < count; i++)
+                int count = PressMultiplierMaps.Count;
+                if (count > 0)
                 {
-                    multiplier *= PressMultiplierMaps[i].GetMultiplier(lon, lat, alt, time, Atmodepth);
+                    for (int i = 0; i < count; i++)
+                    {
+                        multiplier *= PressMultiplierMaps[i].GetMultiplier(lon, lat, alt, time, trueanomaly);
+                    }
                 }
+                multiplier *= TrueAnomalyPressureMultiplierCurve != null ? TrueAnomalyPressureMultiplierCurve.Evaluate((float)trueanomaly) : 1.0;
                 return 0;
             }
             return -1;
@@ -420,16 +426,20 @@ namespace AdvancedAtmosphereTools
             return MolarMassCurve != null ? 0 : -1;
         }
 
-        internal int GetMolarMassOffset(double lon, double lat, double alt, double time, out double offset)
+        internal int GetMolarMassOffset(double lon, double lat, double alt, double time, double trueanomaly, out double offset)
         {
             offset = 0.0;
-            int count = MolarMassOffsetMaps.Count;
-            if (count > 0)
+            if (HasMolarMassOffset)
             {
-                for (int i = 0; i < count; i++)
+                int count = MolarMassOffsetMaps.Count;
+                if (count > 0)
                 {
-                    offset += MolarMassOffsetMaps[i].GetOffset(lon, lat, alt, time, Atmodepth);
+                    for (int i = 0; i < count; i++)
+                    {
+                        offset += MolarMassOffsetMaps[i].GetOffset(lon, lat, alt, time, trueanomaly);
+                    }   
                 }
+                offset += TrueAnomalyMolarMassOffsetCurve != null ? TrueAnomalyMolarMassOffsetCurve.Evaluate((float)trueanomaly) : 0.0;
                 return 0;
             }
             return -1;
@@ -521,12 +531,12 @@ namespace AdvancedAtmosphereTools
     {
         private Texture2D flowmap;
         private bool useThirdChannel = false; //whether or not to use the Blue channel to add a vertical component to the winds.
-        private bool normalizealtitudecurves = false;
         private FloatCurve AltitudeSpeedMultCurve;
         private FloatCurve EW_AltitudeSpeedMultCurve;
         private FloatCurve NS_AltitudeSpeedMultCurve;
         private FloatCurve V_AltitudeSpeedMultCurve;
         private FloatCurve WindSpeedMultiplierTimeCurve;
+        private FloatCurve TrueAnomalyMultiplierCurve;
         private float EWwind = 0.0f;
         private float NSwind = 0.0f;
         private float vWind = 0.0f;
@@ -539,7 +549,7 @@ namespace AdvancedAtmosphereTools
         private int x = 0;
         private int y = 0;
 
-        internal FlowMap(Texture2D path, bool use3rdChannel, FloatCurve altmult, FloatCurve ewaltmultcurve, FloatCurve nsaltmultcurve, FloatCurve valtmultcurve, float EWwind, float NSwind, float vWind, FloatCurve speedtimecurve, float offset, bool canscroll, double scrollperiod, bool normalizealtitudecurves)
+        internal FlowMap(Texture2D path, bool use3rdChannel, FloatCurve altmult, FloatCurve ewaltmultcurve, FloatCurve nsaltmultcurve, FloatCurve valtmultcurve, float EWwind, float NSwind, float vWind, FloatCurve speedtimecurve, float offset, bool canscroll, double scrollperiod, FloatCurve trueanomalycurve)
         {
             flowmap = path;
             useThirdChannel = use3rdChannel;
@@ -548,7 +558,7 @@ namespace AdvancedAtmosphereTools
             NS_AltitudeSpeedMultCurve = nsaltmultcurve;
             V_AltitudeSpeedMultCurve = valtmultcurve;
             WindSpeedMultiplierTimeCurve = speedtimecurve;
-            this.normalizealtitudecurves = normalizealtitudecurves;
+            TrueAnomalyMultiplierCurve = trueanomalycurve;
             this.scrollperiod = scrollperiod;
             this.canscroll = scrollperiod != 0.0 && canscroll;
             this.EWwind = EWwind;
@@ -560,10 +570,10 @@ namespace AdvancedAtmosphereTools
             y = flowmap.height;
         }
 
-        internal Vector3 GetWindVec(double lon, double lat, double alt, double time, double atmodepth)
+        internal Vector3 GetWindVec(double lon, double lat, double alt, double time, double trueanomaly)
         {
             //AltitudeSpeedMultiplierCurve cannot go below 0.
-            float speedmult = Math.Max(AltitudeSpeedMultCurve.Evaluate((float)alt) * WindSpeedMultiplierTimeCurve.Evaluate((float)(time - timeoffset + WindSpeedMultiplierTimeCurve.maxTime) % WindSpeedMultiplierTimeCurve.maxTime), 0.0f);
+            float speedmult = Math.Max(AltitudeSpeedMultCurve.Evaluate((float)alt) * WindSpeedMultiplierTimeCurve.Evaluate((float)(time - timeoffset + WindSpeedMultiplierTimeCurve.maxTime) % WindSpeedMultiplierTimeCurve.maxTime), 0.0f) * TrueAnomalyMultiplierCurve.Evaluate((float)trueanomaly);
             if (speedmult > 0.0f)
             {
                 double scroll = canscroll ? ((time / scrollperiod) * 360.0) % 360.0 : 0.0;
@@ -579,14 +589,11 @@ namespace AdvancedAtmosphereTools
                 int rightx = UtilMath.WrapAround(leftx + 1, 0, x);
                 int bottomy = Utils.Clamp(topy + 1, 0, y - 1);
 
-                Color[] colors = new Color[4];
+                Color[] colors = new Color[4] { flowmap.GetPixel(leftx, topy), flowmap.GetPixel(rightx, topy), flowmap.GetPixel(leftx, bottomy), flowmap.GetPixel(rightx, bottomy) };
+
                 double[] windx = new double[4];
                 double[] windy = new double[4];
                 double[] windz = new double[4];
-                colors[0] = flowmap.GetPixel(leftx, topy);
-                colors[1] = flowmap.GetPixel(rightx, topy);
-                colors[2] = flowmap.GetPixel(leftx, bottomy);
-                colors[3] = flowmap.GetPixel(rightx, bottomy);
 
                 for (int i = 0; i < 4; i++)
                 {
@@ -610,16 +617,16 @@ namespace AdvancedAtmosphereTools
         private double deformity = 0.0;
         private double offset = 0.0;
 
-        private bool normalizealtitudecurve = false;
         private FloatCurve AltitudeMultiplierCurve;
         private FloatCurve TimeMultiplierCurve;
+        private FloatCurve TrueAnomalyMultiplierCurve;
         private bool canscroll = false;
         private double scrollperiod = 0.0;
 
         private int x = 0;
         private int y = 0;
 
-        internal OffsetMap(Texture2D offsetMap, double deformity, double offset, FloatCurve altitudeMultiplierCurve, FloatCurve timeMultiplierCurve, bool canscroll, double scrollperiod, bool normalizealtitudecurve)
+        internal OffsetMap(Texture2D offsetMap, double deformity, double offset, FloatCurve altitudeMultiplierCurve, FloatCurve timeMultiplierCurve, bool canscroll, double scrollperiod, FloatCurve trueanomalycurve)
         {
             this.offsetMap = offsetMap;
             this.deformity = deformity;
@@ -628,15 +635,15 @@ namespace AdvancedAtmosphereTools
             TimeMultiplierCurve = timeMultiplierCurve;
             this.scrollperiod = scrollperiod;
             this.canscroll = scrollperiod != 0.0 && canscroll;
-            this.normalizealtitudecurve = normalizealtitudecurve;
+            TrueAnomalyMultiplierCurve = trueanomalycurve;
 
             x = offsetMap.width;
             y = offsetMap.height;
         }
 
-        internal double GetOffset(double lon, double lat, double alt, double time, double atmodepth)
+        internal double GetOffset(double lon, double lat, double alt, double time, double trueanomaly)
         {
-            double multiplier = (double)(AltitudeMultiplierCurve.Evaluate((float)alt) * TimeMultiplierCurve.Evaluate((float)time % TimeMultiplierCurve.maxTime));
+            double multiplier = (double)(AltitudeMultiplierCurve.Evaluate((float)alt) * TimeMultiplierCurve.Evaluate((float)time % TimeMultiplierCurve.maxTime)) * TrueAnomalyMultiplierCurve.Evaluate((float)trueanomaly);
             if (double.IsFinite(multiplier) && multiplier != 0.0)
             {
                 double scroll = canscroll ? ((time / scrollperiod) * 360.0) % 360.0 : 0.0;
@@ -663,7 +670,7 @@ namespace AdvancedAtmosphereTools
                 double BR = BottomRight.r + BottomRight.g + BottomRight.b;
 
                 double value = ((UtilMath.Lerp(UtilMath.Lerp(TL, TR, lerpx), UtilMath.Lerp(BL, BR, lerpx), lerpy) * deformity) + offset) * multiplier * 0.3333333333;
-                return double.IsFinite(value) ? value : 0;
+                return double.IsFinite(value) ? value : 0.0;
             }
 
             return 0.0;
@@ -676,16 +683,16 @@ namespace AdvancedAtmosphereTools
         private double deformity = 0.0;
         private double offset = 0.0;
 
-        private bool normalizealtitudecurve = false;
         private FloatCurve AltitudeMultiplierCurve;
         private FloatCurve TimeMultiplierCurve;
+        private FloatCurve TrueAnomalyMultiplierCurve;
         private bool canscroll = false;
         private double scrollperiod = 0.0;
 
         private int x = 0;
         private int y = 0;
 
-        internal MultiplierMap(Texture2D multiplierMap, double deformity, double offset, FloatCurve altitudeMultiplierCurve, FloatCurve timeMultiplierCurve, bool canscroll, double scrollperiod, bool normalizealtitudecurve)
+        internal MultiplierMap(Texture2D multiplierMap, double deformity, double offset, FloatCurve altitudeMultiplierCurve, FloatCurve timeMultiplierCurve, bool canscroll, double scrollperiod, FloatCurve trueanomalycurve)
         {
             this.multiplierMap = multiplierMap;
             this.deformity = Math.Max(-1.0, deformity);
@@ -694,15 +701,15 @@ namespace AdvancedAtmosphereTools
             TimeMultiplierCurve = timeMultiplierCurve;
             this.scrollperiod = scrollperiod;
             this.canscroll = scrollperiod != 0.0 && canscroll;
-            this.normalizealtitudecurve = normalizealtitudecurve;
+            TrueAnomalyMultiplierCurve = trueanomalycurve;
 
             x = multiplierMap.width;
             y = multiplierMap.height;
         }
 
-        internal double GetMultiplier(double lon, double lat, double alt, double time, double atmodepth)
+        internal double GetMultiplier(double lon, double lat, double alt, double time, double trueanomaly)
         {
-            double multiplier = (double)(AltitudeMultiplierCurve.Evaluate((float)alt) * TimeMultiplierCurve.Evaluate((float)time % TimeMultiplierCurve.maxTime));
+            double multiplier = (double)(AltitudeMultiplierCurve.Evaluate((float)alt) * TimeMultiplierCurve.Evaluate((float)time % TimeMultiplierCurve.maxTime)) * TrueAnomalyMultiplierCurve.Evaluate((float)trueanomaly);
             if (double.IsFinite(multiplier) && multiplier != 0.0)
             {
                 double scroll = canscroll ? ((time / scrollperiod) * 360.0) % 360.0 : 0.0;
@@ -731,7 +738,6 @@ namespace AdvancedAtmosphereTools
                 double value = ((UtilMath.Lerp(UtilMath.Lerp(TL, TR, lerpx), UtilMath.Lerp(BL, BR, lerpx), lerpy) * deformity) + offset) * multiplier * 0.3333333333;
                 return double.IsFinite(value) ? Math.Max(1.0 + value, 0.0) : 1.0;
             }
-
             return 1.0;
         }
     }

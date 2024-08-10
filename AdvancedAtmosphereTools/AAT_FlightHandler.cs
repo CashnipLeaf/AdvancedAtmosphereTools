@@ -175,6 +175,17 @@ namespace AdvancedAtmosphereTools
             double alt = activevessel.altitude;
             mainbody = activevessel.mainBody;
             string bodyname = mainbody.name;
+            
+            double trueAnomaly;
+            try
+            {
+                CelestialBody starref = Utils.GetLocalPlanet(mainbody);
+                trueAnomaly = ((starref.orbit.trueAnomaly * UtilMath.Rad2Deg) + 360) % 360;
+            }
+            catch
+            {
+                trueAnomaly = 0.0;
+            }
 
             //Get the worldframe of the vessel in question to transform the wind vectors to the global coordinate frame.
             Vesselframe.SetColumn(0, (Vector3)activevessel.north);
@@ -221,7 +232,7 @@ namespace AdvancedAtmosphereTools
                 {
                     try
                     {
-                        int retcode = Data.GetWind(bodyname, lon, lat, Math.Max(alt, 0.0), CurrentTime, out Vector3 datavec, out Vector3 flowmapvec, out DataInfo winfo);
+                        int retcode = Data.GetWind(bodyname, lon, lat, Math.Max(alt, 0.0), CurrentTime, trueAnomaly, out Vector3 datavec, out Vector3 flowmapvec, out DataInfo winfo);
                         if (retcode >= 0)
                         {
                             if (retcode == 2)
@@ -306,7 +317,7 @@ namespace AdvancedAtmosphereTools
                             tempretcode = -1;
                         }
 
-                        int tempmapretcode = Data.GetTemperatureMapData(bodyname, lon, lat, Math.Max(alt, 0.0), CurrentTime, out tempoffset, out tempswingmult);
+                        int tempmapretcode = Data.GetTemperatureMapData(bodyname, lon, lat, Math.Max(alt, 0.0), CurrentTime, trueAnomaly, out tempoffset, out tempswingmult);
                         if (tempmapretcode >= 0)
                         {
                             double latbias = mainbody.latitudeTemperatureBiasCurve.Evaluate((float)Math.Abs(lat));
@@ -418,7 +429,7 @@ namespace AdvancedAtmosphereTools
                             pressretcode = -1;
                         }
 
-                        int pressmapretcode = Data.GetPressureMapData(bodyname, lon, lat, Math.Max(alt, 0.0), CurrentTime, out pressmult);
+                        int pressmapretcode = Data.GetPressureMultiplier(bodyname, lon, lat, Math.Max(alt, 0.0), CurrentTime, trueAnomaly, out pressmult);
                         if (pressmapretcode >= 0)
                         {
                             mappressure = stockpressure * pressmult;
@@ -471,7 +482,7 @@ namespace AdvancedAtmosphereTools
                     HasPress = haspressdata = haspressmult = false;
                 }
 
-                int mmretcode = Data.GetMolarMass(bodyname, lon, lat, alt, CurrentTime, out basemolarmass, out molarmassoffset);
+                int mmretcode = Data.GetMolarMass(bodyname, lon, lat, Math.Max(alt, 0.0), CurrentTime, trueAnomaly, out basemolarmass, out molarmassoffset);
                 switch (mmretcode)
                 {
                     case 0:

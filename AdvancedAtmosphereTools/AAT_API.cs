@@ -497,7 +497,7 @@ namespace AdvancedAtmosphereTools
                     {
                         return extwind;
                     }
-                    int retcode = InternalData.GetWind(body, lon, lat, alt, time, out Vector3 datavec, out Vector3 flowmapvec, out DataInfo garbage); //dont need datainfo, get rid of it
+                    int retcode = InternalData.GetWind(body, lon, lat, alt, time, 0, out Vector3 datavec, out Vector3 flowmapvec, out DataInfo garbage); //dont need datainfo, get rid of it
                     switch (retcode)
                     {
                         case 0:

@@ -374,17 +374,15 @@ namespace AdvancedAtmosphereTools
         public static void Postfix(ref bool __result, KerbalEVA __instance, ref string ___helmetUnsafeReason)
         {
             AAT_Startup Data = AAT_Startup.Instance;
-            if (!__result || Data == null)
+            if (__result && Data != null)
             {
-                return;
-            }
-
-            string bodyname = __instance.vessel.mainBody.name;
-            bool istoxic = Data.IsAtmosphereToxic(bodyname);
-            if (istoxic)
-            {
-                __result = false;
-                ___helmetUnsafeReason = Data.AtmosphereToxicMessage(bodyname);
+                string bodyname = __instance.vessel.mainBody.name;
+                bool istoxic = Data.IsAtmosphereToxic(bodyname);
+                if (istoxic)
+                {
+                    __result = false;
+                    ___helmetUnsafeReason = Data.AtmosphereToxicMessage(bodyname);
+                }
             }
         }
     }
@@ -395,18 +393,16 @@ namespace AdvancedAtmosphereTools
         public static void Postfix(ref bool __result, KerbalEVA __instance, ref string ___helmetUnsafeReason)
         {
             AAT_Startup Data = AAT_Startup.Instance;
-            if (!__result || Data == null)
+            if (__result && Data != null)
             {
-                return;
-            }
-
-            string bodyname = __instance.vessel.mainBody.name;
-            bool istoxic = Data.IsAtmosphereToxic(bodyname);
-            if (istoxic)
-            {
-                __result = false;
-                ___helmetUnsafeReason = Data.AtmosphereToxicMessage(bodyname);
-            }
+                string bodyname = __instance.vessel.mainBody.name;
+                bool istoxic = Data.IsAtmosphereToxic(bodyname);
+                if (istoxic)
+                {
+                    __result = false;
+                    ___helmetUnsafeReason = Data.AtmosphereToxicMessage(bodyname);
+                }
+            } 
         }
     }
 
@@ -416,17 +412,15 @@ namespace AdvancedAtmosphereTools
         public static void Postfix(ref bool __result, KerbalEVA __instance, ref string ___helmetUnsafeReason)
         {
             AAT_Startup Data = AAT_Startup.Instance;
-            if (__result || Data == null)
+            if (!__result && Data != null)
             {
-                return;
-            }
-
-            string bodyname = __instance.vessel.mainBody.name;
-            bool istoxic = Data.IsAtmosphereToxic(bodyname);
-            if (istoxic)
-            {
-                __result = true;
-                ___helmetUnsafeReason = Data.AtmosphereToxicMessage(bodyname);
+                string bodyname = __instance.vessel.mainBody.name;
+                bool istoxic = Data.IsAtmosphereToxic(bodyname);
+                if (istoxic)
+                {
+                    __result = true;
+                    ___helmetUnsafeReason = Data.AtmosphereToxicMessage(bodyname);
+                }
             }
         }
     }

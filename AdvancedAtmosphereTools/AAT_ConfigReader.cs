@@ -41,6 +41,22 @@ namespace AdvancedAtmosphereTools
                     bodydata[body].atmosphereIsToxicMessage = toxicmsg;
                 }
 
+                ConfigNode TApressuremultholder = new ConfigNode();
+                if (node.TryGetNode("TrueAnomalyPressureMultiplierCurve", ref TApressuremultholder))
+                {
+                    FloatCurve fc = new FloatCurve();
+                    fc.Load(TApressuremultholder);
+                    bodydata[body].TrueAnomalyPressureMultiplierCurve = fc;
+                }
+
+                ConfigNode TAMolarMassOffsetholder = new ConfigNode();
+                if (node.TryGetNode("TrueAnomalyMolarMassOffsetCurve", ref TAMolarMassOffsetholder))
+                {
+                    FloatCurve fc = new FloatCurve();
+                    fc.Load(TAMolarMassOffsetholder);
+                    bodydata[body].TrueAnomalyMolarMassOffsetCurve = fc;
+                }
+
                 ConfigNode data = new ConfigNode();
                 if (node.TryGetNode("Combined_Data", ref data))
                 {
@@ -310,8 +326,8 @@ namespace AdvancedAtmosphereTools
                     {
                         try
                         {
-                            ReadMapValues(tempoffsetmap, bod.atmosphereDepth, out Texture2D map, out double deformity, out double offset, out FloatCurve altmult, out FloatCurve timemult, out bool canscroll, out double scrollperiod, out bool normalizealt);
-                            bodydata[body].AddTempOffsetMap(new OffsetMap(map, deformity, offset, altmult, timemult, canscroll, scrollperiod, normalizealt));
+                            ReadMapValues(tempoffsetmap, bod.atmosphereDepth, out Texture2D map, out double deformity, out double offset, out FloatCurve altmult, out FloatCurve timemult, out bool canscroll, out double scrollperiod, out FloatCurve trueanomalycurve);
+                            bodydata[body].AddTempOffsetMap(new OffsetMap(map, deformity, offset, altmult, timemult, canscroll, scrollperiod, trueanomalycurve));
                         }
                         catch (Exception ex)
                         {
@@ -328,8 +344,8 @@ namespace AdvancedAtmosphereTools
                     {
                         try
                         {
-                            ReadMapValues(tempswingmap, bod.atmosphereDepth, out Texture2D map, out double deformity, out double offset, out FloatCurve altmult, out FloatCurve timemult, out bool canscroll, out double scrollperiod, out bool normalizealt);
-                            bodydata[body].AddTempSwingMap(new MultiplierMap(map, deformity, offset, altmult, timemult, canscroll, scrollperiod, normalizealt));
+                            ReadMapValues(tempswingmap, bod.atmosphereDepth, out Texture2D map, out double deformity, out double offset, out FloatCurve altmult, out FloatCurve timemult, out bool canscroll, out double scrollperiod, out FloatCurve trueanomalycurve);
+                            bodydata[body].AddTempSwingMap(new MultiplierMap(map, deformity, offset, altmult, timemult, canscroll, scrollperiod, trueanomalycurve));
                         }
                         catch (Exception ex)
                         {
@@ -346,8 +362,8 @@ namespace AdvancedAtmosphereTools
                     {
                         try
                         {
-                            ReadMapValues(pressmap, bod.atmosphereDepth, out Texture2D map, out double deformity, out double offset, out FloatCurve altmult, out FloatCurve timemult, out bool canscroll, out double scrollperiod, out bool normalizealt);
-                            bodydata[body].AddPressMap(new MultiplierMap(map, deformity, offset, altmult, timemult, canscroll, scrollperiod, normalizealt));
+                            ReadMapValues(pressmap, bod.atmosphereDepth, out Texture2D map, out double deformity, out double offset, out FloatCurve altmult, out FloatCurve timemult, out bool canscroll, out double scrollperiod, out FloatCurve trueanomalycurve);
+                            bodydata[body].AddPressMap(new MultiplierMap(map, deformity, offset, altmult, timemult, canscroll, scrollperiod, trueanomalycurve));
                         }
                         catch (Exception ex)
                         {
@@ -380,8 +396,8 @@ namespace AdvancedAtmosphereTools
                     {
                         try
                         {
-                            ReadMapValues(molarmassmap, bod.atmosphereDepth, out Texture2D map, out double deformity, out double offset, out FloatCurve altmult, out FloatCurve timemult, out bool canscroll, out double scrollperiod, out bool normalizealt);
-                            bodydata[body].AddMolarMassOffsetMap(new OffsetMap(map, deformity, offset, altmult, timemult, canscroll, scrollperiod, normalizealt));
+                            ReadMapValues(molarmassmap, bod.atmosphereDepth, out Texture2D map, out double deformity, out double offset, out FloatCurve altmult, out FloatCurve timemult, out bool canscroll, out double scrollperiod, out FloatCurve trueanomalycurve);
+                            bodydata[body].AddMolarMassOffsetMap(new OffsetMap(map, deformity, offset, altmult, timemult, canscroll, scrollperiod, trueanomalycurve));
                         }
                         catch (Exception ex)
                         {
@@ -414,8 +430,8 @@ namespace AdvancedAtmosphereTools
                     {
                         try
                         {
-                            ReadMapValues(adiabaticindexmap, bod.atmosphereDepth, out Texture2D map, out double deformity, out double offset, out FloatCurve altmult, out FloatCurve timemult, out bool canscroll, out double scrollperiod, out bool normalizealt);
-                            bodydata[body].AddAdiabaticIndexOffsetMap(new OffsetMap(map, deformity, offset, altmult, timemult, canscroll, scrollperiod, normalizealt));
+                            ReadMapValues(adiabaticindexmap, bod.atmosphereDepth, out Texture2D map, out double deformity, out double offset, out FloatCurve altmult, out FloatCurve timemult, out bool canscroll, out double scrollperiod, out FloatCurve trueanomalycurve);
+                            bodydata[body].AddAdiabaticIndexOffsetMap(new OffsetMap(map, deformity, offset, altmult, timemult, canscroll, scrollperiod, trueanomalycurve));
                         }
                         catch (Exception ex)
                         {
@@ -569,7 +585,6 @@ namespace AdvancedAtmosphereTools
 
             bool canscroll = false;
             double scrollperiod = 0.0;
-            bool normalizealtitudecurves = false;
 
             ConfigNode floaty = new ConfigNode();
 
@@ -685,16 +700,20 @@ namespace AdvancedAtmosphereTools
             curveExists = cn.TryGetNode("VerticalAltitudeSpeedMultiplierCurve", ref floaty);
             FloatCurve VertAltMult = CheckCurve(floaty, 1.0f, curveExists);
 
+            curveExists = cn.TryGetNode("TrueAnomalySpeedMultiplierCurve", ref floaty);
+            FloatCurve trueanomalycurve = CheckCurve(floaty, 1.0f, curveExists);
+
             Texture2D flowmap = CreateTexture(gdpath);
-            return new FlowMap(flowmap, thirdchannel, AltitudeSpeedMultCurve, EWAltMult, NSAltMult, VertAltMult, EWwind, NSwind, vWind, WindSpeedMultTimeCurve, offset, canscroll, scrollperiod, normalizealtitudecurves);
+            return new FlowMap(flowmap, thirdchannel, AltitudeSpeedMultCurve, EWAltMult, NSAltMult, VertAltMult, EWwind, NSwind, vWind, WindSpeedMultTimeCurve, offset, canscroll, scrollperiod, trueanomalycurve);
         }
 
-        internal void ReadMapValues(ConfigNode cn, double maxalt, out Texture2D map, out double deformity, out double offset, out FloatCurve altitudemultcurve, out FloatCurve timemultcurve, out bool canscroll, out double scrollperiod, out bool normalizealtitudecurves)
+        internal void ReadMapValues(ConfigNode cn, double maxalt, out Texture2D map, out double deformity, out double offset, out FloatCurve altitudemultcurve, out FloatCurve timemultcurve, out bool canscroll, out double scrollperiod, out FloatCurve trueanomalycurve)
         {
             deformity = offset =  0.0;
             altitudemultcurve = new FloatCurve();
             timemultcurve = new FloatCurve();
-            canscroll = normalizealtitudecurves = false;
+            trueanomalycurve = new FloatCurve();
+            canscroll = false;
             scrollperiod = float.MaxValue;
 
             string path = "";
@@ -710,7 +729,6 @@ namespace AdvancedAtmosphereTools
             map = CreateTexture(gdpath);
 
             ConfigNode floatcurveholder = new ConfigNode();
-            altitudemultcurve = new FloatCurve();
             bool hascurve = cn.TryGetNode("AltitudeMultiplierCurve", ref floatcurveholder);
             if (hascurve)
             {
@@ -724,6 +742,10 @@ namespace AdvancedAtmosphereTools
 
             hascurve = cn.TryGetNode("TimeMultiplierCurve", ref floatcurveholder);
             timemultcurve = CheckCurve(floatcurveholder, 1.0f, hascurve);
+
+            hascurve = cn.TryGetNode("TrueAnomalyMultiplierCurve", ref floatcurveholder);
+            trueanomalycurve = CheckCurve(floatcurveholder, 1.0f, hascurve);
+
 
             cn.TryGetValue("deformity", ref deformity);
             cn.TryGetValue("offset", ref offset);
@@ -745,8 +767,6 @@ namespace AdvancedAtmosphereTools
             {
                 canscroll = false; //failsafe to prevent things from breaking down
             }
-            cn.TryGetValue("nornmalizeAltitudeCurves", ref normalizealtitudecurves);
-            cn.TryGetValue("nornmalizeAltitudeCurve", ref normalizealtitudecurves);
         }
 
         //Creates the float curve, or if one isnt available, converts a relevant float value into one.

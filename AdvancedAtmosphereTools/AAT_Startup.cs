@@ -169,17 +169,17 @@ namespace AdvancedAtmosphereTools
         internal bool HasTemperatureMaps(string body) => BodyExists(body) && (bodydata[body].HasTemperatureOffsetMaps || bodydata[body].HasTemperatureSwingMaps);
         internal bool HasPressure(string body) => BodyExists(body) && bodydata[body].HasPressure;
         internal bool HasPressureData(string body) => BodyExists(body) && bodydata[body].HasPressureData;
-        internal bool HasPressureMaps(string body) => BodyExists(body) && bodydata[body].HasPressureMaps;
+        internal bool HasPressureMultiplier(string body) => BodyExists(body) && bodydata[body].HasPressureMultiplier;
         internal bool HasMolarMass(string body) => BodyExists(body) && bodydata[body].HasMolarMass;
         internal bool HasAdiabaticIndex(string body) => BodyExists(body) && bodydata[body].HasAdiabaticIndex;
 
-        internal int GetWind(string body, double lon, double lat, double alt, double time, out Vector3 windvec, out Vector3 flowmapvec, out DataInfo windinfo)
+        internal int GetWind(string body, double lon, double lat, double alt, double time, double trueanomaly, out Vector3 windvec, out Vector3 flowmapvec, out DataInfo windinfo)
         {
             windvec = Vector3.zero;
             flowmapvec = Vector3.zero;
             windinfo = DataInfo.Zero;
             int dataretcode = HasWindData(body) ? bodydata[body].GetDataWind(lon, lat, alt, time, ref windvec,ref windinfo) : -1;
-            int flowmapretcode = HasFlowmaps(body) ? bodydata[body].GetFlowMapWind(lon, lat, alt, time, ref flowmapvec) : -1;
+            int flowmapretcode = HasFlowmaps(body) ? bodydata[body].GetFlowMapWind(lon, lat, alt, time, trueanomaly, ref flowmapvec) : -1;
             return SetDualRetCode(dataretcode, flowmapretcode);
         }
         internal int GetTemperature(string body, double lon, double lat, double alt, double time, out double temp, out DataInfo tempinfo)
@@ -199,22 +199,22 @@ namespace AdvancedAtmosphereTools
         internal double TemperatureModelTop(string body) => HasTemperatureData(body) ? bodydata[body].TempModelTop : double.MaxValue;
         internal double PressureModelTop(string body) => HasPressureData(body) ? bodydata[body].PressModelTop : double.MaxValue;
 
-        internal int GetTemperatureMapData(string body, double lon, double lat, double alt, double time, out double tempoffset, out double tempswingmult)
+        internal int GetTemperatureMapData(string body, double lon, double lat, double alt, double time, double trueanomaly, out double tempoffset, out double tempswingmult)
         {
             tempoffset = 0.0;
             tempswingmult = 1.0;
             if (HasTemperatureMaps(body))
             {
-                int offsetcode = bodydata[body].GetTemperatureOffset(lon, lat, alt, time, out tempoffset);
-                int swingmultcode = bodydata[body].GetTemperatureSwingMultiplier(lon, lat, alt, time, out tempswingmult);
+                int offsetcode = bodydata[body].GetTemperatureOffset(lon, lat, alt, time, trueanomaly, out tempoffset);
+                int swingmultcode = bodydata[body].GetTemperatureSwingMultiplier(lon, lat, alt, time, trueanomaly, out tempswingmult);
                 return SetDualRetCode(offsetcode, swingmultcode);
             }
             return -1;
         }
-        internal int GetPressureMapData(string body, double lon, double lat, double alt, double time, out double pressmult)
+        internal int GetPressureMultiplier(string body, double lon, double lat, double alt, double time, double trueanomaly, out double pressmult)
         {
             pressmult = 1.0;
-            return HasPressureMaps(body) ? bodydata[body].GetPressureMultiplier(lon, lat, alt, time, out pressmult) : -1;
+            return HasPressureMultiplier(body) ? bodydata[body].GetPressureMultiplier(lon, lat, alt, time, trueanomaly, out pressmult) : -1;
         }
 
         internal bool BlendTemperature(string body, out double blendfactor)
@@ -228,14 +228,14 @@ namespace AdvancedAtmosphereTools
             return HasPressure(body) && bodydata[body].BlendPressWithStock;
         }
 
-        internal int GetMolarMass(string body, double lon, double lat, double alt, double time, out double molarmass, out double molarmassoffset)
+        internal int GetMolarMass(string body, double lon, double lat, double alt, double time, double trueanomaly, out double molarmass, out double molarmassoffset)
         {
             molarmass = 0.0;
             molarmassoffset = 0.0;
             if (HasMolarMass(body))
             {
                 int baseretcode = bodydata[body].GetMolarMass(alt, out molarmass);
-                int offsetretcode = bodydata[body].GetMolarMassOffset(lon, lat, alt, time, out molarmassoffset);
+                int offsetretcode = bodydata[body].GetMolarMassOffset(lon, lat, alt, time, trueanomaly, out molarmassoffset);
                 return SetDualRetCode(baseretcode, offsetretcode);
             }
             return -1;
