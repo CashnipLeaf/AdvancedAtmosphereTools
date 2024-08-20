@@ -123,7 +123,7 @@ namespace AdvancedAtmosphereTools
                 foreach (KeyValuePair<string, AAT_BodyData> pair in bodydata)
                 {
                     AAT_BodyData val = pair.Value;
-                    if (!val.HasAtmo || (!val.HasWind && !val.HasTemperature && !val.HasPressure && !val.HasFlowmaps && !val.HasMolarMass && !val.HasAdiabaticIndex && !val.AtmosphereIsToxic))
+                    if (!val.HasAtmo || (!val.HasWind && !val.HasTemperature && !val.HasPressure && !val.HasFlowmaps && !val.HasMolarMass && !val.HasAdiabaticIndex && !val.AtmosphereIsToxic && val.maxTempAngleOffset == 45.0))
                     {
                         todelete.Add(pair.Key);
                     }
@@ -256,6 +256,17 @@ namespace AdvancedAtmosphereTools
 
         internal bool IsAtmosphereToxic(string body) => BodyExists(body) && bodydata[body].AtmosphereIsToxic;
         internal string AtmosphereToxicMessage(string body) => Localizer.Format(BodyExists(body) ? bodydata[body].atmosphereIsToxicMessage : "");
+
+        internal bool HasMaxTempAngleOffset(string body, out double angleoffset)
+        {
+            angleoffset = 45.0;
+            if (BodyExists(body))
+            {
+                angleoffset = bodydata[body].maxTempAngleOffset;
+                return true;
+            }
+            return false;
+        } 
 
         internal float[][,,] WindData(string body, double time)
         {

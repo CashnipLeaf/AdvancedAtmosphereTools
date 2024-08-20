@@ -57,6 +57,13 @@ namespace AdvancedAtmosphereTools
                     bodydata[body].TrueAnomalyMolarMassOffsetCurve = fc;
                 }
 
+                double maxtempangleoffset = 45.0;
+                if (node.TryGetValue("maxTempAngleOffset", ref maxtempangleoffset))
+                {
+                    Utils.LogInfo(string.Format("Applied Max Temp Angle Offset of {0:F1} to {1}", maxtempangleoffset, body));
+                    bodydata[body].maxTempAngleOffset = maxtempangleoffset;
+                }
+
                 ConfigNode data = new ConfigNode();
                 if (node.TryGetNode("Combined_Data", ref data))
                 {

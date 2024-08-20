@@ -7,16 +7,10 @@ namespace AdvancedAtmosphereTools
     using WindDelegate = Func<string, double, double, double, double, Vector3>; //body, lon, lat, alt, time, Vector3 (return value)
     using PropertyDelegate = Func<string, double, double, double, double, double>; //body, lon, lat, alt, time, double (return value)
 
-    using PostProcessWindDelegate = Func<Vector3, string, double, double, double, double, Vector3>; //Wind vector, body, lon, lat, alt, time, Vector3 (return value)
-    using PostProcessPropertyDelegate = Func<double, string, double, double, double, double, double>; //double, body, lon, lat, alt, time, double (return value)
-
     //API for interfacing with this mod.
     public static class AAT_API
     {
         private static Dictionary<string, ExternalBodyData> externalbodydata;
-        private static PostProcessWindDelegate globalpostprocesswind;
-        private static PostProcessPropertyDelegate globalpostprocesstemperature;
-        private static PostProcessPropertyDelegate globalpostprocesspressure;
 
         #region register
         //--------------------------REGISTER EXTERNAL DATA--------------------------
@@ -71,99 +65,6 @@ namespace AdvancedAtmosphereTools
             CannotRegister("Pressure", name, body);
             return false;
         }
-
-        public static bool RegisterWindPostProcess(string body, PostProcessWindDelegate dlg, string name)
-        {
-            if(string.IsNullOrEmpty(name) || string.IsNullOrEmpty(body) || dlg == null)
-            {
-                throw new ArgumentNullException("One or more arguments was null or empty.");
-            }
-            CheckRegistration(body);
-            ToPost("Wind", name, body);
-            if (!externalbodydata[body].CanPostWind)
-            {
-                externalbodydata[body].SetPostProcessWind(dlg);
-                SuccessfulPost("Wind", name, body);
-                return true;
-            }
-            CannotPost("Wind", name, body);
-            return false;
-        }
-        public static bool RegisterTemperaturePostProcess(string body, PostProcessPropertyDelegate dlg, string name)
-        {
-            if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(body) || dlg == null)
-            {
-                throw new ArgumentNullException("One or more arguments was null or empty.");
-            }
-            CheckRegistration(body);
-            ToPost("Temperature", name, body);
-            if (!externalbodydata[body].CanPostTemp)
-            {
-                externalbodydata[body].SetPostProcessTemperature(dlg);
-                SuccessfulPost("Temperature", name, body);
-                return true;
-            }
-            CannotPost("Temperature", name, body);
-            return false;
-        }
-        public static bool RegisterPressurePostProcess(string body, PostProcessPropertyDelegate dlg, string name)
-        {
-            if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(body) || dlg == null)
-            {
-                throw new ArgumentNullException("One or more arguments was null or empty.");
-            }
-            CheckRegistration(body);
-            ToPost("Pressure", name, body);
-            if (!externalbodydata[body].CanPostPress)
-            {
-                externalbodydata[body].SetPostProcessPressure(dlg);
-                SuccessfulPost("Pressure", name, body);
-                return true;
-            }
-            CannotPost("Pressure", name, body);
-            return false;
-        }
-        public static bool RegisterGlobalWindPostProcess(PostProcessWindDelegate dlg, string name)
-        {
-            if (string.IsNullOrEmpty(name) || dlg == null)
-            {
-                throw new ArgumentNullException("One or more arguments was null or empty.");
-            }
-            if (globalpostprocesswind == null)
-            {
-                globalpostprocesswind = dlg;
-                Utils.LogAPI("Registered " + name + " as a global Wind post-processor.");
-            }
-            return false;
-        }
-        public static bool RegisterGlobalTemperaturePostProcess(PostProcessPropertyDelegate dlg, string name)
-        {
-            if (string.IsNullOrEmpty(name) || dlg == null)
-            {
-                throw new ArgumentNullException("One or more arguments was null or empty.");
-            }
-            if (globalpostprocesstemperature == null)
-            {
-                globalpostprocesstemperature = dlg;
-                Utils.LogAPI("Registered " + name + " as a global Temperature post-processor.");
-            }
-            return false;
-        }
-
-        public static bool RegisterGlobalPressurePostProcess(PostProcessPropertyDelegate dlg, string name)
-        {
-            if (string.IsNullOrEmpty(name) || dlg == null)
-            {
-                throw new ArgumentNullException("One or more arguments was null or empty.");
-            }
-            if (globalpostprocesspressure == null) 
-            {
-                globalpostprocesspressure = dlg;
-                Utils.LogAPI("Registered " + name + " as a global Pressure post-processor.");
-            }
-            return false;
-        }
-
         #endregion
 
         #region fetchdata
@@ -218,67 +119,6 @@ namespace AdvancedAtmosphereTools
             }
             return -1;
         }
-
-        internal static int PostProcess(ref Vector3 windvec, ref double temp, ref double press, string body, double lon, double lat, double alt, double time)
-        {
-            if (!BodyExists(body) || ( globalpostprocesswind == null && globalpostprocesstemperature == null && globalpostprocesspressure == null))
-            {
-                return -1;
-            }
-
-            Vector3 windbackup = windvec;
-            double tempbackup = temp;
-            double pressbackup = press;
-
-            if (BodyExists(body))
-            {
-                int retcode = externalbodydata[body].PostProcess(ref windbackup, ref tempbackup, ref pressbackup, lon, lat, alt, time);
-                if (retcode == 0)
-                {
-                    windvec = windbackup; 
-                    temp = tempbackup; 
-                    press = pressbackup;
-                }
-            }
-            
-            if (globalpostprocesswind != null)
-            {
-                try
-                {
-                    Vector3 newwind = globalpostprocesswind.Invoke(windbackup, body, lon, lat, alt, time);
-                    if (newwind.IsFinite())
-                    {
-                        windvec = newwind;
-                    }
-                }
-                catch { }
-            }
-            if (globalpostprocesstemperature != null)
-            {
-                try
-                {
-                    double newtemp = globalpostprocesstemperature.Invoke(tempbackup, body, lon, lat, alt, time);
-                    if (double.IsFinite(newtemp))
-                    {
-                        temp = newtemp;
-                    }
-                }
-                catch { }
-            }
-            if (globalpostprocesspressure != null)
-            {
-                try
-                {
-                    double newpress = globalpostprocesspressure.Invoke(pressbackup * 1000, body, lon, lat, alt, time);
-                    if (double.IsFinite(newpress))
-                    {
-                        press = newpress * 0.001;
-                    }
-                }
-                catch { }
-            }
-            return 0;
-        }
         #endregion
 
         //-------------BODY DATA CLASS------------------
@@ -290,22 +130,13 @@ namespace AdvancedAtmosphereTools
             internal string WindSource => string.IsNullOrEmpty(windsource) ? "None" : windsource;
             private WindDelegate windfunc;
 
-            internal PostProcessWindDelegate postprocesswind;
-            internal bool CanPostWind => postprocesswind != null;
-
             private string tempsource;
             internal string TemperatureSource => string.IsNullOrEmpty(tempsource) ? "None" : tempsource;
             private PropertyDelegate temper;
 
-            private PostProcessPropertyDelegate postprocesstemp;
-            internal bool CanPostTemp => postprocesstemp != null;
-
             private string presssource;
             internal string PressureSource => string.IsNullOrEmpty(presssource) ? "None" : presssource;
             private PropertyDelegate pressure;
-
-            private PostProcessPropertyDelegate postprocesspress;
-            internal bool CanPostPress => postprocesspress != null;
 
             internal ExternalBodyData(string bodyname) => Body = bodyname;
 
@@ -324,10 +155,6 @@ namespace AdvancedAtmosphereTools
                 presssource = name;
                 pressure = del;
             }
-
-            internal void SetPostProcessWind(PostProcessWindDelegate dlg) => postprocesswind = dlg;
-            internal void SetPostProcessTemperature(PostProcessPropertyDelegate del) => postprocesstemp = del;
-            internal void SetPostProcessPressure(PostProcessPropertyDelegate dlg) => postprocesspress = dlg;
 
             internal bool HasWind => !string.IsNullOrEmpty(windsource) && windfunc != null;
             internal int GetWind(double lon, double lat, double alt, double time, out Vector3 windvec)
@@ -365,53 +192,6 @@ namespace AdvancedAtmosphereTools
                 return -1;
             }
 
-            internal int PostProcess(ref Vector3 windvec, ref double temp, ref double press, double lon, double lat, double alt, double time)
-            {
-                if(!CanPostWind && !CanPostTemp && !CanPostPress)
-                {
-                    return -1;
-                }
-                if (CanPostWind)
-                {
-                    try
-                    {
-                        Vector3 newwind = postprocesswind.Invoke(windvec, Body, lon, lat, alt, time);
-                        if (newwind.IsFinite())
-                        {
-                            windvec = newwind;
-                        }
-                    }
-                    catch { } //garbage
-                }
-
-                if (CanPostTemp)
-                {
-                    try
-                    {
-                        double newtemp = postprocesstemp.Invoke(temp, Body, lon, lat, alt, time);
-                        if (double.IsFinite(newtemp))
-                        {
-                            temp = newtemp;
-                        }
-                    }
-                    catch { } //garbage
-                }
-
-                if (CanPostPress)
-                {
-                    try
-                    {
-                        double newpress = postprocesspress.Invoke(press * 1000, Body, lon, lat, alt, time);
-                        if (double.IsFinite(newpress))
-                        {
-                            press = newpress * 0.001;
-                        }
-                    }
-                    catch { } //garbage
-                }
-
-                return 0;
-            }
         }
         
         internal static bool BodyExists(string body) => externalbodydata != null && externalbodydata.ContainsKey(body);

@@ -259,6 +259,29 @@ namespace AdvancedAtmosphereTools
                                 WindDataInfo.SetNew(winfo);
                             }
 
+                            //do other shenanigans with the wind
+                            if (!Settings.debugmode)
+                            {
+                                normalwind.x *= varyx;
+                                normalwind.y *= varyy;
+                                normalwind.z *= varyz;
+                            }
+
+                            transformedwind = Vesselframe * normalwind;
+
+                            RawWind.Set(normalwind);
+                            RawWind.MultiplyByConstant(Settings.GlobalWindSpeedMultiplier);
+                            AppliedWind = Vesselframe * RawWind;
+
+                            if (activevessel.easingInToSurface)
+                            {
+                                InternalAppliedWind.Zero();
+                            }
+                            else
+                            {
+                                InternalAppliedWind.Set(AppliedWind);
+                                InternalAppliedWind.MultiplyByConstant(DisableMultiplier);
+                            }
                             HasWind = true;
                         }
                     }
@@ -526,51 +549,6 @@ namespace AdvancedAtmosphereTools
                         AdiabaticIndex = stockadiabaticindex;
                         HasAdiabaticIndex = hasbaseadiabaticindex = hasadiabaticindexoffset = false;
                         break;
-                }
-
-                //post-processing through API
-                Vector3 windbackup = normalwind;
-                double tempbackup = Temperature;
-                double pressbackup = Pressure;
-
-                int postretcode = AAT_API.PostProcess(ref windbackup, ref tempbackup, ref pressbackup, bodyname, lon, lat, alt, CurrentTime);
-                if (postretcode == 0)
-                {
-                    if (windbackup.IsFinite() && !windbackup.IsZero())
-                    {
-                        normalwind.Set(windbackup);
-                    }
-                    if (double.IsFinite(tempbackup))
-                    {
-                        Temperature = tempbackup;
-                    }
-                    if (double.IsFinite(pressbackup))
-                    {
-                        Pressure = pressbackup;
-                    }
-                }
-
-                //do other shenanigans with the wind
-                if (!Settings.debugmode)
-                {
-                    normalwind.x *= varyx;
-                    normalwind.y *= varyy;
-                    normalwind.z *= varyz;
-                }
-                transformedwind = Vesselframe * normalwind;
-
-                RawWind.Set(normalwind);
-                RawWind.MultiplyByConstant(Settings.GlobalWindSpeedMultiplier);
-                AppliedWind = Vesselframe * RawWind;
-
-                if (activevessel.easingInToSurface)
-                {
-                    InternalAppliedWind.Zero();
-                }
-                else
-                {
-                    InternalAppliedWind.Set(AppliedWind);
-                    InternalAppliedWind.MultiplyByConstant(DisableMultiplier);
                 }
             }
             else

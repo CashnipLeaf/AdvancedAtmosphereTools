@@ -17,6 +17,8 @@ namespace AdvancedAtmosphereTools
         }
         internal string atmosphereIsToxicMessage = "Atmosphere is Toxic.";
 
+        internal double maxTempAngleOffset = 45.0;
+
         private float[][,,] WindDataX;
         private float[][,,] WindDataY;
         private float[][,,] WindDataZ;

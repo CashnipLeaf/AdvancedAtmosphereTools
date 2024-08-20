@@ -269,13 +269,12 @@ namespace AdvancedAtmosphereTools
                 return;
             }
             Vector3 windvec = FH.InternalAppliedWind;
-            if (!windvec.IsFinite() || Mathf.Approximately(windvec.magnitude, 0.0f))
+            if (windvec.IsFinite() && !Mathf.Approximately(windvec.magnitude, 0.0f))
             {
-                return;
+                float submerged = (float)__instance.part.submergedPortion;
+                windvec.LerpWith(Vector3.zero, submerged * submerged);
+                pointVelocity -= windvec;
             }
-            float submerged = (float)__instance.part.submergedPortion;
-            windvec.LerpWith(Vector3.zero, submerged * submerged);
-            pointVelocity -= windvec;
         }
     }
 
@@ -364,6 +363,27 @@ namespace AdvancedAtmosphereTools
             }
             __instance.status = Localizer.Format("#autoLOC_8005416");
             return false;
+        }
+    }
+
+    //replicates the functionality of Sigma Heat Shifter's maxTempAngleOffset
+    [HarmonyPatch(typeof(CelestialBody),nameof(CelestialBody.GetAtmoThermalStats))]
+    public static class AngleOffsetOverride
+    {
+        public static void Prefix(CelestialBody __instance, ref CelestialBody sunBody, ref Vector3d upAxis)
+        {
+            AAT_Startup Data = AAT_Startup.Instance;
+            if (sunBody != __instance && Data != null && Data.BodyExists(__instance.name))
+            {
+                bool hasangleoffset = Data.HasMaxTempAngleOffset(__instance.name, out double angleoffset);
+                if (hasangleoffset)
+                {
+                    Vector3 up = __instance.bodyTransform.up;
+                    //rotate the vessel's upaxis to counteract the rotation applied by the game.
+                    //default rotation is 45 degrees, so the default behavior is no rotation applied.
+                    upAxis = Quaternion.AngleAxis((-45f + (float)angleoffset) * Mathf.Sign((float)__instance.rotationPeriod), up) * upAxis;
+                }
+            }
         }
     }
 
