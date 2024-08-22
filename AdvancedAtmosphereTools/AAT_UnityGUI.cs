@@ -64,6 +64,7 @@ namespace AdvancedAtmosphereTools
             }
         }
 
+        //TODO: Add font scaling
         void DrawWindow(int windowID)
         {
             GUIStyle button = new GUIStyle(GUI.skin.button)
@@ -406,9 +407,9 @@ namespace AdvancedAtmosphereTools
             {
                 switch (Settings.Minutesforcoords)
                 {
-                    case "Degrees, Minutes, Seconds":
+                    case Settings.DegreesDisplay.DegreesMinutesSeconds:
                         return string.Format("{0:F0}{1} {2:F0}{3} {4:F0}{5} {6}", degrees, Degreesstr, Math.Floor(minutes), Minutesstr, seconds, Secondsstr, dir);
-                    case "Degrees, Minutes":
+                    case Settings.DegreesDisplay.DegreesMinutes:
                         return string.Format("{0:F0}{1} {2:F1}{3} {4}", degrees, Degreesstr, minutes, Minutesstr, dir);
                     default:
                         return string.Format("{0:F2}{1}", deg, Degreesstr);

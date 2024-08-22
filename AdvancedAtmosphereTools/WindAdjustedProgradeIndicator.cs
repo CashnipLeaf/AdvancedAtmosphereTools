@@ -21,11 +21,12 @@ namespace AdvancedAtmosphereTools
         {
             if (Instance == null)
             {
+                Settings.CheckGameSettings();
                 Instance = this;
 
                 cfg = PluginConfiguration.CreateForType<WindAdjustedProgradeIndicator>();
                 cfg.load();
-                Vector3 tmp = cfg.GetValue("alignmentmarkercolor", new Vector3(0f, 1f, 0.2f)); // default: light green
+                Vector3 tmp = cfg.GetValue("alignmentmarkercolor", Settings.ProgradeMarkerColor);
                 color = new Color(tmp.x, tmp.y, tmp.z);
                 cfg.save();
                 GameEvents.onUIScaleChange.Add(ResizeIndicators);

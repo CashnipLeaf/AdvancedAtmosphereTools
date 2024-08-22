@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using UnityEngine;
 
 namespace AdvancedAtmosphereTools
 {
@@ -22,6 +23,9 @@ namespace AdvancedAtmosphereTools
         [GameParameters.CustomStringParameterUI("#LOC_AAT_LonLatUnits", autoPersistance = true)]
         public string minsforcoords = "Degrees";
 
+        [GameParameters.CustomStringParameterUI("#LOC_AAT_MarkerColor", autoPersistance = true)]
+        public string markercolor = "Light Green";
+
         public override void SetDifficultyPreset(GameParameters.Preset preset)
         {
             switch (preset)
@@ -41,7 +45,7 @@ namespace AdvancedAtmosphereTools
 
         public override IList ValidValues(MemberInfo member)
         {
-            if(member.Name == "minsforcoords")
+            if (member.Name == "minsforcoords")
             {
                 List<string> coordsunitlist = new List<string>
                 {
@@ -50,6 +54,14 @@ namespace AdvancedAtmosphereTools
                     "Degrees, Minutes, Seconds"
                 };
                 return (IList)coordsunitlist;
+            }
+            if (member.Name == "markercolor")
+            {
+                List<string> colorlist = new List<string>
+                {
+                    "Light Green", "Light Red", "Light Gray", "Dark Blue", "Purple"
+                };
+                return (IList)colorlist;
             }
             return null;
         }
@@ -100,7 +112,8 @@ namespace AdvancedAtmosphereTools
 
     internal static class Settings
     {
-        internal static string Minutesforcoords = "Degrees";
+        internal static DegreesDisplay Minutesforcoords = DegreesDisplay.Degrees;
+        internal static MarkerColor markercolor = MarkerColor.LightGreen;
         internal static float GlobalWindSpeedMultiplier = 1.0f;
         internal static bool FAR_Exists = false;
         internal static float WindSpeedVariability = 0.0f;
@@ -119,11 +132,65 @@ namespace AdvancedAtmosphereTools
 
         internal static void CheckGameSettings() //fetch game settings.
         {
-            Minutesforcoords = HighLogic.CurrentGame.Parameters.CustomParams<AAT_CustomSettings>().minsforcoords;
+            string tmpcolor = HighLogic.CurrentGame.Parameters.CustomParams<AAT_CustomSettings>().markercolor;
+            switch (tmpcolor)
+            {
+                case "Light Red":
+                    markercolor = MarkerColor.LightRed; 
+                    break;
+                case "Light Gray":
+                    markercolor = MarkerColor.LightGray;
+                    break;
+                case "Dark Blue":
+                    markercolor = MarkerColor.DarkBlue;
+                    break;
+                case "Purple":
+                    markercolor = MarkerColor.Purple;
+                    break;
+                default:
+                    markercolor = MarkerColor.LightGreen;
+                    break;
+            }
+            string tmpcoords = HighLogic.CurrentGame.Parameters.CustomParams<AAT_CustomSettings>().minsforcoords;
+            switch (tmpcoords)
+            {
+                case "Degrees, Minutes, Seconds":
+                    Minutesforcoords = DegreesDisplay.DegreesMinutesSeconds;
+                    break;
+                case "Degrees, Minutes":
+                    Minutesforcoords = DegreesDisplay.DegreesMinutes;
+                    break;
+                default:
+                    Minutesforcoords = DegreesDisplay.Degrees;
+                    break;
+            }
             settingsindicatorsenabled = HighLogic.CurrentGame.Parameters.CustomParams<AAT_CustomSettings>().adjustedmarkers;
             settingsdisablewindstationary = HighLogic.CurrentGame.Parameters.CustomParams<AAT_CustomSettings>().disablestationarywind;
             GlobalWindSpeedMultiplier = HighLogic.CurrentGame.Parameters.CustomParams<AAT_CustomSettingsAero>().windmult;
             WindSpeedVariability = ((float)HighLogic.CurrentGame.Parameters.CustomParams<AAT_CustomSettingsAero>().windvariability) * 0.01f;
+        }
+
+        //TODO: Add the rest of the colors
+        internal static Vector3 ProgradeMarkerColor
+        {
+            get
+            {
+                switch (markercolor)
+                {
+                    default:
+                        return new Vector3(0f, 1f, 0.2f); // default: light green
+                }
+            }
+        }
+
+        internal enum DegreesDisplay
+        {
+            Degrees, DegreesMinutes, DegreesMinutesSeconds
+        }
+
+        internal enum MarkerColor
+        {
+            LightGreen, LightRed, LightGray, DarkBlue, Purple
         }
     }
 }
