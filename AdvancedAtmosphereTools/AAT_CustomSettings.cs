@@ -170,15 +170,22 @@ namespace AdvancedAtmosphereTools
             WindSpeedVariability = ((float)HighLogic.CurrentGame.Parameters.CustomParams<AAT_CustomSettingsAero>().windvariability) * 0.01f;
         }
 
-        //TODO: Add the rest of the colors
-        internal static Vector3 ProgradeMarkerColor
+        internal static Color ProgradeMarkerColor
         {
             get
             {
                 switch (markercolor)
                 {
+                    case MarkerColor.LightRed:
+                        return new Color(1f,0.2f,0.2f);
+                    case MarkerColor.LightGray:
+                        return new Color(0.6f, 0.6f, 0.6f);
+                    case MarkerColor.DarkBlue:
+                        return new Color(0f, 0.1f, 0.5f);
+                    case MarkerColor.Purple:
+                        return new Color(0.5f, 0f, 1f);
                     default:
-                        return new Vector3(0f, 1f, 0.2f); // default: light green
+                        return new Color(0f, 1f, 0.2f); // default: light green
                 }
             }
         }

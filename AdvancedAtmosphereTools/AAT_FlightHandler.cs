@@ -15,7 +15,7 @@ namespace AdvancedAtmosphereTools
         public static AAT_FlightHandler Instance { get; private set; }
 
         #region variables
-        private Vessel activevessel;
+        private Vessel Activevessel => FlightGlobals.ActiveVessel;
         private CelestialBody mainbody;
         private Matrix4x4 Vesselframe = Matrix4x4.identity;
         internal double CurrentTime => Planetarium.GetUniversalTime();
@@ -164,23 +164,21 @@ namespace AdvancedAtmosphereTools
             HasWind = hasflowmaps = haswinddata = HasTemp = hastempdata = hastempmaps = hastempoffset = hastempswingmult = HasPress = haspressdata = haspressmult =  HasMolarMass = hasbasemolarmass = hasmolarmassoffset = HasAdiabaticIndex = hasbaseadiabaticindex = hasadiabaticindexoffset = false;
             FIPressureMultiplier = 1.0;
 
-            if (!FlightGlobals.ready || FlightGlobals.ActiveVessel == null)
+            if (!FlightGlobals.ready || Activevessel == null)
             {
-                activevessel = null;
                 return;
             }
-            activevessel = FlightGlobals.ActiveVessel;
-            double lon = activevessel.longitude;
-            double lat = activevessel.latitude;
-            double alt = activevessel.altitude;
-            mainbody = activevessel.mainBody;
+            double lon = Activevessel.longitude;
+            double lat = Activevessel.latitude;
+            double alt = Activevessel.altitude;
+            mainbody = Activevessel.mainBody;
             string bodyname = mainbody.name;
             
             double trueAnomaly;
             try
             {
                 CelestialBody starref = Utils.GetLocalPlanet(mainbody);
-                trueAnomaly = ((starref.orbit.trueAnomaly * UtilMath.Rad2Deg) + 360) % 360;
+                trueAnomaly = ((starref.orbit.trueAnomaly * UtilMath.Rad2Deg) + 360.0) % 360.0;
             }
             catch
             {
@@ -188,9 +186,9 @@ namespace AdvancedAtmosphereTools
             }
 
             //Get the worldframe of the vessel in question to transform the wind vectors to the global coordinate frame.
-            Vesselframe.SetColumn(0, (Vector3)activevessel.north);
-            Vesselframe.SetColumn(1, (Vector3)activevessel.upAxis);
-            Vesselframe.SetColumn(2, (Vector3)activevessel.east);
+            Vesselframe.SetColumn(0, (Vector3)Activevessel.north);
+            Vesselframe.SetColumn(1, (Vector3)Activevessel.upAxis);
+            Vesselframe.SetColumn(2, (Vector3)Activevessel.east);
 
             if (TimeWarp.CurrentRate <= 1.0f && CurrentTime > timeofnextvary) //pause updating the vary shenanigans when timewarp is active
             {
@@ -208,12 +206,12 @@ namespace AdvancedAtmosphereTools
             float varyy = (float)(1.0 + UtilMath.Lerp(-Settings.WindSpeedVariability, Settings.WindSpeedVariability, UtilMath.Lerp(varyoney, varytwoy, (CurrentTime - timeofnextvary) / varyinterval)));
             float varyz = (float)(1.0 + UtilMath.Lerp(-Settings.WindSpeedVariability, Settings.WindSpeedVariability, UtilMath.Lerp(varyonez, varytwoz, (CurrentTime - timeofnextvary) / varyinterval)));
 
-            DisableMultiplier = activevessel != null && activevessel.LandedOrSplashed && Settings.DisableWindWhenStationary ? (float)UtilMath.Lerp(0.0, 1.0, (activevessel.srfSpeed - 5.0) * 0.2) : 1.0f;
+            DisableMultiplier = Activevessel != null && Activevessel.LandedOrSplashed && Settings.DisableWindWhenStationary ? (float)UtilMath.Lerp(0.0, 1.0, (Activevessel.srfSpeed - 5.0) * 0.2) : 1.0f;
 
             if (mainbody.atmosphere && alt <= mainbody.atmosphereDepth)
             {
                 //set fallback data
-                FlightIntegrator FI = activevessel.GetComponent<FlightIntegrator>();
+                FlightIntegrator FI = Activevessel.GetComponent<FlightIntegrator>();
                 double temperatureoffset = FI != null ? FI.atmosphereTemperatureOffset : 0.0;
                 Temperature = stocktemperature = derivedtemp = maptemperature = FI != null ? mainbody.GetFullTemperature(alt, temperatureoffset) : mainbody.GetTemperature(alt);
                 Pressure = derivedpressure = mappressure = stockpressure = mainbody.GetPressure(alt);
@@ -273,7 +271,7 @@ namespace AdvancedAtmosphereTools
                             RawWind.MultiplyByConstant(Settings.GlobalWindSpeedMultiplier);
                             AppliedWind = Vesselframe * RawWind;
 
-                            if (activevessel.easingInToSurface)
+                            if (Activevessel.easingInToSurface)
                             {
                                 InternalAppliedWind.Zero();
                             }
@@ -343,9 +341,8 @@ namespace AdvancedAtmosphereTools
                         int tempmapretcode = Data.GetTemperatureMapData(bodyname, lon, lat, Math.Max(alt, 0.0), CurrentTime, trueAnomaly, out tempoffset, out tempswingmult);
                         if (tempmapretcode >= 0)
                         {
-                            double latbias = mainbody.latitudeTemperatureBiasCurve.Evaluate((float)Math.Abs(lat));
-                            double offsetnolatbias = temperatureoffset - latbias;
-                            double newoffset = offsetnolatbias * tempswingmult;
+                            Utils.ReverseEngineerTemperatureOffset(mainbody, temperatureoffset, lat, trueAnomaly, out double latbias, out double latsunbias, out double axialbias, out double eccentricitybias);
+                            double newoffset = (latsunbias * tempswingmult) + latbias + axialbias + eccentricitybias;
                             switch (tempmapretcode)
                             {
                                 case 1:
@@ -354,12 +351,12 @@ namespace AdvancedAtmosphereTools
                                     hastempswingmult = false;
                                     break;
                                 case 2:
-                                    maptemperature = mainbody.GetFullTemperature(alt, newoffset + latbias);
+                                    maptemperature = mainbody.GetFullTemperature(alt, newoffset);
                                     hastempoffset = false;
                                     hastempswingmult = true;
                                     break;
                                 default:
-                                    maptemperature = mainbody.GetFullTemperature(alt, newoffset + latbias) + tempoffset;
+                                    maptemperature = mainbody.GetFullTemperature(alt, newoffset) + tempoffset;
                                     hastempoffset = hastempswingmult = true;
                                     break;
                             }
@@ -564,7 +561,6 @@ namespace AdvancedAtmosphereTools
             Utils.LogInfo("Flight Scene has ended. Unloading Flight Handler.");
             RemoveToolbarButton();
             GameEvents.onGUIApplicationLauncherDestroyed.Remove(RemoveToolbarButton);
-            activevessel = null;
             mainbody = null;
             varywind = null;
             if (Instance == this)
@@ -581,7 +577,7 @@ namespace AdvancedAtmosphereTools
         internal double GetTheTemperature(CelestialBody body, Vector3d pos, double time) => Temperature;
         internal double GetThePressure(CelestialBody body, Vector3d pos, double time) => Pressure;
 
-        internal bool RegisterWithFAR() //Register MCWS with FAR.
+        internal bool RegisterWithFAR() //Register AdvAtmoTools with FAR.
         {
             try
             {

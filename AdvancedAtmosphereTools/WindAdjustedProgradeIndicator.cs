@@ -13,8 +13,7 @@ namespace AdvancedAtmosphereTools
         private NavBall navBall;
         private GameObject progradewind;
         private GameObject retrogradewind;
-        PluginConfiguration cfg;
-        Color color;
+        Color Color => Settings.ProgradeMarkerColor;
         Vector3 navBallLocalScale = new Vector3(44, 44, 44);
         
         void Start()
@@ -23,12 +22,6 @@ namespace AdvancedAtmosphereTools
             {
                 Settings.CheckGameSettings();
                 Instance = this;
-
-                cfg = PluginConfiguration.CreateForType<WindAdjustedProgradeIndicator>();
-                cfg.load();
-                Vector3 tmp = cfg.GetValue("alignmentmarkercolor", Settings.ProgradeMarkerColor);
-                color = new Color(tmp.x, tmp.y, tmp.z);
-                cfg.save();
                 GameEvents.onUIScaleChange.Add(ResizeIndicators);
             }
             else
@@ -54,12 +47,10 @@ namespace AdvancedAtmosphereTools
                         progradewind = Instantiate(navBall.progradeVector.gameObject);
                         progradewind.transform.parent = navBall.progradeVector.parent;
                         progradewind.transform.position = navBall.progradeVector.position;
-                        progradewind.GetComponent<MeshRenderer>().materials[0].SetColor("_TintColor", color);
 
                         retrogradewind = Instantiate(navBall.retrogradeVector.gameObject);
                         retrogradewind.transform.parent = navBall.retrogradeVector.parent;
                         retrogradewind.transform.position = navBall.retrogradeVector.position;
-                        retrogradewind.GetComponent<MeshRenderer>().materials[0].SetColor("_TintColor", color);
                         
                         ResizeIndicators();
                     }
@@ -72,13 +63,18 @@ namespace AdvancedAtmosphereTools
 
                     bool vthresholdmet = srfv.magnitude > navBall.VectorVelocityThreshold;
 
+                    Material progrademat = progradewind.GetComponent<MeshRenderer>().materials[0];
+                    Material retrogrademat = retrogradewind.GetComponent<MeshRenderer>().materials[0];
+
                     float opacity1 = Mathf.Clamp01(Vector3.Dot(progradewind.transform.localPosition.normalized, Vector3.forward));
-                    progradewind.GetComponent<MeshRenderer>().materials[0].SetFloat("_Opacity", opacity1);
+                    progrademat.SetFloat("_Opacity", opacity1);
+                    progrademat.SetColor("_TintColor", Color);
                     progradewind.SetActive(progradewind.transform.localPosition.z > navBall.VectorUnitCutoff && vthresholdmet);
                     progradewind.transform.localPosition = navBall.attitudeGymbal * (displayVnormalized * navBall.VectorUnitScale);
 
                     float opacity2 = Mathf.Clamp01(Vector3.Dot(retrogradewind.transform.localPosition.normalized, Vector3.forward));
-                    retrogradewind.GetComponent<MeshRenderer>().materials[0].SetFloat("_Opacity", opacity2);
+                    retrogrademat.SetFloat("_Opacity", opacity2);
+                    retrogrademat.SetColor("_TintColor", Color);
                     retrogradewind.SetActive(retrogradewind.transform.localPosition.z > navBall.VectorUnitCutoff && vthresholdmet);
                     retrogradewind.transform.localPosition = navBall.attitudeGymbal * (-displayVnormalized * navBall.VectorUnitScale);
                     

@@ -7,7 +7,7 @@ namespace AdvancedAtmosphereTools
 {
     internal static class Utils
     {
-        internal const string version = "1.2.0";
+        internal const string version = "1.2.1";
         internal static string GameDataPath => KSPUtil.ApplicationRootPath + "GameData/";
         internal static Dictionary<string, string> LOCCache; //localization cache
 
@@ -56,9 +56,8 @@ namespace AdvancedAtmosphereTools
         //Apparently no such function exists for integers in either UtilMath or Mathf. Why?
         internal static int Clamp(int value, int min, int max) => Math.Min(Math.Max(value, min), max);
 
-        internal static double MeanAnomalyToTrueAnomaly(double meananomaly, double eccentricity) => meananomaly + (2 * eccentricity * Math.Sin(meananomaly));
-
-        internal static double MeanAnomalyToTrueAnomalyD(double meananomalyd, double eccentricity) => MeanAnomalyToTrueAnomaly(meananomalyd * UtilMath.Deg2Rad, eccentricity) * UtilMath.Rad2Deg;
+        #region bodyutils
+        //--------------------CELESTIAL BODY UTILITIES---------------------
 
         //Get the host star of the body.
         //Adapted from Kopernicus
@@ -99,7 +98,34 @@ namespace AdvancedAtmosphereTools
             }
             return body;
         }
+        
+        //break the temperature offset down into its four main components:
+        //1. latitude bias (variation by latitude)
+        //2. latitude sun mult (day/night temperature variation by latitude)
+        //3. axial sun bias (temperature variation by true anomaly in degrees)
+        //4. eccentricity bias (eccentric orbit temperature variation where 0 = periapsis, 1 = apoapsis)
+        internal static void ReverseEngineerTemperatureOffset(CelestialBody body, double offset, double latitude, double trueanomaly, out double latitudebias, out double latitudesunmult, out double axialsunbias, out double eccentricitybias)
+        {
+            latitudebias = latitudesunmult = axialsunbias = eccentricitybias = 0.0;
+            try
+            {
+                if (body != null && body.atmosphere)
+                {
+                    latitude = Math.Abs(latitude);
+                    latitudebias = body.latitudeTemperatureBiasCurve.Evaluate((float)latitude);
+                    axialsunbias = body.axialTemperatureSunBiasCurve.Evaluate((float)trueanomaly) * body.axialTemperatureSunMultCurve.Evaluate((float)latitude);
+                    eccentricitybias = body.eccentricityTemperatureBiasCurve.Evaluate((float)((body.orbit.radius - body.orbit.PeR) / (body.orbit.ApR - body.orbit.PeR)));
+                    latitudesunmult = offset - (latitudebias + eccentricitybias + axialsunbias);
+                }
+            }
+            catch
+            {
+                latitudebias = latitudesunmult = axialsunbias = eccentricitybias = 0.0;
+            }
+        }
+        #endregion
 
+        #region extensions
         //--------------------EXTENSION METHODS---------------------
 
         //faster extension methods for Vector3
@@ -155,6 +181,7 @@ namespace AdvancedAtmosphereTools
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static bool IsZero(ref this Vector3 v) => v.x == 0.0f && v.y == 0.0f && v.z == 0.0f;
+        #endregion
     }
 
     //struct to encapsulate data info nicely

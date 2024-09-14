@@ -26,6 +26,7 @@ namespace AdvancedAtmosphereTools
         private static float Ypos => 100f * GameSettings.UI_SCALE;
         private static float Xwidth => 285.0f * Mathf.Clamp(GameSettings.UI_SCALE, 0.75f, 1.25f);
         private static float Yheight => 60f * GameSettings.UI_SCALE;
+        private static int FontSize => (int)(12.0f * Mathf.Clamp(GameSettings.UI_SCALE, 0.75f, 1.25f));
         
         private static string Speedunit => Localizer.Format(GetLOC("#LOC_AAT_meterspersec"));
         private static string Pressunit => Localizer.Format(GetLOC("#LOC_AAT_kpa"));
@@ -38,6 +39,7 @@ namespace AdvancedAtmosphereTools
         private static string Secondsstr => Localizer.Format("″");
         private static readonly string[] directions = { "N", "S", "E", "W" };
         private static readonly string[] cardinaldirs = { "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW" };
+        
 
         //retrieve localization tag.
         internal static string GetLOC(string name) => (Utils.LOCCache != null && Utils.LOCCache.ContainsKey(name)) ? Utils.LOCCache[name] : name;
@@ -53,11 +55,13 @@ namespace AdvancedAtmosphereTools
                 toolbarButtonAdded = true;
             }
             windowPos = new Rect(Xpos, Ypos, Xwidth, Yheight);
+            GUI.skin.label.margin = new RectOffset(2, 2, 2, 2);
             Settings.buttondisablewindstationary = Settings.buttonindicatorsenabled = false;
         }
 
         void OnGUI()
         {
+            GUI.skin.label.fontSize = FontSize;
             if (GUIEnabled)
             {
                 windowPos = GUILayout.Window("AdvAtmoTools".GetHashCode(), windowPos, DrawWindow, UIHeader);
@@ -73,7 +77,7 @@ namespace AdvancedAtmosphereTools
                 margin = new RectOffset(2, 2, 2, 2),
                 stretchWidth = true,
                 stretchHeight = false,
-                fontSize = 13
+                fontSize = FontSize
             }; //Unity does not allow calling GUI functions outside of OnGUI(). FML
 
             GUILayout.BeginVertical();
@@ -119,16 +123,16 @@ namespace AdvancedAtmosphereTools
                 }
             }
 
-            if (activevessel != null && mainbody != null)
+            if (Activevessel != null && mainbody != null)
             {
-                bool inatmo = mainbody.atmosphere && activevessel.staticPressurekPa > 0.0;
-                string altitude = string.Format(Math.Abs(activevessel.altitude) > 1000000d ? "{0:0.#####E+00} {1}" : "{0:F2} {1}", activevessel.altitude, Localizer.Format(GetLOC("#LOC_AAT_meter")));
+                bool inatmo = mainbody.atmosphere && Activevessel.staticPressurekPa > 0.0;
+                string altitude = string.Format(Math.Abs(Activevessel.altitude) > 1000000d ? "{0:0.#####E+00} {1}" : "{0:F2} {1}", Activevessel.altitude, Localizer.Format(GetLOC("#LOC_AAT_meter")));
                 if (Settings.debugmode && enabledebug)
                 {
                     DrawHeader("Position Info");
                     DrawElement("Body", mainbody.name);
-                    DrawElement("Longitude", DegreesString(activevessel.longitude, 1, true)); //east/west
-                    DrawElement("Latitude", DegreesString(activevessel.latitude, 0, true)); //north/south
+                    DrawElement("Longitude", DegreesString(Activevessel.longitude, 1, true)); //east/west
+                    DrawElement("Latitude", DegreesString(Activevessel.latitude, 0, true)); //north/south
                     DrawElement("Altitude", altitude);
                     DrawElement("Universal Time", string.Format("{0:F1}", CurrentTime));
 
@@ -203,8 +207,8 @@ namespace AdvancedAtmosphereTools
                 }
                 else
                 {
-                    Vector3 craftdragvector = activevessel.srf_velocity;
-                    Vector3 craftdragvectorwind = activevessel.srf_velocity - InternalAppliedWind;
+                    Vector3 craftdragvector = Activevessel.srf_velocity;
+                    Vector3 craftdragvectorwind = Activevessel.srf_velocity - InternalAppliedWind;
                     Vector3 craftdragvectortransformed = Vesselframe.inverse * craftdragvector;
 
                     double alpha = 0.0;
@@ -220,7 +224,7 @@ namespace AdvancedAtmosphereTools
                     double grndspd = Math.Sqrt(Math.Pow(craftdragvectortransformed.x, 2) + Math.Pow(craftdragvectortransformed.z, 2));
                     string groundspeed = inatmo ? string.Format("{0:F1} {1}", grndspd, Speedunit) : GetLOC("#LOC_AAT_na");
                     string TAS = inatmo ? string.Format("{0:F1} {1}", craftdragvectorwind.magnitude, Speedunit) : GetLOC("#LOC_AAT_na");
-                    string mach = inatmo ? string.Format("{0:F2}", activevessel.mach) : GetLOC("#LOC_AAT_na");
+                    string mach = inatmo ? string.Format("{0:F2}", Activevessel.mach) : GetLOC("#LOC_AAT_na");
                     double trk = craftdragvector.magnitude > 0.0 ? UtilMath.WrapAround(Math.Atan2(craftdragvectortransformed.z, craftdragvectortransformed.x) * UtilMath.Rad2Deg, 0.0, 360.0) : 0.0;
                     string track = inatmo && craftdragvector.magnitude > 0.1 ? string.Format("{0:F1} {1}", trk, Degreesstr) : GetLOC("#LOC_AAT_na");
 
@@ -234,31 +238,31 @@ namespace AdvancedAtmosphereTools
                     string windheading = istherewind ? string.Format("{0:F1} {1}", heading, Degreesstr) : GetLOC("#LOC_AAT_na");
                     string winddirection = istherewind ? cardinaldirs[(int)((heading / 22.5) + .5) % 16] : GetLOC("#LOC_AAT_na");
 
-                    string statictemp = string.Format("{0:F1} {1}", activevessel.atmosphericTemperature, Tempunit);
-                    string exttemp = string.Format("{0:F1} {1}", activevessel.externalTemperature, Tempunit);
-                    string staticpress = string.Format("{0:F3} {1}", activevessel.staticPressurekPa, Pressunit);
-                    string dynamicpress = string.Format("{0:F3} {1}", activevessel.dynamicPressurekPa, Pressunit);
-                    string density = string.Format("{0:F3} {1}", activevessel.atmDensity, DensityUnit);
-                    string soundspeed = string.Format("{0:F1} {1}", activevessel.speedOfSound, Speedunit);
+                    string statictemp = string.Format("{0:F1} {1}", Activevessel.atmosphericTemperature, Tempunit);
+                    string exttemp = string.Format("{0:F1} {1}", Activevessel.externalTemperature, Tempunit);
+                    string staticpress = string.Format("{0:F3} {1}", Activevessel.staticPressurekPa, Pressunit);
+                    string dynamicpress = string.Format("{0:F3} {1}", Activevessel.dynamicPressurekPa, Pressunit);
+                    string density = string.Format("{0:F3} {1}", Activevessel.atmDensity, DensityUnit);
+                    string soundspeed = string.Format("{0:F1} {1}", Activevessel.speedOfSound, Speedunit);
 
                     if (craftdragvectorwind.magnitude > 0.01)
                     {
-                        Vector3d nvel = (activevessel.srf_velocity - InternalAppliedWind).normalized;
-                        Vector3d forward = (Vector3d)activevessel.transform.forward;
-                        Vector3d vector3d = Vector3d.Exclude((Vector3d)activevessel.transform.right, nvel);
+                        Vector3d nvel = (Activevessel.srf_velocity - InternalAppliedWind).normalized;
+                        Vector3d forward = (Vector3d)Activevessel.transform.forward;
+                        Vector3d vector3d = Vector3d.Exclude((Vector3d)Activevessel.transform.right, nvel);
                         Vector3d normalized1 = vector3d.normalized;
                         alpha = Math.Asin(Vector3d.Dot(forward, normalized1)) * UtilMath.Rad2Deg;
                         alpha = double.IsNaN(alpha) ? 0.0 : alpha;
 
-                        Vector3d up = (Vector3d)activevessel.transform.up;
+                        Vector3d up = (Vector3d)Activevessel.transform.up;
                         vector3d = Vector3d.Exclude(forward, nvel);
                         Vector3d normalized2 = vector3d.normalized;
                         slip = Math.Acos(Vector3d.Dot(up, normalized2)) * UtilMath.Rad2Deg;
                         slip = double.IsNaN(slip) ? 0.0 : slip;
 
-                        if (activevessel.atmDensity > 0.0)
+                        if (Activevessel.atmDensity > 0.0)
                         {
-                            foreach (Part p in activevessel.Parts)
+                            foreach (Part p in Activevessel.Parts)
                             {
                                 totaldrag.Add(p.dragScalar * -p.dragVectorDir);
                                 if (!p.hasLiftModule)
@@ -294,8 +298,8 @@ namespace AdvancedAtmosphereTools
                     DrawHeader(GetLOC("#LOC_AAT_grdtrk"));
                     DrawElement(GetLOC("#LOC_AAT_body"), Localizer.Format(bodyname));
                     //TODO: add biome info (?)
-                    DrawElement(GetLOC("#LOC_AAT_lon"), DegreesString(activevessel.longitude, 1, false)); //east/west
-                    DrawElement(GetLOC("#LOC_AAT_lat"), DegreesString(activevessel.latitude, 0, false)); //north/south
+                    DrawElement(GetLOC("#LOC_AAT_lon"), DegreesString(Activevessel.longitude, 1, false)); //east/west
+                    DrawElement(GetLOC("#LOC_AAT_lat"), DegreesString(Activevessel.latitude, 0, false)); //north/south
                     DrawElement(GetLOC("#LOC_AAT_alt"), altitude);
 
                     //Velocity Information
@@ -399,21 +403,14 @@ namespace AdvancedAtmosphereTools
             double minutes = Math.Abs((deg % 1) * 60.0);
             double seconds = Math.Floor(Math.Abs(((deg % 1) * 3600.0) % 60.0));
             string dir = directions[(2 * axis) + (deg < 0.0 ? 1 : 0)];
-            if (debug)
+            switch (Settings.Minutesforcoords)
             {
-                return string.Format("{0:F2}{1}", deg, Degreesstr);
-            }
-            else
-            {
-                switch (Settings.Minutesforcoords)
-                {
-                    case Settings.DegreesDisplay.DegreesMinutesSeconds:
-                        return string.Format("{0:F0}{1} {2:F0}{3} {4:F0}{5} {6}", degrees, Degreesstr, Math.Floor(minutes), Minutesstr, seconds, Secondsstr, dir);
-                    case Settings.DegreesDisplay.DegreesMinutes:
-                        return string.Format("{0:F0}{1} {2:F1}{3} {4}", degrees, Degreesstr, minutes, Minutesstr, dir);
-                    default:
-                        return string.Format("{0:F2}{1}", deg, Degreesstr);
-                }
+                case Settings.DegreesDisplay.DegreesMinutesSeconds:
+                    return string.Format("{0:F0}{1} {2:F0}{3} {4:F0}{5} {6}", degrees, Degreesstr, Math.Floor(minutes), Minutesstr, seconds, Secondsstr, dir);
+                case Settings.DegreesDisplay.DegreesMinutes:
+                    return string.Format("{0:F0}{1} {2:F1}{3} {4}", degrees, Degreesstr, minutes, Minutesstr, dir);
+                default:
+                    return string.Format("{0:F2}{1}", deg, Degreesstr);
             }
         }
     }
