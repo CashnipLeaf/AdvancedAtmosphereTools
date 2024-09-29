@@ -234,7 +234,11 @@ namespace AdvancedAtmosphereTools
             molarmassoffset = 0.0;
             if (HasMolarMass(body))
             {
-                int baseretcode = bodydata[body].GetMolarMass(alt, out molarmass);
+                int baseretcode = bodydata[body].MolarMassCurve != null ? 0 : -1;
+                if (baseretcode == 0)
+                {
+                    molarmass = bodydata[body].MolarMassCurve.Evaluate((float)alt);
+                }
                 int offsetretcode = bodydata[body].GetMolarMassOffset(lon, lat, alt, time, trueanomaly, out molarmassoffset);
                 return SetDualRetCode(baseretcode, offsetretcode);
             }
@@ -247,7 +251,11 @@ namespace AdvancedAtmosphereTools
             idxoffset = 0.0;
             if (HasAdiabaticIndex(body))
             {
-                int baseretcode = bodydata[body].GetAdiabaticIndex(alt, out idx);
+                int baseretcode = bodydata[body].AdiabaticIndexCurve != null ? 0 : -1;
+                if (baseretcode == 0)
+                {
+                    idx = bodydata[body].AdiabaticIndexCurve.Evaluate((float)alt);
+                }
                 int offsetretcode = bodydata[body].GetAdiabaticIndexOffset(lon, lat, alt, time, out idxoffset);
                 return SetDualRetCode(baseretcode, offsetretcode);
             }

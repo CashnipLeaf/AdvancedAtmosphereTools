@@ -18,8 +18,6 @@ namespace AdvancedAtmosphereTools
         internal static void LogError(string message) => Debug.LogError("[AdvAtmoTools][ERROR] " + message); //Errors that invoke fail-safe protections.
 
         //------------------------------MISC HELPERS-------------------------
-        internal static double Epsilon => float.Epsilon * 16d; //value that is very nearly zero to prevent the log interpolation from breaking
-
         internal static float BiLerp(float first1, float second1, float first2, float second2, float by1, float by2)
         {
             return Mathf.Lerp(Mathf.Lerp(first1, second1, by1), Mathf.Lerp(first2, second2, by1), by2);
@@ -41,7 +39,7 @@ namespace AdvancedAtmosphereTools
             {
                 throw new ArgumentOutOfRangeException();
             }
-            if (first <= Epsilon || second <= Epsilon)
+            if (first <= float.Epsilon || second <= float.Epsilon)
             {
                 return UtilMath.Lerp(first, second, by);
             }
@@ -109,7 +107,7 @@ namespace AdvancedAtmosphereTools
             latitudebias = latitudesunmult = axialsunbias = eccentricitybias = 0.0;
             try
             {
-                if (body != null && body.atmosphere)
+                if (body != null && body.atmosphere && offset != 0.0)
                 {
                     latitude = Math.Abs(latitude);
                     latitudebias = body.latitudeTemperatureBiasCurve.Evaluate((float)latitude);

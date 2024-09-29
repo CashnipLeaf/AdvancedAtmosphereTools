@@ -1,5 +1,4 @@
 ﻿using UnityEngine;
-using KSP.IO;
 using KSP.UI.Screens.Flight;
 
 namespace AdvancedAtmosphereTools
@@ -8,26 +7,15 @@ namespace AdvancedAtmosphereTools
     [KSPAddon(KSPAddon.Startup.Flight, false)]
     public class WindAdjustedProgradeIndicator : MonoBehaviour
     {
-        public static WindAdjustedProgradeIndicator Instance { get; private set; }
-
         private NavBall navBall;
         private GameObject progradewind;
         private GameObject retrogradewind;
-        Color Color => Settings.ProgradeMarkerColor;
         Vector3 navBallLocalScale = new Vector3(44, 44, 44);
         
         void Start()
         {
-            if (Instance == null)
-            {
-                Settings.CheckGameSettings();
-                Instance = this;
-                GameEvents.onUIScaleChange.Add(ResizeIndicators);
-            }
-            else
-            {
-                DestroyImmediate(this);
-            }
+            Settings.CheckGameSettings();
+            GameEvents.onUIScaleChange.Add(ResizeIndicators);
         }
 
         void LateUpdate()
@@ -68,13 +56,13 @@ namespace AdvancedAtmosphereTools
 
                     float opacity1 = Mathf.Clamp01(Vector3.Dot(progradewind.transform.localPosition.normalized, Vector3.forward));
                     progrademat.SetFloat("_Opacity", opacity1);
-                    progrademat.SetColor("_TintColor", Color);
+                    progrademat.SetColor("_TintColor", Settings.ProgradeMarkerColor);
                     progradewind.SetActive(progradewind.transform.localPosition.z > navBall.VectorUnitCutoff && vthresholdmet);
                     progradewind.transform.localPosition = navBall.attitudeGymbal * (displayVnormalized * navBall.VectorUnitScale);
 
                     float opacity2 = Mathf.Clamp01(Vector3.Dot(retrogradewind.transform.localPosition.normalized, Vector3.forward));
                     retrogrademat.SetFloat("_Opacity", opacity2);
-                    retrogrademat.SetColor("_TintColor", Color);
+                    retrogrademat.SetColor("_TintColor", Settings.ProgradeMarkerColor);
                     retrogradewind.SetActive(retrogradewind.transform.localPosition.z > navBall.VectorUnitCutoff && vthresholdmet);
                     retrogradewind.transform.localPosition = navBall.attitudeGymbal * (-displayVnormalized * navBall.VectorUnitScale);
                     
@@ -97,11 +85,6 @@ namespace AdvancedAtmosphereTools
                 Destroy(retrogradewind);
             }
             GameEvents.onUIScaleChange.Remove(ResizeIndicators);
-
-            if (Instance == this)
-            {
-                Instance = null;
-            }
         }
 
         void ResizeIndicators()

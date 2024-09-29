@@ -40,7 +40,6 @@ namespace AdvancedAtmosphereTools
         private static readonly string[] directions = { "N", "S", "E", "W" };
         private static readonly string[] cardinaldirs = { "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW" };
         
-
         //retrieve localization tag.
         internal static string GetLOC(string name) => (Utils.LOCCache != null && Utils.LOCCache.ContainsKey(name)) ? Utils.LOCCache[name] : name;
 
@@ -122,19 +121,20 @@ namespace AdvancedAtmosphereTools
                     GUILayout.EndHorizontal();
                 }
             }
-
-            if (Activevessel != null && mainbody != null)
+            Vessel Activevessel = FlightGlobals.ActiveVessel;
+            if (Activevessel != null && Activevessel.mainBody != null)
             {
+                CelestialBody mainbody = Activevessel.mainBody;
                 bool inatmo = mainbody.atmosphere && Activevessel.staticPressurekPa > 0.0;
                 string altitude = string.Format(Math.Abs(Activevessel.altitude) > 1000000d ? "{0:0.#####E+00} {1}" : "{0:F2} {1}", Activevessel.altitude, Localizer.Format(GetLOC("#LOC_AAT_meter")));
                 if (Settings.debugmode && enabledebug)
                 {
                     DrawHeader("Position Info");
                     DrawElement("Body", mainbody.name);
-                    DrawElement("Longitude", DegreesString(Activevessel.longitude, 1, true)); //east/west
-                    DrawElement("Latitude", DegreesString(Activevessel.latitude, 0, true)); //north/south
+                    DrawElement("Longitude", DegreesString(Activevessel.longitude, 1)); //east/west
+                    DrawElement("Latitude", DegreesString(Activevessel.latitude, 0)); //north/south
                     DrawElement("Altitude", altitude);
-                    DrawElement("Universal Time", string.Format("{0:F1}", CurrentTime));
+                    DrawElement("Universal Time", string.Format("{0:F1}", Planetarium.GetUniversalTime()));
 
                     if (viewingbindata)
                     {
@@ -298,8 +298,8 @@ namespace AdvancedAtmosphereTools
                     DrawHeader(GetLOC("#LOC_AAT_grdtrk"));
                     DrawElement(GetLOC("#LOC_AAT_body"), Localizer.Format(bodyname));
                     //TODO: add biome info (?)
-                    DrawElement(GetLOC("#LOC_AAT_lon"), DegreesString(Activevessel.longitude, 1, false)); //east/west
-                    DrawElement(GetLOC("#LOC_AAT_lat"), DegreesString(Activevessel.latitude, 0, false)); //north/south
+                    DrawElement(GetLOC("#LOC_AAT_lon"), DegreesString(Activevessel.longitude, 1)); //east/west
+                    DrawElement(GetLOC("#LOC_AAT_lat"), DegreesString(Activevessel.latitude, 0)); //north/south
                     DrawElement(GetLOC("#LOC_AAT_alt"), altitude);
 
                     //Velocity Information
@@ -397,7 +397,7 @@ namespace AdvancedAtmosphereTools
         private void ToolbarButtonOnFalse() => GUIEnabled = false;
 
         //display the longitude and latitude information as either degrees or degrees, minutes, and seconds + direction
-        private static string DegreesString(double deg, int axis, bool debug)
+        private static string DegreesString(double deg, int axis)
         {
             double degrees = Math.Floor(Math.Abs(deg));
             double minutes = Math.Abs((deg % 1) * 60.0);

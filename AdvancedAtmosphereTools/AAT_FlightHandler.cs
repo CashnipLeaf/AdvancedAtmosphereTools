@@ -15,10 +15,7 @@ namespace AdvancedAtmosphereTools
         public static AAT_FlightHandler Instance { get; private set; }
 
         #region variables
-        private Vessel Activevessel => FlightGlobals.ActiveVessel;
-        private CelestialBody mainbody;
         private Matrix4x4 Vesselframe = Matrix4x4.identity;
-        internal double CurrentTime => Planetarium.GetUniversalTime();
         internal static AAT_Startup Data => AAT_Startup.Instance;
 
         internal bool HasWind = false;
@@ -42,15 +39,15 @@ namespace AdvancedAtmosphereTools
         private bool haswinddata = false;
         private bool hasflowmaps = false;
 
-        private double temperature = PhysicsGlobals.SpaceTemperature;
+        private double temperature = 0.0;
         internal double Temperature
         {
             get => temperature;
-            private set => temperature = UtilMath.Clamp(value, PhysicsGlobals.SpaceTemperature, float.MaxValue);
+            private set => temperature = UtilMath.Clamp(value, 0.0, float.MaxValue);
         }
-        private double stocktemperature = PhysicsGlobals.SpaceTemperature;
-        private double derivedtemp = PhysicsGlobals.SpaceTemperature;
-        private double maptemperature = PhysicsGlobals.SpaceTemperature;
+        private double stocktemperature = 0.0;
+        private double derivedtemp = 0.0;
+        private double maptemperature = 0.0;
         private double tempswingmult = 1.0;
         private double tempoffset = 0.0;
         private bool hastempoffset = false;
@@ -164,16 +161,18 @@ namespace AdvancedAtmosphereTools
             HasWind = hasflowmaps = haswinddata = HasTemp = hastempdata = hastempmaps = hastempoffset = hastempswingmult = HasPress = haspressdata = haspressmult =  HasMolarMass = hasbasemolarmass = hasmolarmassoffset = HasAdiabaticIndex = hasbaseadiabaticindex = hasadiabaticindexoffset = false;
             FIPressureMultiplier = 1.0;
 
-            if (!FlightGlobals.ready || Activevessel == null)
+            if (!FlightGlobals.ready || FlightGlobals.ActiveVessel == null)
             {
                 return;
             }
+            Vessel Activevessel = FlightGlobals.ActiveVessel;
             double lon = Activevessel.longitude;
             double lat = Activevessel.latitude;
             double alt = Activevessel.altitude;
-            mainbody = Activevessel.mainBody;
+            CelestialBody mainbody = Activevessel.mainBody;
             string bodyname = mainbody.name;
-            
+            double CurrentTime = Planetarium.GetUniversalTime();
+
             double trueAnomaly;
             try
             {
@@ -561,7 +560,6 @@ namespace AdvancedAtmosphereTools
             Utils.LogInfo("Flight Scene has ended. Unloading Flight Handler.");
             RemoveToolbarButton();
             GameEvents.onGUIApplicationLauncherDestroyed.Remove(RemoveToolbarButton);
-            mainbody = null;
             varywind = null;
             if (Instance == this)
             {

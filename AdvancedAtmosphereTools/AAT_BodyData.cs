@@ -52,8 +52,8 @@ namespace AdvancedAtmosphereTools
         private double TempLonOffset = 0.0;
         private double TempTimeOffset = 0.0;
 
-        private List<OffsetMap> TempOffsetMaps;
-        private List<MultiplierMap> TempSwingMultiplierMaps;
+        internal List<OffsetMap> TempOffsetMaps;
+        internal List<MultiplierMap> TempSwingMultiplierMaps;
 
         internal bool HasTemperature => HasTemperatureData || HasTemperatureOffsetMaps || HasTemperatureSwingMaps;
         internal bool HasTemperatureData => TempData != null;
@@ -79,24 +79,22 @@ namespace AdvancedAtmosphereTools
         internal bool HasPressureData => PressData != null;
         internal bool HasPressureMultiplier => (PressMultiplierMaps != null && PressMultiplierMaps?.Count > 0) || TrueAnomalyPressureMultiplierCurve != null;
 
-        private List<MultiplierMap> PressMultiplierMaps;
+        internal List<MultiplierMap> PressMultiplierMaps;
         private bool blendpresswithstock = false;
         internal bool BlendPressWithStock => (HasPressureData && HasPressureMultiplier) || blendpresswithstock;
         internal double BlendPressFactor { get; private set; } = 0.5;
         internal FloatCurve TrueAnomalyPressureMultiplierCurve;
 
         internal FloatCurve MolarMassCurve;
-        internal bool HasMolarMassCurve => MolarMassCurve != null;
         internal List<OffsetMap> MolarMassOffsetMaps;
         internal bool HasMolarMassOffset => (MolarMassOffsetMaps != null && MolarMassOffsetMaps.Count > 0) || TrueAnomalyMolarMassOffsetCurve != null;
-        internal bool HasMolarMass => HasMolarMassCurve || HasMolarMassOffset;
+        internal bool HasMolarMass => MolarMassCurve != null || HasMolarMassOffset;
         internal FloatCurve TrueAnomalyMolarMassOffsetCurve;
 
         internal FloatCurve AdiabaticIndexCurve;
-        internal bool HasAdiabaticIndexCurve => AdiabaticIndexCurve != null;
         internal List<OffsetMap> AdiabaticIndexOffsetMaps;
         internal bool HasAdiabaticIndexOffset => AdiabaticIndexOffsetMaps != null && AdiabaticIndexOffsetMaps.Count > 0;
-        internal bool HasAdiabaticIndex => HasAdiabaticIndexCurve || HasAdiabaticIndexOffset;
+        internal bool HasAdiabaticIndex => AdiabaticIndexCurve != null || HasAdiabaticIndexOffset;
 
         internal AAT_BodyData(string bodyname, CelestialBody body)
         {
@@ -173,13 +171,6 @@ namespace AdvancedAtmosphereTools
                 Utils.LogInfo(string.Format("Successfully added Pressure Data to {0}.", bodyname));
             }
         }
-
-        internal void AddFlowMap(FlowMap flowmap) => Flowmaps?.Add(flowmap);
-        internal void AddTempOffsetMap(OffsetMap map) => TempOffsetMaps?.Add(map);
-        internal void AddTempSwingMap(MultiplierMap map) => TempSwingMultiplierMaps?.Add(map);
-        internal void AddPressMap(MultiplierMap map) => PressMultiplierMaps?.Add(map);
-        internal void AddMolarMassOffsetMap(OffsetMap map) => MolarMassOffsetMaps?.Add(map);
-        internal void AddAdiabaticIndexOffsetMap(OffsetMap map) => AdiabaticIndexOffsetMaps?.Add(map);
 
         internal int GetDataWind(double lon, double lat, double alt, double time, ref Vector3 winddatavector, ref DataInfo windinfo)
         {
@@ -422,12 +413,6 @@ namespace AdvancedAtmosphereTools
             return -1;
         }
 
-        internal int GetMolarMass(double alt, out double molarmass)
-        {
-            molarmass = MolarMassCurve != null ? MolarMassCurve.Evaluate((float)alt) : 0.0;
-            return MolarMassCurve != null ? 0 : -1;
-        }
-
         internal int GetMolarMassOffset(double lon, double lat, double alt, double time, double trueanomaly, out double offset)
         {
             offset = 0.0;
@@ -445,12 +430,6 @@ namespace AdvancedAtmosphereTools
                 return 0;
             }
             return -1;
-        }
-
-        internal int GetAdiabaticIndex(double alt, out double adiabaticindex)
-        {
-            adiabaticindex = AdiabaticIndexCurve != null ? AdiabaticIndexCurve.Evaluate((float)alt) : 0.0;
-            return AdiabaticIndexCurve != null ? 0 : -1;
         }
 
         internal int GetAdiabaticIndexOffset(double lon, double lat, double alt, double time, out double offset)
@@ -679,6 +658,7 @@ namespace AdvancedAtmosphereTools
         }
     }
 
+    //would probably like to get rid of this at some point and have everything based on the offsetmap
     internal class MultiplierMap
     {
         private Texture2D multiplierMap;
