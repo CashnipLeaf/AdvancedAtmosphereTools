@@ -184,7 +184,7 @@ namespace AdvancedAtmosphereTools
             internal int GetPressure(double lon, double lat, double alt, double time, out double press)
             {
                 press = 0.0;
-                if (HasTemperature)
+                if (HasPressure)
                 {   
                     press = pressure.Invoke(Body, lon, lat, alt, time);
                     return double.IsFinite(press) ? 0 : -2;
